@@ -28,6 +28,13 @@ Stay tuned
 │  └───────────┘         └──────────────┘      └──────────┘   │
 └─────────────────────────────────────────────────────────────┘
 ```
+Each timestep DREAM executes the following steps:
+  1. Get surrounding vehicles (left/center/right lanes)
+  2. Convert to DRIFT format → drift.step() → updates field
+  3. Query risk at ego: drift.get_risk_cartesian(ego_x, ego_y)
+  4. Run the integrated decision making (gap selection, path choice)  
+  5. Run MPC+CBF solving                                       
+  6. Visualize: risk field contourf + vehicles on top
 
 
 ## 🚀 Quick Start
