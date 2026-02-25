@@ -11,23 +11,7 @@ Stay tuned
 ![simple snapshot for quick understanding](assests/DREAM_demo2.gif)
 
 ### proposed framework:
-```
-┌─────────────────────────────────────────────────────────────┐
-│                      DREAM ARCHITECTURE                     │
-│                                                             │
-│  ┌────────────┐        ┌──────────────┐      ┌──────────┐   │
-│  │   DRIFT    │───────▶   DREAM        ─────▶  IDEAM   │   │
-│  │ Risk Field │ Risk   │  Controller  │ Mod. │ LMPC+CBF │   │
-│  │   (PDE)    │ Query  │              │Params│          │   │
-│  └────────────┘        └──────────────┘      └──────────┘   │
-│       ▲                        │                     │      │
-│       │                        ▼                     ▼      │
-│  ┌────┴──────┐         ┌──────────────┐      ┌──────────┐   │
-│  │ Traffic   │         │   Decision   │      │ Control  │   │
-│  │  State    │         │   Gating     │      │ Actions  │   │
-│  └───────────┘         └──────────────┘      └──────────┘   │
-└─────────────────────────────────────────────────────────────┘
-```
+
 Each timestep DREAM executes the following steps:
   1. Get surrounding vehicles (left/center/right lanes)
   2. Convert to DRIFT format → drift.step() → updates field
