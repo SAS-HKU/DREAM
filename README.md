@@ -1,5 +1,5 @@
 # DREAM
-DREAM: Dynamic Risk-Aware Enhanced Autonomous Maneuver Planning for Highway Interactive Driving
+DREAM: Dynamic Risk-Aware Enhanced Autonomous Maneuver Planning for Highway Driving with Heterogeneous Traffic
 
 This project is a joint work by Zian Wang and [Yiming Shu](https://github.com/YimingShu-teay)
 
