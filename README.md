@@ -166,7 +166,9 @@ From `risk_analysis_utils.py`:
 - **Full simulation**: ~15-20 minutes for 400 frames
 - **Memory**: ~500MB for storing risk fields (if enabled)
 ---
-
+### example result:
+![simple snapshot for quick understanding](assests/94.png)
+Compared with the baseline planner, DREAM enables the ego overtake the truck in faster speed and reduced time in the high risk region, ensuring feasible headaway distances simultaneously.
 
 ## 📈 Example Workflow
 
