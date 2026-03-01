@@ -167,8 +167,8 @@ From `risk_analysis_utils.py`:
 - **Memory**: ~500MB for storing risk fields (if enabled)
 ---
 ### example result:
-![simple snapshot for quick understanding](assests/94.png)
-Compared with the baseline planner, DREAM enables the ego overtake the truck in faster speed and reduced time in the high risk region, ensuring feasible headaway distances simultaneously.
+![simple snapshot for quick understanding](assests/198.png)
+Compared with the baseline planner, DREAM enables the ego stay away from the agent group ahead and find the appropriate segment with no agents around, where the risk score is minimal.
 
 ## 📈 Example Workflow
 
