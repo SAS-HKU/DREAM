@@ -170,6 +170,9 @@ From `risk_analysis_utils.py`:
 ![simple snapshot for quick understanding](assests/198.png)
 Compared with the baseline planner, DREAM enables the ego stay away from the agent group ahead and find the appropriate segment with no agents around, where the risk score is minimal.
 
+![simple snapshot for quick understanding](assests/299.png)
+The baseline planner forced the ego to perform very aggressive and dangerous overtaking (LC to the left) and nearly collide with the rear of the truck-trailer ahead. Instead, DREAM shows a more conservative planning that better aware of the risk from the truck-trailer and the uncertainty.
+
 ## 📈 Example Workflow
 
 ```bash
