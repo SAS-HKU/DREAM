@@ -173,6 +173,10 @@ Compared with the baseline planner, DREAM enables the ego stay away from the age
 ![simple snapshot for quick understanding](assests/299.png)
 The baseline planner forced the ego to perform very aggressive and dangerous overtaking (LC to the left) and nearly collide with the rear of the truck-trailer ahead. Instead, DREAM shows a more conservative planning that better aware of the risk from the truck-trailer and the uncertainty.
 
+We compare the trajectories of (1): the ground truth ego trajectories from BEV datasets; (2): the baseline planner trajectories; (3): the DREAM planner trajectories.
+![simple snapshot for quick understanding](assests/inD_dream_benchmark_03-ezgif.com-video-to-gif-converter.gif)
+The results show that baseline planner is over aggressive as near collision with the truck rear, and our planner is more conservative but sacrifice the progress. (The selected scenario include the occlusion-aware planning from the truck-trailer that may block the visibility of the ego)
+
 ## 📈 Example Workflow
 
 ```bash
