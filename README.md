@@ -138,8 +138,6 @@ You should see elevated risk (red zones) in:
 
 ### Analysis Metrics
 
-From `risk_analysis_utils.py`:
-
 - **Mean Risk**: Average exposure level
 - **Peak Risk**: Maximum risk encountered
 - **Time in High Risk**: Duration above threshold
