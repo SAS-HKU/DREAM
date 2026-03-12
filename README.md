@@ -4,8 +4,6 @@ This project is a joint work by Zian Wang and [Yiming Shu](https://github.com/Yi
 
 This repository is built upon the [Risk Field Modeling Comparative Study](https://github.com/SAS-HKU/Riskfield_Benchmark.git) and [DRIFT](https://github.com/SAS-HKU/DRIFT.git): Dynamic Risk Inference via Field Transport for Human-like Autonomous Driving.
 
-### demonstration of LC for emergency vehicle with safety-critical considerations ([IDEAM](https://github.com/YimingShu-teay/IDEAM.git)-based planning):
-![simple snapshot for quick understanding](assests/DREAM_demo2.gif)
 
 ### proposed framework:
 
@@ -162,6 +160,10 @@ From `risk_analysis_utils.py`:
 - **Memory**: ~500MB for storing risk fields (if enabled)
 ---
 ### example result:
+
+![simple snapshot for quick understanding](assests/DREAM_demo2.gif)
+demonstration of LC for emergency vehicle with safety-critical considerations ([IDEAM](https://github.com/YimingShu-teay/IDEAM.git)-based planning).
+
 ![simple snapshot for quick understanding](assests/198.png)
 Compared with the baseline planner, DREAM enables the ego stay away from the agent group ahead and find the appropriate segment with no agents around, where the risk score is minimal.
 
