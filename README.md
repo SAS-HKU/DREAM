@@ -177,23 +177,45 @@ The results show that baseline planner is over aggressive as near collision with
 
 ## 📈 Example Workflow
 
+### 1) Emergency highway scenario (synthetic)
 ```bash
-# 1. Run simulation with visualization
-python emergency_test_with_risk_viz.py
+python emergency_test_prideam.py \
+  --integration-mode conservative \
+  --steps 120 \
+  --scenario-file file_save/120_100 \
+  --save-dir outputs/emergency_run01 \
+  --save-dpi 300 \
+  --save-frames true
+```
 
-# Output: figsave_risk_viz/0.png, 1.png, ..., 399.png
-#         figsave_risk_viz/risk_at_ego.npy
+### 2) Uncertainty merger scenario (synthetic)
+```bash
+python uncertainty_merger_DREAM.py \
+  --integration-mode conservative \
+  --steps 120 \
+  --save-dir outputs/uncertainty_merger_run01 \
+  --save-dpi 300 \
+  --save-frames true
+```
 
-# 2. Create video
-python video_generation.py
+### 3) Dataset benchmark (rounD/inD replay)
+```bash
+python dream_dataset_benchmark.py \
+  --dataset-dir data/rounD \
+  --recording-id 01 \
+  --ego-track-id 254 \
+  --save-dir outputs/dataset_benchmark_run01 \
+  --steps 120 \
+  --integration-mode conservative \
+  --save-frames true \
+  --frame-dpi 150
+```
 
-# 3. Analyze risk data
-python risk_analysis_utils.py figsave_risk_viz/risk_at_ego.npy
-
-# Output: risk_timeline.png, risk_histogram.png, risk_analysis.png, risk_events.csv
-
-# 4. Review results
-# - Check risk_analysis.png for statistics
-# - Inspect risk_events.csv for high-risk moments
+### Optional: frame sequence to MP4
+```bash
+python video_generation.py \
+  --image-folder outputs/dataset_benchmark_run01 \
+  --video-name outputs/dataset_benchmark_run01/benchmark.mp4 \
+  --fps 20
 ```
 
