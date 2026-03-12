@@ -3,6 +3,8 @@ DREAM: Dynamic Risk-Aware Enhanced Autonomous Vehicles Maneuver Planning in Hete
 
 This project is a joint work by Zian Wang and [Yiming Shu](https://github.com/YimingShu-teay), all affiliated with [HKU-SAS](https://github.com/SAS-HKU) under the Department of Data and Systems Engineering, The University of Hong Kong.
 
+This repositories are built upon the [Risk Field Modeling Comparative Study](https://github.com/SAS-HKU/Riskfield_Benchmark.git) and [DRIFT](https://github.com/SAS-HKU/DRIFT.git): Dynamic Risk Inference via Field Transport for Human-like Autonomous Driving.
+
 ### demonstration of LC for emergency vehicle with safety-critical considerations ([IDEAM](https://github.com/YimingShu-teay/IDEAM.git)-based planning):
 ![simple snapshot for quick understanding](assests/DREAM_demo2.gif)
 
