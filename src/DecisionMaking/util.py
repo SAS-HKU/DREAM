@@ -278,7 +278,7 @@ class LeaderFollower_Uitl:
     def target_f_judge(self,proj_f_0):
         # it can be fixed later
         if proj_f_0 is not None and proj_f_0 <= -self.l/2:
-            judger = True #说明可以开始dhocbf约束
+            judger = True 
         else:
             judger = False
         return judger
@@ -305,7 +305,6 @@ class LeaderFollower_Uitl:
         '''
         direction_signal: to give signal about whether the constraint is in left lane or right lane
         needs to exclude the target dmin_f
-        这个地方其实是直接从原来的道路映射到desired lane上,而不是从 path now
         '''
         if index_len != 0:
             for item in constraint_index:
