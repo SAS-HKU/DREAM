@@ -1,5 +1,4 @@
-# DREAM
-DREAM: Dynamic Risk-Aware Enhanced Autonomous Vehicles Maneuver Planning in Heterogeneous Traffic
+# DREAM: Dynamic Risk-Aware Enhanced Autonomous Vehicles Maneuver Planning in Heterogeneous Traffic
 
 This project is a joint work by Zian Wang and [Yiming Shu](https://github.com/YimingShu-teay), all affiliated with [HKU-SAS](https://github.com/SAS-HKU) under the Department of Data and Systems Engineering, The University of Hong Kong.
 
