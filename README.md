@@ -21,16 +21,15 @@ Each timestep DREAM executes the following steps:
 
 ## 🚀 Quick Start
 
-### Step 1: Run Visualization Simulation
+### Step 1: Run Visualization Simulation based on the BEV dataset trajectories
 
 ```bash
-cd C:\DREAM
-python emergency_test_with_risk_viz.py
+cd src
+python drift_dataset_visualization.py
 ```
 
 **Output:**
-- Frames saved to `figsave_risk_viz/`
-- Risk values saved to `figsave_risk_viz/risk_at_ego.npy`
+- Frames saved to `figsave_DRIFT_dataset/`
 
 ### Step 2: Create Video Animation
 
