@@ -219,3 +219,31 @@ The baseline planner forced the ego to perform very aggressive and dangerous ove
 
 We compare the trajectories of (1): the ground truth ego trajectories from BEV datasets; (2): the baseline planner trajectories; (3): the DREAM planner trajectories.
 The results show that baseline planner is over aggressive as near collision with the truck rear, and our planner is more conservative but sacrifice the progress. (The selected scenario include the occlusion-aware planning from the truck-trailer that may block the visibility of the ego)
+
+## Citations of relevant papers
+
+The baseline planner:
+
+```
+@article{shu2025agile,
+  title={Agile Decision-Making and Safety-Critical Motion Planning for Emergency Autonomous Vehicles},
+  author={Shu, Yiming and Zhou, Jingyuan and Zhang, Fu},
+  journal={IEEE Transactions on Intelligent Transportation Systems},
+  year={2025},
+  publisher={IEEE}
+}
+```
+
+The baseline GVF modeling:
+```
+@article{zhang2021spatiotemporal,
+  title={Spatiotemporal learning of multivehicle interaction patterns in lane-change scenarios},
+  author={Zhang, Chengyuan and Zhu, Jiacheng and Wang, Wenshuo and Xi, Junqiang},
+  journal={IEEE Transactions on Intelligent Transportation Systems},
+  volume={23},
+  number={7},
+  pages={6446--6459},
+  year={2021},
+  publisher={IEEE}
+}
+```
