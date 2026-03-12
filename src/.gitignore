@@ -1,0 +1,27 @@
+# Python caches
+__pycache__/
+*.py[cod]
+
+# Local tooling
+.claude/
+.pytest_cache/
+.mypy_cache/
+
+# Virtual environments
+.venv/
+venv/
+env/
+
+# Generated experiment outputs
+figsave*/
+figures_statistics/
+outputs/
+*.mp4
+*.avi
+*.gif
+
+# Generated metrics/artifacts
+metrics*.npy
+metrics*.png
+risk_at_ego.npy
+risk_summary.txt
