@@ -1,12 +1,7 @@
 # DREAM
 DREAM: Dynamic Risk-Aware Enhanced Autonomous Vehicles Maneuver Planning in Heterogeneous Traffic
 
-
 This project is a joint work by Zian Wang and [Yiming Shu](https://github.com/YimingShu-teay), all affiliated with [HKU-SAS](https://github.com/SAS-HKU) under the Department of Data and Systems Engineering, The University of Hong Kong.
-
-Stay tuned
-### demonstration of gap searching for LC with stop-and-go traffic (MPC-based planning):
-![simple snapshot for quick understanding](assests/DREAM_demo3.gif)
 
 ### demonstration of LC for emergency vehicle with safety-critical considerations ([IDEAM](https://github.com/YimingShu-teay/IDEAM.git)-based planning):
 ![simple snapshot for quick understanding](assests/DREAM_demo2.gif)
