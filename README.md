@@ -7,6 +7,9 @@ This repository is built upon the [Risk Field Modeling Comparative Study](https:
 
 ### proposed framework:
 
+![Methodology graph](assests/DREAM_fig1_v2.png)
+
+
 Each timestep DREAM executes the following steps:
   1. Get surrounding vehicles (left/center/right lanes)
   2. Convert to DRIFT format → drift.step() → updates field
