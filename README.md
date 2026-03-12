@@ -159,21 +159,6 @@ From `risk_analysis_utils.py`:
 - **Full simulation**: ~15-20 minutes for 400 frames
 - **Memory**: ~500MB for storing risk fields (if enabled)
 ---
-### example result:
-
-![simple snapshot for quick understanding](assests/DREAM_demo2.gif)
-demonstration of LC for emergency vehicle with safety-critical considerations ([IDEAM](https://github.com/YimingShu-teay/IDEAM.git)-based planning).
-
-![simple snapshot for quick understanding](assests/198.png)
-Compared with the baseline planner, DREAM enables the ego stay away from the agent group ahead and find the appropriate segment with no agents around, where the risk score is minimal.
-
-![simple snapshot for quick understanding](assests/299.png)
-The baseline planner forced the ego to perform very aggressive and dangerous overtaking (LC to the left) and nearly collide with the rear of the truck-trailer ahead. Instead, DREAM shows a more conservative planning that better aware of the risk from the truck-trailer and the uncertainty.
-
-![simple snapshot for quick understanding](assests/inD_dream_benchmark_03-ezgif.com-video-to-gif-converter.gif)
-
-We compare the trajectories of (1): the ground truth ego trajectories from BEV datasets; (2): the baseline planner trajectories; (3): the DREAM planner trajectories.
-The results show that baseline planner is over aggressive as near collision with the truck rear, and our planner is more conservative but sacrifice the progress. (The selected scenario include the occlusion-aware planning from the truck-trailer that may block the visibility of the ego)
 
 ## 📈 Example Workflow
 
@@ -219,3 +204,18 @@ python video_generation.py \
   --fps 20
 ```
 
+## Demonstrations:
+
+![simple snapshot for quick understanding](assests/DREAM_demo2.gif)
+demonstration of LC for emergency vehicle with safety-critical considerations ([IDEAM](https://github.com/YimingShu-teay/IDEAM.git)-based planning).
+
+![simple snapshot for quick understanding](assests/198.png)
+Compared with the baseline planner, DREAM enables the ego stay away from the agent group ahead and find the appropriate segment with no agents around, where the risk score is minimal.
+
+![simple snapshot for quick understanding](assests/299.png)
+The baseline planner forced the ego to perform very aggressive and dangerous overtaking (LC to the left) and nearly collide with the rear of the truck-trailer ahead. Instead, DREAM shows a more conservative planning that better aware of the risk from the truck-trailer and the uncertainty.
+
+![simple snapshot for quick understanding](assests/inD_dream_benchmark_03-ezgif.com-video-to-gif-converter.gif)
+
+We compare the trajectories of (1): the ground truth ego trajectories from BEV datasets; (2): the baseline planner trajectories; (3): the DREAM planner trajectories.
+The results show that baseline planner is over aggressive as near collision with the truck rear, and our planner is more conservative but sacrifice the progress. (The selected scenario include the occlusion-aware planning from the truck-trailer that may block the visibility of the ego)
