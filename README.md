@@ -222,10 +222,13 @@ The baseline planner forced the ego to perform very aggressive and dangerous ove
 We compare the trajectories of (1): the ground truth ego trajectories from BEV datasets; (2): the baseline planner trajectories; (3): the DREAM planner trajectories.
 The results show that baseline planner is over aggressive as near collision with the truck rear, and our planner is more conservative but sacrifice the progress. (The selected scenario include the occlusion-aware planning from the truck-trailer that may block the visibility of the ego)
 
-## Citations of relevant papers
+## Acknowledgement:
+The BEV dataset visualizations:
+[dron-dataset-tools](https://github.com/ika-rwth-aachen/drone-dataset-tools.git)
 
 The baseline planner:
-
+[IDEAM](https://github.com/YimingShu-teay/IDEAM.git)
+Corresponding paper:
 ```
 @article{shu2025agile,
   title={Agile Decision-Making and Safety-Critical Motion Planning for Emergency Autonomous Vehicles},
