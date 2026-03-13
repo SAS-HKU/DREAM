@@ -249,3 +249,14 @@ The baseline GVF modeling:
   publisher={IEEE}
 }
 ```
+
+The baseline assymetric driving aggressiveness modeling:
+```
+@article{hu2025socially,
+  title={Socially Game-Theoretic Lane-Change for Autonomous Heavy Vehicle based on Asymmetric Driving Aggressiveness},
+  author={Hu, Wen and Deng, Zejian and Yang, Yanding and Zhang, Pingyi and Cao, Kai and Chu, Duanfeng and Zhang, Bangji and Cao, Dongpu},
+  journal={IEEE Transactions on Vehicular Technology},
+  year={2025},
+  publisher={IEEE}
+}
+```
