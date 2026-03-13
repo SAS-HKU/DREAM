@@ -8,15 +8,6 @@ This repository is built upon the [Risk Field Modeling Comparative Study](https:
 ![Methodology graph](assests/DREAM_fig1_v2.png)
 
 
-Each timestep DREAM executes the following steps:
-  1. Get surrounding vehicles (left/center/right lanes)
-  2. Convert to DRIFT format → drift.step() → updates field
-  3. Query risk at ego: drift.get_risk_cartesian(ego_x, ego_y)
-  4. Run the integrated decision making (gap selection, path choice)  
-  5. Run MPC+CBF solving                                       
-  6. Visualize: risk field contourf + vehicles on top
-
-
 ## 🚀 Quick Start
 
 ### Step 1: Install required packages; Run Visualization Simulation based on the BEV dataset trajectories
