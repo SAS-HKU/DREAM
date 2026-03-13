@@ -21,10 +21,11 @@ Each timestep DREAM executes the following steps:
 
 ## 🚀 Quick Start
 
-### Step 1: Run Visualization Simulation based on the BEV dataset trajectories
+### Step 1: Install required packages; Run Visualization Simulation based on the BEV dataset trajectories
 
 ```bash
 cd src
+pip install -r requirements.txt
 python drift_dataset_visualization.py
 ```
 
