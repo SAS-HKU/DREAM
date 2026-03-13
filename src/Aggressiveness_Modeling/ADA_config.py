@@ -1,11 +1,11 @@
 import numpy as np
 
 
-class KWFConfig:
+class ADAConfig:
     """
-    Configuration for the Kinetic Wave Field (KWF) model.
+    Configuration for the Kinetic Wave Field (ADA) model.
 
-    The KWF quantifies the driving risk perceived by an ego vehicle from
+    The ADA quantifies the driving risk perceived by an ego vehicle from
     surrounding agents through a momentum-driven, wave-propagation analogy
     with Doppler-like frequency modulation and asymmetric spatial decay.
 
@@ -23,7 +23,7 @@ class KWFConfig:
     Y_ = np.arange(y_min, y_max + resolution, resolution)
     X_mesh, Y_mesh = np.meshgrid(X_, Y_)
 
-    # --- KWF model coefficients (Eq. 12 in paper) ---
+    # --- ADA model coefficients (Eq. 12 in paper) ---
     mu1 = 0.2                  # Doppler weight – source velocity projection
     mu2 = 0.21                 # Doppler weight – ego velocity projection
     sigma = 0.1                # spatial decay coefficient  (σ)
