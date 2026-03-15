@@ -1660,18 +1660,11 @@ for i in range(N_t):
         x_range=xr_apf, y_range=yr_apf,
         risk_field=risk_field_apf, horizon=h_apf, ego_color=EGO_APF_COLOR
     )
-    if cf_gvf is not None:
-        cbar = fig.colorbar(cf_gvf, ax=ax_p2, orientation="vertical", pad=0.02, fraction=0.035)
+    _cf_shared = cf_apf if cf_apf is not None else (cf_ada if cf_ada is not None else cf_gvf)
+    if _cf_shared is not None:
+        cbar = fig.colorbar(_cf_shared, ax=ax_p4, orientation="vertical", pad=0.02, fraction=0.035)
         cbar.set_label("Risk Level", fontsize=9, weight="bold")
         cbar.ax.tick_params(labelsize=8, colors="black")
-    if cf_ada is not None:
-        cbar2 = fig.colorbar(cf_ada, ax=ax_p3, orientation="vertical", pad=0.02, fraction=0.035)
-        cbar2.set_label("Risk Level", fontsize=9, weight="bold")
-        cbar2.ax.tick_params(labelsize=8, colors="black")
-    if cf_apf is not None:
-        cbar3 = fig.colorbar(cf_apf, ax=ax_p4, orientation="vertical", pad=0.02, fraction=0.035)
-        cbar3.set_label("Risk Level", fontsize=9, weight="bold")
-        cbar3.ax.tick_params(labelsize=8, colors="black")
 
     if SAVE_FRAMES:
         plt.savefig(os.path.join(save_dir, f"{i}.png"), dpi=SAVE_DPI)
