@@ -74,6 +74,10 @@ from tracks_import import read_from_csv
 sys.path.insert(0, os.path.join(SCRIPT_DIR, "Aggressiveness_Modeling"))
 from Aggressiveness_Modeling.ADA_drift_source import compute_Q_ADA  # noqa: E402
 
+# APF source adapter (DREAM-APF benchmark arm)
+sys.path.insert(0, os.path.join(SCRIPT_DIR, "APF_Modeling"))
+from APF_Modeling.APF_drift_source import compute_Q_APF  # noqa: E402
+
 
 def _str2bool(value):
     if isinstance(value, bool):
@@ -100,13 +104,13 @@ def _parse_cli_args():
     )
     parser.add_argument(
         "--recording-id",
-        default=os.environ.get("DREAM_RECORDING_ID", "01"),
-        help="Recording id, e.g., 01.",
+        default=os.environ.get("DREAM_RECORDING_ID", "03"),
+        help="Recording id, e.g., 00.",
     )
     parser.add_argument(
         "--ego-track-id",
         type=int,
-        default=int(os.environ.get("DREAM_EGO_TRACK_ID", "254")),
+        default=int(os.environ.get("DREAM_EGO_TRACK_ID", "167")),
         help="Track id used as ego. Ignored when --auto-ego-track is set.",
     )
     parser.add_argument(
@@ -116,7 +120,7 @@ def _parse_cli_args():
     )
     parser.add_argument(
         "--save-dir",
-        default=os.path.join(SCRIPT_DIR, "figsave_DREAM_inD_benchmark_04"),
+        default=os.path.join(SCRIPT_DIR, "figsave_DREAM_inD_benchmark_07"),
         help="Directory where output frames and metrics are saved.",
     )
     parser.add_argument(
@@ -127,7 +131,7 @@ def _parse_cli_args():
     )
     parser.add_argument(
         "--integration-mode",
-        default=os.environ.get("DREAM_INTEGRATION_MODE", "conservative"),
+        default=os.environ.get("DREAM_INTEGRATION_MODE", "dense"),
         help="Integration preset name for PRIDEAM controller.",
     )
     parser.add_argument(
@@ -791,33 +795,36 @@ def draw_three_panel(step, frame_idx,
         )
 
 
-def draw_four_panel(step, frame_idx,
+def draw_five_panel(step, frame_idx,
                     X0_g_gt,    vx_gt,
                     X0_g_ideam, X0_ideam,
                     X0_g_dream, X0_dream,
                     X0_g_ada,   X0_ada,
+                    X0_g_apf,   X0_apf,
                     risk_field,     risk_at_ego,
                     risk_field_ada, risk_at_ego_ada,
+                    risk_field_apf, risk_at_ego_apf,
                     tracks, tracks_meta, class_map,
                     bg_img, bg_extent,
-                    horizon_ideam=None, horizon_dream=None, horizon_ada=None):
+                    horizon_ideam=None, horizon_dream=None,
+                    horizon_ada=None,   horizon_apf=None):
     """
-    Four-panel benchmark: Ground Truth | IDEAM | DREAM (GVF) | DREAM (ADA).
+    Five-panel benchmark: GT | IDEAM | DREAM (GVF) | DREAM (ADA) | DREAM (APF).
 
-    The two DREAM panels share the same vmax so risk magnitudes are directly
-    comparable.  Remaining geometry/shape differences between the GVF and ADA
-    panels are structural — not amplitude artefacts.
+    All three DREAM panels share the same vmax so risk magnitudes are directly
+    comparable across source formulations.
     """
     _sc = _ortho_px_m * _vis_scale_down
 
     fig = plt.gcf()
     fig.clf()
-    ax_gt    = fig.add_subplot(1, 4, 1)
-    ax_ideam = fig.add_subplot(1, 4, 2)
-    ax_dream = fig.add_subplot(1, 4, 3)
-    ax_ada   = fig.add_subplot(1, 4, 4)
+    ax_gt    = fig.add_subplot(1, 5, 1)
+    ax_ideam = fig.add_subplot(1, 5, 2)
+    ax_dream = fig.add_subplot(1, 5, 3)
+    ax_ada   = fig.add_subplot(1, 5, 4)
+    ax_apf   = fig.add_subplot(1, 5, 5)
 
-    # Shared vmax across both DREAM panels (computed from GVF field)
+    # Shared vmax across all three DREAM panels (anchored to GVF field)
     _shared_vmax = RISK_VMAX
     if risk_field is not None:
         _nz = _gf(risk_field, sigma=RISK_SMOOTH_SIGMA)
@@ -876,14 +883,29 @@ def draw_four_panel(step, frame_idx,
                 color=rc_a, fontsize=7, fontweight="bold",
                 bbox=dict(boxstyle="round", facecolor="black", alpha=0.55))
 
-    # Shared colorbar on the ADA panel (rightmost DREAM panel)
+    # ── DREAM (APF source) ────────────────────────────────────────────────
+    dp_x_px   =  X0_g_apf[0] / _sc
+    dp_y_px   = -X0_g_apf[1] / _sc
+    dp_psi_px = -X0_g_apf[2]
+    _render_panel(ax_apf, dp_x_px, dp_y_px, dp_psi_px, X0_apf[0],
+                  "#009688", "DREAM (APF-DRIFT)",
+                  frame_idx, tracks, tracks_meta, class_map,
+                  bg_img, risk_field_apf, horizon=horizon_apf, draw_risk=True,
+                  vmax=_shared_vmax)
+    rc_p = "red" if risk_at_ego_apf > 1.5 else "orange" if risk_at_ego_apf > 0.5 else "lime"
+    ax_apf.text(0.985, 0.965, f"R={risk_at_ego_apf:.2f}",
+                transform=ax_apf.transAxes, ha="right", va="top",
+                color=rc_p, fontsize=7, fontweight="bold",
+                bbox=dict(boxstyle="round", facecolor="black", alpha=0.55))
+
+    # Shared colorbar on the APF panel (rightmost DREAM panel)
     if _cfg_X_vis is not None:
         import matplotlib.cm as _mcm
         _sm = _mcm.ScalarMappable(
             norm=plt.Normalize(vmin=0, vmax=_shared_vmax),
             cmap=plt.colormaps[RISK_CMAP])
         _sm.set_array([])
-        cbar = fig.colorbar(_sm, ax=ax_ada, fraction=0.030, pad=0.010)
+        cbar = fig.colorbar(_sm, ax=ax_apf, fraction=0.030, pad=0.010)
         cbar.set_label(f"Risk  (vmax={_shared_vmax:.1f})", fontsize=6)
         cbar.ax.tick_params(labelsize=5)
 
@@ -1198,9 +1220,11 @@ print(f"Road boundary: lane_width={_ego_lane_width:.2f}m  "
 controller = create_prideam_controller(
     paths={0: paths[0], 1: paths[1], 2: paths[2]},
     risk_weights={
-        "mpc_cost":           config_integration.mpc_risk_weight,
-        "cbf_modulation":     config_integration.cbf_alpha,
-        "decision_threshold": config_integration.decision_risk_threshold,
+        "mpc_cost":               config_integration.mpc_risk_weight,
+        "cbf_modulation":         config_integration.cbf_alpha,
+        "decision_threshold":     config_integration.decision_risk_threshold,
+        "max_cbf_scale":          config_integration.cbf_max_scale,
+        "cbf_risk_normalization": config_integration.cbf_risk_normalization,
     })
 controller.get_path_curvature(path=paths[EGO_LANE])
 drift = controller.drift
@@ -1220,9 +1244,11 @@ mpc_ctrl = controller.mpc
 controller_ada = create_prideam_controller(
     paths={0: paths[0], 1: paths[1], 2: paths[2]},
     risk_weights={
-        "mpc_cost":           config_integration.mpc_risk_weight,
-        "cbf_modulation":     config_integration.cbf_alpha,
-        "decision_threshold": config_integration.decision_risk_threshold,
+        "mpc_cost":               config_integration.mpc_risk_weight,
+        "cbf_modulation":         config_integration.cbf_alpha,
+        "decision_threshold":     config_integration.decision_risk_threshold,
+        "max_cbf_scale":          config_integration.cbf_max_scale,
+        "cbf_risk_normalization": config_integration.cbf_risk_normalization,
     })
 controller_ada.get_path_curvature(path=paths[EGO_LANE])
 drift_ada = controller_ada.drift
@@ -1231,6 +1257,24 @@ utils_ada = LeaderFollower_Uitl(**util_params())
 _bind_dataset_path_adapters_to_utils(utils_ada, "DREAM-ADA")
 controller_ada.set_util(utils_ada)
 mpc_ada = controller_ada.mpc
+
+# -- DREAM (APF-DRIFT) controller — same MPC/CBF/decision logic, APF source --
+controller_apf = create_prideam_controller(
+    paths={0: paths[0], 1: paths[1], 2: paths[2]},
+    risk_weights={
+        "mpc_cost":               config_integration.mpc_risk_weight,
+        "cbf_modulation":         config_integration.cbf_alpha,
+        "decision_threshold":     config_integration.decision_risk_threshold,
+        "max_cbf_scale":          config_integration.cbf_max_scale,
+        "cbf_risk_normalization": config_integration.cbf_risk_normalization,
+    })
+controller_apf.get_path_curvature(path=paths[EGO_LANE])
+drift_apf = controller_apf.drift
+
+utils_apf = LeaderFollower_Uitl(**util_params())
+_bind_dataset_path_adapters_to_utils(utils_apf, "DREAM-APF")
+controller_apf.set_util(utils_apf)
+mpc_apf = controller_apf.mpc
 
 Params       = params()
 dynamics     = Dynamic(**Params)
@@ -1270,24 +1314,31 @@ drift.warmup(d0 + [_ei], _ei, dt=dt, duration=WARMUP_S, substeps=3)
 print("ADA-DRIFT warm-up ...")
 drift_ada.warmup(d0 + [_ei], _ei, dt=dt, duration=WARMUP_S, substeps=3,
                  source_fn=compute_Q_ADA)
+print("APF-DRIFT warm-up ...")
+drift_apf.warmup(d0 + [_ei], _ei, dt=dt, duration=WARMUP_S, substeps=3,
+                 source_fn=compute_Q_APF)
 print()
 
 # -- Misc state ---------------------------------------------------------------
 oa, od         = 0.0, 0.0
 oa_i, od_i     = 0.0, 0.0
 oa_ada, od_ada = 0.0, 0.0
-last_X = last_X_ideam = last_X_ada = None
-path_changed = path_changed_i = path_changed_ada = EGO_LANE
-last_ideam_hor = last_ada_hor = None
+oa_apf, od_apf = 0.0, 0.0
+last_X = last_X_ideam = last_X_ada = last_X_apf = None
+path_changed = path_changed_i = path_changed_ada = path_changed_apf = EGO_LANE
+last_ideam_hor = last_ada_hor = last_apf_hor = None
 
 X0_ada   = list(X0);   X0_g_ada   = list(X0_g)
+X0_apf   = list(X0);   X0_g_apf   = list(X0_g)
 
 risk_list     = []
 risk_list_ada = []
+risk_list_apf = []
 gt_vx_list    = []             # ground truth speed (from dataset)
 dream_vx, dream_acc = [], []
 ideam_vx,  ideam_acc  = [], []
 ada_vx,    ada_acc    = [], []
+apf_vx,    apf_acc    = [], []
 
 METRICS_AUTOSAVE_EVERY = 5     # write metrics every N completed steps
 
@@ -1309,13 +1360,16 @@ def _save_metrics_outputs(interrupted=False, dpi=200):
     _tai    = np.arange(len(ideam_acc)) * dt
     _trisk  = np.arange(len(risk_list)) * dt
     _tada   = np.arange(len(ada_vx)) * dt
+    _tapf   = np.arange(len(apf_vx)) * dt
     _trisk_ada = np.arange(len(risk_list_ada)) * dt
+    _trisk_apf = np.arange(len(risk_list_apf)) * dt
 
     with plt.style.context(["science", "no-latex"]):
         fig_m, axes_m = plt.subplots(3, 1, figsize=(10, 9),
                                       constrained_layout=True, sharex=True)
         fig_m.suptitle(
-            f"GT vs IDEAM vs DREAM-GVF vs DREAM-ADA  —  {rec} ego {EGO_TRACK_ID}",
+            f"GT vs IDEAM vs DREAM-GVF vs DREAM-ADA vs DREAM-APF"
+            f"  —  {rec} ego {EGO_TRACK_ID}",
             fontsize=11)
 
         # Speed
@@ -1327,6 +1381,8 @@ def _save_metrics_outputs(interrupted=False, dpi=200):
             axes_m[0].plot(_td, dream_vx, color="C0", ls="-", lw=1.4, label="DREAM (GVF)")
         if len(ada_vx) > 0:
             axes_m[0].plot(_tada, ada_vx, color="#9C27B0", ls="-.", lw=1.4, label="DREAM (ADA)")
+        if len(apf_vx) > 0:
+            axes_m[0].plot(_tapf, apf_vx, color="#009688", ls=":", lw=1.4, label="DREAM (APF)")
         axes_m[0].set_ylabel("$v_x$ [m/s]")
         axes_m[0].set_title("Speed")
         if len(axes_m[0].lines) > 0:
@@ -1340,6 +1396,8 @@ def _save_metrics_outputs(interrupted=False, dpi=200):
             axes_m[1].plot(_tad, dream_acc, color="C0", ls="-", lw=1.4, label="DREAM (GVF)")
         if len(ada_acc) > 0:
             axes_m[1].plot(_tada, ada_acc, color="#9C27B0", ls="-.", lw=1.4, label="DREAM (ADA)")
+        if len(apf_acc) > 0:
+            axes_m[1].plot(_tapf, apf_acc, color="#009688", ls=":", lw=1.4, label="DREAM (APF)")
         axes_m[1].axhline(0, color="k", lw=0.5, alpha=0.5)
         axes_m[1].set_ylabel("$a_x$ [m/s²]")
         axes_m[1].set_title("Acceleration")
@@ -1347,13 +1405,16 @@ def _save_metrics_outputs(interrupted=False, dpi=200):
             axes_m[1].legend(fontsize=7)
         axes_m[1].grid(True, lw=0.4, alpha=0.4)
 
-        # DRIFT risk — both sources
+        # DRIFT risk — all three sources
         if len(risk_list) > 0:
             axes_m[2].plot(_trisk, risk_list, color="C0", lw=1.4, label="GVF source")
             axes_m[2].fill_between(_trisk, risk_list, alpha=0.15, color="C0")
         if len(risk_list_ada) > 0:
             axes_m[2].plot(_trisk_ada, risk_list_ada,
                            color="#9C27B0", lw=1.4, ls="--", label="ADA source")
+        if len(risk_list_apf) > 0:
+            axes_m[2].plot(_trisk_apf, risk_list_apf,
+                           color="#009688", lw=1.4, ls=":", label="APF source")
         axes_m[2].set_ylabel("Risk $R$")
         axes_m[2].set_title("DRIFT Risk at Ego")
         axes_m[2].set_xlabel("t [s]")
@@ -1366,16 +1427,18 @@ def _save_metrics_outputs(interrupted=False, dpi=200):
 
     np.save(os.path.join(save_dir, "metrics.npy"), {
         "gt_vx": gt_vx_list,
-        "dream_vx": dream_vx, "ideam_vx": ideam_vx, "ada_vx": ada_vx,
-        "dream_acc": dream_acc, "ideam_acc": ideam_acc, "ada_acc": ada_acc,
-        "risk": risk_list, "risk_ada": risk_list_ada,
+        "dream_vx": dream_vx, "ideam_vx": ideam_vx,
+        "ada_vx": ada_vx,     "apf_vx": apf_vx,
+        "dream_acc": dream_acc, "ideam_acc": ideam_acc,
+        "ada_acc": ada_acc,     "apf_acc": apf_acc,
+        "risk": risk_list, "risk_ada": risk_list_ada, "risk_apf": risk_list_apf,
         "rec": rec, "ego": EGO_TRACK_ID,
         "interrupted": bool(interrupted),
     })
 
 
 bar = Bar(max=N_t - 1)
-plt.figure(figsize=(25, 6.5))   # 4 panels side-by-side
+plt.figure(figsize=(31, 6.5))   # 5 panels side-by-side
 max_frame  = max(tm["finalFrame"] for tm in tracks_meta)
 
 # ===========================================================================
@@ -1454,6 +1517,18 @@ for i in range(N_t):
                                      source_fn=compute_Q_ADA)
     risk_at_ego_ada = float(drift_ada.get_risk_cartesian(X0_g_ada[0], X0_g_ada[1]))
     risk_list_ada.append(risk_at_ego_ada)
+
+    # ── 2c. DRIFT step (APF) ──────────────────────────────────────────────
+    psi_apf = X0_g_apf[2]
+    ego_dv_apf = drift_create_vehicle(vid=0, x=X0_g_apf[0], y=X0_g_apf[1],
+                                       vx=X0_apf[0]*math.cos(psi_apf)-X0_apf[1]*math.sin(psi_apf),
+                                       vy=X0_apf[0]*math.sin(psi_apf)+X0_apf[1]*math.cos(psi_apf),
+                                       vclass="car")
+    ego_dv_apf["heading"] = psi_apf
+    risk_field_apf  = drift_apf.step(drift_vehicles, ego_dv_apf, dt=dt, substeps=3,
+                                     source_fn=compute_Q_APF)
+    risk_at_ego_apf = float(drift_apf.get_risk_cartesian(X0_g_apf[0], X0_g_apf[1]))
+    risk_list_apf.append(risk_at_ego_apf)
 
     # ── 3. DREAM path decision ────────────────────────────────────────────
     path_now = _judge_lane(X0_g[:2])
@@ -1623,6 +1698,69 @@ for i in range(N_t):
     ada_vx.append(float(Xa_p[0]))
     ada_acc.append(float(oa_ada[0]) if hasattr(oa_ada, "__len__") else float(oa_ada))
 
+    # ── 5c. DREAM-APF planner (mirrors DREAM steps 3–4) ──────────────────
+    Xp_p, Xgp_p, hor_apf_cur = list(X0_apf), list(X0_g_apf), last_apf_hor
+    try:
+        pn_apf = _judge_lane(X0_g_apf[:2])
+        pe_apf = paths[pn_apf]; sg_apf = {0:"L1",1:"C1",2:"R1"}[pn_apf]
+        if i == 0:
+            _oa_init_apf = clac_last_X(oa_apf, od_apf, mpc_apf.T, pe_apf, dt, 6, X0_apf, X0_g_apf)
+            last_X_apf = list(_oa_init_apf)
+        ai_apf = utils_apf.get_alllane_lf(pe_apf, X0_g_apf, pn_apf, vl, vc, vr)
+        gd_apf, eg_apf = utils_apf.formulate_gap_group(pn_apf, last_X_apf, ai_apf, vl, vc, vr)
+        dg_apf = decision_maker.decision_making(gd_apf, sg_apf)
+        pd_apf, pdi_apf, CL_apf, smp_apf, xl_apf, yl_apf, X0_apf = _Decision_info(
+            X0_apf, X0_g_apf, path_center, sample_center, x_center, y_center,
+            boundary, dg_apf, pe_apf, pn_apf)
+        CLa_apf = utils_apf.inquire_C_state(CL_apf, dg_apf)
+        if CLa_apf == "Probe":
+            pd_apf, pdi_apf, CLv_apf = pe_apf, pn_apf, "K"
+            _, xc_apf, yc_apf, sc_apf = _get_path_info(pdi_apf)
+            X0_apf = repropagate(pd_apf, sc_apf, xc_apf, yc_apf, X0_g_apf, X0_apf)
+        else:
+            CLv_apf = CL_apf
+        if config_integration.enable_decision_veto and CL_apf != "K":
+            _, allow_apf, _ = controller_apf.evaluate_decision_risk(
+                list(X0_apf), pn_apf, pdi_apf)
+            if not allow_apf:
+                pd_apf, pdi_apf, CLv_apf = pe_apf, pn_apf, "K"
+                _, xc_apf, yc_apf, sc_apf = _get_path_info(pdi_apf)
+                X0_apf = repropagate(pd_apf, sc_apf, xc_apf, yc_apf, X0_g_apf, X0_apf)
+        _target_ey_apf = (pdi_apf - EGO_LANE) * LANE_WIDTH
+        if abs(_target_ey_apf) > ROAD_HALF_WIDTH + 0.5 and CLv_apf != "K":
+            pd_apf, pdi_apf, CLv_apf = pe_apf, pn_apf, "K"
+            _, xc_apf, yc_apf, sc_apf = _get_path_info(pdi_apf)
+            X0_apf = repropagate(pd_apf, sc_apf, xc_apf, yc_apf, X0_g_apf, X0_apf)
+        if path_changed_apf != pdi_apf and last_X_apf:
+            _oSp, _oeyp = _path_to_path_proj(last_X_apf[3], last_X_apf[4],
+                                              path_changed_apf, pdi_apf)
+            last_X_apf[3], last_X_apf[4] = _oSp, _oeyp
+        controller_apf.get_path_curvature(path=pd_apf)
+        path_changed_apf = pdi_apf
+        (oa_apf, od_apf,
+         ovx_p, ovy_p, owz_p, oS_p, oeyv_p, oepsi_p) = controller_apf.solve_with_risk(
+            X0_apf, oa_apf, od_apf, dt, None, None, CL_apf, X0_g_apf,
+            pd_apf, last_X_apf, pn_apf, eg_apf, pe_apf, dg_apf,
+            vl, vc, vr, pdi_apf, CLa_apf, CLv_apf)
+        last_X_apf = [ovx_p, ovy_p, owz_p, oS_p, oeyv_p, oepsi_p]
+        X0_apf, X0_g_apf, _, _ = dynamics.propagate(
+            X0_apf, [oa_apf[0], od_apf[0]], dt, X0_g_apf,
+            pd_apf, smp_apf, xl_apf, yl_apf, boundary)
+        Xp_p, Xgp_p = list(X0_apf), list(X0_g_apf)
+        # APF horizon rollout
+        _Xvp, _Xgvp = list(X0_apf), list(X0_g_apf)
+        _dhp = [list(_Xgvp)]
+        for k in range(len(oa_apf)-1):
+            _Xvp, _Xgvp, _, _ = dynamics.propagate(
+                _Xvp, [oa_apf[k+1], od_apf[k+1]], dt,
+                _Xgvp, pd_apf, smp_apf, xl_apf, yl_apf, boundary)
+            _dhp.append(list(_Xgvp))
+        hor_apf_cur = np.array(_dhp); last_apf_hor = hor_apf_cur
+    except Exception as e:
+        if i % 50 == 0: print(f"  [APF] step {i}: {e}")
+    apf_vx.append(float(Xp_p[0]))
+    apf_acc.append(float(oa_apf[0]) if hasattr(oa_apf, "__len__") else float(oa_apf))
+
     # Periodic autosave so Ctrl+C aborts inside native solvers still leave
     # a recent metrics figure/data on disk.
     if ((i + 1) % METRICS_AUTOSAVE_EVERY) == 0:
@@ -1637,18 +1775,21 @@ for i in range(N_t):
         _dh.append(list(_Xgv))
     _dh = np.array(_dh)
 
-    # ── 7. Visualize — four-panel: GT | IDEAM | DREAM-GVF | DREAM-ADA ────
-    draw_four_panel(
+    # ── 7. Visualize — five-panel: GT | IDEAM | DREAM-GVF | DREAM-ADA | DREAM-APF ──
+    draw_five_panel(
         i, frame_idx,
         X0_g_gt, gt_vx_list[-1],
         Xgi_p, Xi_p,
         X0_g, X0,
         Xga_p, Xa_p,
+        Xgp_p, Xp_p,
         risk_field,     risk_at_ego,
         risk_field_ada, risk_at_ego_ada,
+        risk_field_apf, risk_at_ego_apf,
         tracks, tracks_meta, class_map,
         bg_img, bg_extent,
-        horizon_ideam=hor_i, horizon_dream=_dh, horizon_ada=hor_ada_cur)
+        horizon_ideam=hor_i, horizon_dream=_dh,
+        horizon_ada=hor_ada_cur, horizon_apf=hor_apf_cur)
 
 bar.finish()
 print()
@@ -1657,6 +1798,8 @@ if len(dream_vx) > 0:
     print(f"  DREAM (GVF) final vx={dream_vx[-1]:.2f}m/s")
 if len(ada_vx) > 0:
     print(f"  DREAM (ADA) final vx={ada_vx[-1]:.2f}m/s")
+if len(apf_vx) > 0:
+    print(f"  DREAM (APF) final vx={apf_vx[-1]:.2f}m/s")
 if len(ideam_vx) > 0:
     print(f"  IDEAM       final vx={ideam_vx[-1]:.2f}m/s")
 
