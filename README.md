@@ -256,7 +256,7 @@ Corresponding paper:
 ```
 (Referenced coding package: [Gaussian Velocity Field (GVF)](https://github.com/Chengyuan-Zhang/Gaussian_Velocity_Field.git))
 
-### The baseline assymetric driving aggressiveness modeling:
+### The baseline asymmetric driving aggressiveness modeling:
 ```
 @article{hu2025socially,
   title={Socially Game-Theoretic Lane-Change for Autonomous Heavy Vehicle based on Asymmetric Driving Aggressiveness},
