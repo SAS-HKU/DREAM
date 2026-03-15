@@ -212,10 +212,10 @@ We compare the trajectories of (1): the ground truth ego trajectories from BEV d
 The results show that baseline planner is over aggressive as near collision with the truck rear, and our planner is more conservative but sacrifice the progress. (The selected scenario include the occlusion-aware planning from the truck-trailer that may block the visibility of the ego)
 
 ## Acknowledgement:
-The BEV dataset visualizations:
+### The BEV dataset visualizations:
 [dron-dataset-tools](https://github.com/ika-rwth-aachen/drone-dataset-tools.git)
 
-The baseline planner:
+### The baseline planner:
 [IDEAM](https://github.com/YimingShu-teay/IDEAM.git)
 Corresponding paper:
 ```
@@ -227,7 +227,7 @@ Corresponding paper:
   publisher={IEEE}
 }
 ```
-The baseline APF modeling:
+### The baseline APF modeling:
 Corresponding paper:
 ```
 @inproceedings{rasidescu2024artificial,
@@ -239,10 +239,9 @@ Corresponding paper:
   organization={IEEE}
 }
 ```
-
 (Referenced coding package: [Artificial-Potential-Field](https://github.com/liuxuexun/Artificial-Potential-Field.git))
 
-The baseline GVF modeling:
+### The baseline GVF modeling:
 ```
 @article{zhang2021spatiotemporal,
   title={Spatiotemporal learning of multivehicle interaction patterns in lane-change scenarios},
@@ -255,8 +254,9 @@ The baseline GVF modeling:
   publisher={IEEE}
 }
 ```
+(Referenced coding package: [Gaussian Velocity Field (GVF)](https://github.com/Chengyuan-Zhang/Gaussian_Velocity_Field.git))
 
-The baseline assymetric driving aggressiveness modeling:
+### The baseline assymetric driving aggressiveness modeling:
 ```
 @article{hu2025socially,
   title={Socially Game-Theoretic Lane-Change for Autonomous Heavy Vehicle based on Asymmetric Driving Aggressiveness},
