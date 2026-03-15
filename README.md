@@ -216,7 +216,6 @@ The results show that baseline planner is over aggressive as near collision with
 [dron-dataset-tools](https://github.com/ika-rwth-aachen/drone-dataset-tools.git)
 
 ### The baseline planner:
-[IDEAM](https://github.com/YimingShu-teay/IDEAM.git)
 Corresponding paper:
 ```
 @article{shu2025agile,
@@ -227,6 +226,8 @@ Corresponding paper:
   publisher={IEEE}
 }
 ```
+(Referenced coding package: [IDEAM](https://github.com/YimingShu-teay/IDEAM.git))
+
 ### The baseline APF modeling:
 Corresponding paper:
 ```
