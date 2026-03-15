@@ -227,6 +227,20 @@ Corresponding paper:
   publisher={IEEE}
 }
 ```
+The baseline APF modeling:
+Corresponding paper:
+```
+@inproceedings{rasidescu2024artificial,
+  title={Artificial Potential Fields-Enhanced Socially Intelligent Path-Planning for Autonomous Vehicles Using Type 2 Fuzzy Systems},
+  author={Rasidescu, Victor and Taghavifar, Hamid},
+  booktitle={2024 IEEE 27th International Conference on Intelligent Transportation Systems (ITSC)},
+  pages={2599--2605},
+  year={2024},
+  organization={IEEE}
+}
+```
+
+(Referenced coding package: [Artificial-Potential-Field](https://github.com/liuxuexun/Artificial-Potential-Field.git))
 
 The baseline GVF modeling:
 ```
