@@ -1,4 +1,4 @@
-﻿"""
+"""
 uncertainty_DREAM_dataset.py
 ============================
 DREAM vs IDEAM benchmark on real naturalistic vehicle trajectories.
@@ -67,6 +67,14 @@ from Integration.drift_interface import DRIFTInterface
 from Integration.prideam_controller import create_prideam_controller
 from Integration.integration_config import get_preset
 
+# ADA source adapter (for source-comparison experiments)
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), "Aggressiveness_Modeling"))
+from Aggressiveness_Modeling.ADA_drift_source import compute_Q_ADA  # noqa: E402
+
+# APF source adapter
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), "APF_Modeling"))
+from APF_Modeling.APF_drift_source import compute_Q_APF  # noqa: E402
+
 # Dataset loader
 from tracks_import import read_from_csv
 
@@ -90,6 +98,12 @@ INTEGRATION_MODE  = "conservative"
 DRIFT_CELL_M      = 2.0          # DRIFT grid cell size [m]
 SCENE_MARGIN      = 60.0         # margin beyond track bbox [m]
 SCENARIO_MODE     = "drift_overlay"   # "drift_overlay" or "benchmark"
+SOURCE_MODE       = "all"            # "gvf" | "ada" | "apf" | "both" | "all"
+                                      # "gvf"  – current GVF formulation only (original behaviour)
+                                      # "ada"  – ADA-sourced DRIFT only
+                                      # "apf"  – APF-sourced DRIFT only
+                                      # "both" – GVF + ADA side-by-side (drift_overlay only)
+                                      # "all"  – GVF + ADA + APF triple panel (drift_overlay only)
 
 # Risk visualisation
 RISK_ALPHA   = 0.24    # max overlay alpha; keep road + vehicles readable
@@ -120,8 +134,9 @@ VIS_SCALE_PRESETS = {"exid": 6.0, "ind": 12.0, "round": 10.0}
 # Optional explicit path to visualizer_params.json.
 VISUALIZER_PARAMS_PATH = None
 
+_src_tag = f"_{SOURCE_MODE}" if SOURCE_MODE != "gvf" else ""
 save_dir = os.path.join(os.path.abspath(os.path.dirname(__file__)),
-                        ("figsave_DRIFT_dataset_rounD_03"
+                        (f"figsave_DRIFT_dataset_rounD_04{_src_tag}"
                          if SCENARIO_MODE == "drift_overlay"
                          else "figsave_DREAM_dataset"))
 os.makedirs(save_dir, exist_ok=True)
@@ -907,70 +922,43 @@ def draw_frame(i, X0_g_dream, X0_dream, X0_g_ideam, X0_ideam,
 def draw_frame_drift_overlay(i, frame_idx, tracks, tracks_meta, class_map,
                              bg_img, risk_field, risk_at_ego,
                              ego_vx_hist=None, ego_ax_hist=None,
-                             risk_hist=None):
+                             risk_hist=None,
+                             risk_field_ada=None, risk_at_ego_ada=0.0,
+                             risk_field_apf=None, risk_at_ego_apf=0.0):
     """
     Pixel-space rendering — traffic scene only (no telemetry strip in frames).
     Motion data is recorded externally and shown in metrics_drift_overlay.png.
+
+    When risk_field_ada is provided (SOURCE_MODE="both"), renders two panels
+    side by side:  left = DRIFT/GVF source,  right = DRIFT/ADA source.
+    When risk_field_apf is also provided (SOURCE_MODE="all"), renders three panels:
+    GVF | ADA | APF. All panels share the same colour scale for direct comparison.
     """
     fig = plt.gcf()
     fig.clf()
-    ax = fig.add_subplot(1, 1, 1)
-    ax.cla()
 
+    n_panels = 1
+    if risk_field_ada is not None:
+        n_panels = 2
+    if risk_field_apf is not None:
+        n_panels = 3
+
+    # ── shared vmax: derived from GVF field so all panels use the same scale ──
     vmax = RISK_VMAX
-
-    # 1) Background in pixel coordinates.
-    if bg_img is not None:
-        ax.imshow(bg_img, origin="upper", zorder=0)
-    else:
-        ax.set_facecolor("#111111")
-
-    # 2) DRIFT risk projected to pixel coordinates.
-    if risk_field is not None and _cfg_X_vis is not None and _cfg_Y_vis is not None:
-        R_sm = _gf(risk_field, sigma=RISK_SMOOTH_SIGMA)
-        nonzero = R_sm[R_sm > RISK_MIN_VIS]
-        vmax = float(np.percentile(nonzero, 95)) if nonzero.size > 50 else RISK_VMAX
+    if risk_field is not None:
+        R_sm0 = _gf(risk_field, sigma=RISK_SMOOTH_SIGMA)
+        nonzero0 = R_sm0[R_sm0 > RISK_MIN_VIS]
+        if nonzero0.size > 50:
+            vmax = float(np.percentile(nonzero0, 95))
         vmax = max(vmax, RISK_MIN_VIS + 1e-3)
 
-        # Compress contrast slightly so the map and vehicles remain readable.
-        Rn = (np.clip(R_sm, RISK_MIN_VIS, vmax) - RISK_MIN_VIS) / (vmax - RISK_MIN_VIS)
-        Rn = np.power(np.clip(Rn, 0.0, 1.0), RISK_ALPHA_GAMMA)
-        R_masked = np.ma.masked_less_equal(Rn, 0.0)
-        if np.ma.count(R_masked) > 0:
-            ax.contourf(_cfg_X_vis, _cfg_Y_vis, R_masked,
-                        levels=np.linspace(0.02, 1.0, RISK_LEVELS),
-                        cmap=RISK_CMAP, alpha=RISK_ALPHA,
-                        zorder=2, antialiased=True)
+    panels = [(risk_field,     risk_at_ego,     "DRIFT  (GVF source)")]
+    if risk_field_ada is not None:
+        panels.append((risk_field_ada, risk_at_ego_ada, "DRIFT  (ADA source)"))
+    if risk_field_apf is not None:
+        panels.append((risk_field_apf, risk_at_ego_apf, "DRIFT  (APF source)"))
 
-    # 3) Vehicles using bboxVis/centerVis in the same pixel coordinate system.
-    for tm in tracks_meta:
-        tid = tm["trackId"]
-        if not (tm["initialFrame"] <= frame_idx <= tm["finalFrame"]):
-            continue
-        tr = tracks[tid]
-        fi = frame_idx - tm["initialFrame"]
-        cls_ = class_map.get(tid, "car")
-        is_ego = (tid == EGO_TRACK_ID)
-        fc = "#F4511E" if is_ego else ("#FF8C00" if cls_ in ("truck", "van") else "#AED6F1")
-        ec = "red" if is_ego else "black"
-        lw = 1.0 if is_ego else 0.5
-        alpha = 0.95 if is_ego else 0.82
-        z = 5 if is_ego else 4
-
-        if tr.get("bboxVis") is not None:
-            bbox = np.asarray(tr["bboxVis"][fi], dtype=float) / _vis_scale_down
-            poly = plt.Polygon(bbox, closed=True, facecolor=fc, edgecolor=ec,
-                               linewidth=lw, alpha=alpha, zorder=z)
-            ax.add_patch(poly)
-        else:
-            cx = float(tr["xCenterVis"][fi]) / _vis_scale_down
-            cy = float(tr["yCenterVis"][fi]) / _vis_scale_down
-            circ = plt.Circle((cx, cy), radius=max(1.4, 2.4 / _vis_scale_down),
-                              facecolor=fc, edgecolor=ec, linewidth=lw,
-                              alpha=alpha, zorder=z)
-            ax.add_patch(circ)
-
-    # 4) Ego-centric viewport (same physical window as run_simulation.py).
+    # ── ego pixel position (computed once, shared across panels) ─────────────
     if EGO_TRACK_ID is not None:
         ego_tm = tracks_meta[EGO_TRACK_ID]
         ego_tr = tracks[EGO_TRACK_ID]
@@ -987,49 +975,96 @@ def draw_frame_drift_overlay(i, frame_idx, tracks, tracks_meta, class_map,
 
     view_x_px = VIEW_X / (_ortho_px_m * _vis_scale_down)
     view_y_px = VIEW_Y / (_ortho_px_m * _vis_scale_down)
-    x0, x1 = ex_px - view_x_px, ex_px + view_x_px
-    y_top, y_bot = ey_px - view_y_px, ey_px + view_y_px
+    x0_vp, x1_vp = ex_px - view_x_px, ex_px + view_x_px
+    y_top_vp, y_bot_vp = ey_px - view_y_px, ey_px + view_y_px
     if bg_img is not None:
-        h, w = bg_img.shape[:2]
-        if x0 < 0:
-            x1 -= x0
-            x0 = 0
-        if x1 > (w - 1):
-            x0 -= (x1 - (w - 1))
-            x1 = w - 1
-        if y_top < 0:
-            y_bot -= y_top
-            y_top = 0
-        if y_bot > (h - 1):
-            y_top -= (y_bot - (h - 1))
-            y_bot = h - 1
-        x0 = max(0, x0)
-        x1 = min(w - 1, x1)
-        y_top = max(0, y_top)
-        y_bot = min(h - 1, y_bot)
+        h_bg, w_bg = bg_img.shape[:2]
+        if x0_vp < 0:
+            x1_vp -= x0_vp; x0_vp = 0
+        if x1_vp > (w_bg - 1):
+            x0_vp -= (x1_vp - (w_bg - 1)); x1_vp = w_bg - 1
+        if y_top_vp < 0:
+            y_bot_vp -= y_top_vp; y_top_vp = 0
+        if y_bot_vp > (h_bg - 1):
+            y_top_vp -= (y_bot_vp - (h_bg - 1)); y_bot_vp = h_bg - 1
+        x0_vp  = max(0, x0_vp);  x1_vp  = min(w_bg - 1, x1_vp)
+        y_top_vp = max(0, y_top_vp); y_bot_vp = min(h_bg - 1, y_bot_vp)
 
-    ax.set_xlim(x0, x1)
-    # Keep TrackVisualizer's "y increases downward" pixel orientation.
-    ax.set_ylim(y_bot, y_top)
-    ax.set_aspect("equal", adjustable="box")
-    ax.axis("off")
+    # ── draw each panel ───────────────────────────────────────────────────────
+    for panel_idx, (rf, rae, panel_title) in enumerate(panels):
+        ax = fig.add_subplot(1, n_panels, panel_idx + 1)
+        ax.cla()
 
-    # 5) Labels / colorbar.
-    rc = "red" if risk_at_ego > 1.5 else "orange" if risk_at_ego > 0.5 else "lime"
-    ax.text(0.985, 0.965, f"R={risk_at_ego:.2f}",
-            transform=ax.transAxes, ha="right", va="top",
-            color=rc, fontsize=9, fontweight="bold",
-            bbox=dict(boxstyle="round", facecolor="black", alpha=0.55))
-    ax.set_title(f"DRIFT Risk Overlay  |  t={i*dt:.1f} s  frame={frame_idx}",
-                 fontsize=9, fontweight="bold")
+        # 1) Background
+        if bg_img is not None:
+            ax.imshow(bg_img, origin="upper", zorder=0)
+        else:
+            ax.set_facecolor("#111111")
 
-    _sm = plt.cm.ScalarMappable(
-        norm=plt.Normalize(vmin=RISK_MIN_VIS, vmax=vmax),
-        cmap=plt.colormaps[RISK_CMAP])
-    _sm.set_array([])
-    cbar = fig.colorbar(_sm, ax=ax, fraction=0.018, pad=0.005)
-    cbar.set_label(f"Risk  (vmax={vmax:.2f})", fontsize=7)
-    cbar.ax.tick_params(labelsize=6)
+        # 2) Risk overlay (pixel-space contourf using shared vmax)
+        if rf is not None and _cfg_X_vis is not None and _cfg_Y_vis is not None:
+            R_sm = _gf(rf, sigma=RISK_SMOOTH_SIGMA)
+            Rn = (np.clip(R_sm, RISK_MIN_VIS, vmax) - RISK_MIN_VIS) / (vmax - RISK_MIN_VIS)
+            Rn = np.power(np.clip(Rn, 0.0, 1.0), RISK_ALPHA_GAMMA)
+            R_masked = np.ma.masked_less_equal(Rn, 0.0)
+            if np.ma.count(R_masked) > 0:
+                ax.contourf(_cfg_X_vis, _cfg_Y_vis, R_masked,
+                            levels=np.linspace(0.02, 1.0, RISK_LEVELS),
+                            cmap=RISK_CMAP, alpha=RISK_ALPHA,
+                            zorder=2, antialiased=True)
+
+        # 3) Vehicles (identical in both panels)
+        for tm in tracks_meta:
+            tid = tm["trackId"]
+            if not (tm["initialFrame"] <= frame_idx <= tm["finalFrame"]):
+                continue
+            tr = tracks[tid]
+            fi = frame_idx - tm["initialFrame"]
+            cls_ = class_map.get(tid, "car")
+            is_ego = (tid == EGO_TRACK_ID)
+            fc = "#F4511E" if is_ego else ("#FF8C00" if cls_ in ("truck", "van") else "#AED6F1")
+            ec = "red" if is_ego else "black"
+            lw = 1.0 if is_ego else 0.5
+            alpha_v = 0.95 if is_ego else 0.82
+            z = 5 if is_ego else 4
+
+            if tr.get("bboxVis") is not None:
+                bbox = np.asarray(tr["bboxVis"][fi], dtype=float) / _vis_scale_down
+                poly = plt.Polygon(bbox, closed=True, facecolor=fc, edgecolor=ec,
+                                   linewidth=lw, alpha=alpha_v, zorder=z)
+                ax.add_patch(poly)
+            else:
+                cx = float(tr["xCenterVis"][fi]) / _vis_scale_down
+                cy = float(tr["yCenterVis"][fi]) / _vis_scale_down
+                circ = plt.Circle((cx, cy), radius=max(1.4, 2.4 / _vis_scale_down),
+                                  facecolor=fc, edgecolor=ec, linewidth=lw,
+                                  alpha=alpha_v, zorder=z)
+                ax.add_patch(circ)
+
+        # 4) Viewport
+        ax.set_xlim(x0_vp, x1_vp)
+        ax.set_ylim(y_bot_vp, y_top_vp)   # y increases downward (pixel convention)
+        ax.set_aspect("equal", adjustable="box")
+        ax.axis("off")
+
+        # 5) Risk badge and title
+        rc = "red" if rae > 1.5 else "orange" if rae > 0.5 else "lime"
+        ax.text(0.985, 0.965, f"R={rae:.2f}",
+                transform=ax.transAxes, ha="right", va="top",
+                color=rc, fontsize=9, fontweight="bold",
+                bbox=dict(boxstyle="round", facecolor="black", alpha=0.55))
+        ax.set_title(f"{panel_title}  |  t={i*dt:.1f} s  frame={frame_idx}",
+                     fontsize=9, fontweight="bold")
+
+        # 6) Colorbar (label only on leftmost / single panel)
+        _sm = plt.cm.ScalarMappable(
+            norm=plt.Normalize(vmin=RISK_MIN_VIS, vmax=vmax),
+            cmap=plt.colormaps[RISK_CMAP])
+        _sm.set_array([])
+        cbar = fig.colorbar(_sm, ax=ax, fraction=0.018, pad=0.005)
+        if panel_idx == 0:
+            cbar.set_label(f"Risk  (vmax={vmax:.2f})", fontsize=7)
+        cbar.ax.tick_params(labelsize=6)
 
     plt.savefig(os.path.join(save_dir, f"{i}.png"), dpi=150,
                 bbox_inches="tight")
@@ -1225,6 +1260,28 @@ drift.warmup(_drift_init + [_ego_init], _ego_init,
              dt=dt, duration=WARMUP_S, substeps=3)
 print()
 
+# ADA-source DRIFT instance (SOURCE_MODE "ada" or "both" or "all", drift_overlay only)
+drift_ada = None
+risk_at_ego_ada_list = []
+if SOURCE_MODE in ("ada", "both", "all") and SCENARIO_MODE == "drift_overlay":
+    print("ADA-source DRIFT warm-up ...")
+    drift_ada = DRIFTInterface()
+    drift_ada.warmup(_drift_init + [_ego_init], _ego_init,
+                     dt=dt, duration=WARMUP_S, substeps=3,
+                     source_fn=compute_Q_ADA)
+    print()
+
+# APF-source DRIFT instance (SOURCE_MODE "apf" or "all", drift_overlay only)
+drift_apf = None
+risk_at_ego_apf_list = []
+if SOURCE_MODE in ("apf", "all") and SCENARIO_MODE == "drift_overlay":
+    print("APF-source DRIFT warm-up ...")
+    drift_apf = DRIFTInterface()
+    drift_apf.warmup(_drift_init + [_ego_init], _ego_init,
+                     dt=dt, duration=WARMUP_S, substeps=3,
+                     source_fn=compute_Q_APF)
+    print()
+
 if SCENARIO_MODE == "drift_overlay":
     print(f"Running DRIFT overlay only ({N_t} steps, dt={dt}s) ...")
     print()
@@ -1232,7 +1289,8 @@ if SCENARIO_MODE == "drift_overlay":
     ego_vx_list      = []   # longitudinal speed [m/s]
     ego_ax_list      = []   # longitudinal acceleration [m/s²]
     bar = Bar(max=N_t - 1)
-    plt.figure(figsize=(12, 7))
+    _figw = 32 if SOURCE_MODE == "all" else (22 if SOURCE_MODE in ("both",) else 12)
+    plt.figure(figsize=(_figw, 7))
 
     max_frame_all = max(tm["finalFrame"] for tm in tracks_meta)
     for i in range(N_t):
@@ -1264,16 +1322,63 @@ if SCENARIO_MODE == "drift_overlay":
             vclass="car")
         ego_drift_v["heading"] = epsi
 
+        # GVF-source DRIFT step (always)
         risk_field = drift.step(drift_vehicles, ego_drift_v, dt=dt, substeps=3)
         risk_at_ego = float(drift.get_risk_cartesian(ex, ey))
         risk_at_ego_list.append(risk_at_ego)
 
+        # ADA-source DRIFT step (when SOURCE_MODE in "ada", "both", or "all")
+        risk_field_ada_cur  = None
+        risk_at_ego_ada_cur = 0.0
+        if drift_ada is not None:
+            risk_field_ada_cur  = drift_ada.step(drift_vehicles, ego_drift_v,
+                                                  dt=dt, substeps=3,
+                                                  source_fn=compute_Q_ADA)
+            risk_at_ego_ada_cur = float(drift_ada.get_risk_cartesian(ex, ey))
+            risk_at_ego_ada_list.append(risk_at_ego_ada_cur)
+
+        # APF-source DRIFT step (when SOURCE_MODE in "apf" or "all")
+        risk_field_apf_cur  = None
+        risk_at_ego_apf_cur = 0.0
+        if drift_apf is not None:
+            risk_field_apf_cur  = drift_apf.step(drift_vehicles, ego_drift_v,
+                                                  dt=dt, substeps=3,
+                                                  source_fn=compute_Q_APF)
+            risk_at_ego_apf_cur = float(drift_apf.get_risk_cartesian(ex, ey))
+            risk_at_ego_apf_list.append(risk_at_ego_apf_cur)
+
+        # Choose which field(s) to render
+        if SOURCE_MODE == "ada":
+            _rf_show, _rae_show = risk_field_ada_cur, risk_at_ego_ada_cur
+            _rf_ada,  _rae_ada  = None, 0.0
+            _rf_apf,  _rae_apf  = None, 0.0
+        elif SOURCE_MODE == "apf":
+            _rf_show, _rae_show = risk_field_apf_cur, risk_at_ego_apf_cur
+            _rf_ada,  _rae_ada  = None, 0.0
+            _rf_apf,  _rae_apf  = None, 0.0
+        elif SOURCE_MODE == "both":
+            _rf_show, _rae_show = risk_field,         risk_at_ego
+            _rf_ada,  _rae_ada  = risk_field_ada_cur, risk_at_ego_ada_cur
+            _rf_apf,  _rae_apf  = None, 0.0
+        elif SOURCE_MODE == "all":
+            _rf_show, _rae_show = risk_field,         risk_at_ego
+            _rf_ada,  _rae_ada  = risk_field_ada_cur, risk_at_ego_ada_cur
+            _rf_apf,  _rae_apf  = risk_field_apf_cur, risk_at_ego_apf_cur
+        else:  # "gvf"
+            _rf_show, _rae_show = risk_field, risk_at_ego
+            _rf_ada,  _rae_ada  = None, 0.0
+            _rf_apf,  _rae_apf  = None, 0.0
+
         draw_frame_drift_overlay(
             i, frame_idx, tracks, tracks_meta, class_map,
-            bg_img, risk_field, risk_at_ego,
+            bg_img, _rf_show, _rae_show,
             ego_vx_hist=list(ego_vx_list),
             ego_ax_hist=list(ego_ax_list),
-            risk_hist=list(risk_at_ego_list))
+            risk_hist=list(risk_at_ego_list),
+            risk_field_ada=_rf_ada,
+            risk_at_ego_ada=_rae_ada,
+            risk_field_apf=_rf_apf,
+            risk_at_ego_apf=_rae_apf)
 
     bar.finish()
     print()
@@ -1302,17 +1407,36 @@ if SCENARIO_MODE == "drift_overlay":
             axes_r[1].axhline(0, color="black", lw=0.6, alpha=0.5)
             axes_r[2].set_xlabel("t [s]")
 
+            # Overlay ADA / APF risk series when multiple sources were run
+            _multi = risk_at_ego_ada_list or risk_at_ego_apf_list
+            if _multi:
+                axes_r[2].plot(_t_r[:len(risk_at_ego_list)], risk_at_ego_list,
+                               color="C3", lw=1.4, label="GVF source")
+            if risk_at_ego_ada_list:
+                _t_ada = np.arange(len(risk_at_ego_ada_list)) * dt
+                axes_r[2].plot(_t_ada, risk_at_ego_ada_list,
+                               color="C5", lw=1.4, ls="--", label="ADA source")
+            if risk_at_ego_apf_list:
+                _t_apf = np.arange(len(risk_at_ego_apf_list)) * dt
+                axes_r[2].plot(_t_apf, risk_at_ego_apf_list,
+                               color="#009688", lw=1.4, ls=":", label="APF source")
+            if _multi:
+                axes_r[2].legend(fontsize=7)
+
             plt.savefig(os.path.join(save_dir, "metrics_drift_overlay.png"),
                         dpi=200, bbox_inches="tight")
             plt.close(fig_r)
 
         np.save(os.path.join(save_dir, "metrics_drift_overlay.npy"), {
-            "risk_at_ego": risk_at_ego_list,
-            "ego_vx":      ego_vx_list,
-            "ego_ax":      ego_ax_list,
-            "recording":   rec,
-            "ego_track_id": EGO_TRACK_ID,
-            "scenario_mode": SCENARIO_MODE,
+            "risk_at_ego":     risk_at_ego_list,
+            "risk_at_ego_ada": risk_at_ego_ada_list,
+            "risk_at_ego_apf": risk_at_ego_apf_list,
+            "ego_vx":          ego_vx_list,
+            "ego_ax":          ego_ax_list,
+            "recording":       rec,
+            "ego_track_id":    EGO_TRACK_ID,
+            "scenario_mode":   SCENARIO_MODE,
+            "source_mode":     SOURCE_MODE,
         })
 
     print(f"\nFrames  -> {save_dir}/")
