@@ -55,6 +55,14 @@ from pde_solver import create_vehicle as drift_create_vehicle
 from Integration.prideam_controller import create_prideam_controller
 from Integration.integration_config import get_preset
 
+# ADA source adapter (DREAM-ADA arm)
+sys.path.insert(0, os.path.join(SCRIPT_DIR, "Aggressiveness_Modeling"))
+from Aggressiveness_Modeling.ADA_drift_source import compute_Q_ADA  # noqa: E402
+
+# APF source adapter (DREAM-APF arm)
+sys.path.insert(0, os.path.join(SCRIPT_DIR, "APF_Modeling"))
+from APF_Modeling.APF_drift_source import compute_Q_APF  # noqa: E402
+
 
 def _str2bool(value):
     if isinstance(value, bool):
@@ -102,7 +110,7 @@ def _parse_cli_args():
     )
     parser.add_argument(
         "--save-dir",
-        default=os.path.join(SCRIPT_DIR, "figsave_uncertainty_merger_v3"),
+        default=os.path.join(SCRIPT_DIR, "figsave_uncertainty_merger_v4"),
         help="Directory where frames and metrics are saved.",
     )
     return parser.parse_args()
@@ -134,6 +142,8 @@ TRUCK_WIDTH = 2.0
 # Colors
 EGO_IDEAM_COLOR = "#4CAF50"
 EGO_DREAM_COLOR = "#2196F3"
+EGO_ADA_COLOR   = "#9C27B0"
+EGO_APF_COLOR   = "#009688"
 TRUCK_COLOR = "#FF6F00"
 MERGER_COLOR = "#E91E63"
 SHADOW_COLOR = "#4A4A4A"
@@ -844,6 +854,48 @@ dream_merger_utils = LeaderFollower_Uitl(**util_cfg)
 dream_merger_mpc.set_util(dream_merger_utils)
 dream_merger_mpc.get_path_curvature(path=path3c)
 
+# DREAM-ADA controller — same MPC/CBF/decision logic, ADA source field.
+ada_controller = create_prideam_controller(
+    paths={0: path1c, 1: path2c, 2: path3c},
+    risk_weights={
+        "mpc_cost": config_integration.mpc_risk_weight,
+        "cbf_modulation": config_integration.cbf_alpha,
+        "decision_threshold": config_integration.decision_risk_threshold,
+    }
+)
+ada_utils = LeaderFollower_Uitl(**util_cfg)
+ada_controller.set_util(ada_utils)
+ada_controller.get_path_curvature(path=path1c)
+decision_ada = decision(**decision_param)
+
+# ADA-world merger controller (IDEAM).
+ada_merger_mpc = LMPC(**constraint_params())
+ada_merger_utils = LeaderFollower_Uitl(**util_cfg)
+ada_merger_mpc.set_util(ada_merger_utils)
+ada_merger_mpc.get_path_curvature(path=path3c)
+decision_merger_ada = decision(**decision_param)
+
+# DREAM-APF controller — same MPC/CBF/decision logic, APF source field.
+apf_controller = create_prideam_controller(
+    paths={0: path1c, 1: path2c, 2: path3c},
+    risk_weights={
+        "mpc_cost": config_integration.mpc_risk_weight,
+        "cbf_modulation": config_integration.cbf_alpha,
+        "decision_threshold": config_integration.decision_risk_threshold,
+    }
+)
+apf_utils = LeaderFollower_Uitl(**util_cfg)
+apf_controller.set_util(apf_utils)
+apf_controller.get_path_curvature(path=path1c)
+decision_apf = decision(**decision_param)
+
+# APF-world merger controller (IDEAM).
+apf_merger_mpc = LMPC(**constraint_params())
+apf_merger_utils = LeaderFollower_Uitl(**util_cfg)
+apf_merger_mpc.set_util(apf_merger_utils)
+apf_merger_mpc.get_path_curvature(path=path3c)
+decision_merger_apf = decision(**decision_param)
+
 # Ego states
 X0_base = [EGO_V0, 0.0, 0.0, EGO_S0, 0.0, 0.0]
 X0_g_base = [path1c(EGO_S0)[0], path1c(EGO_S0)[1], path1c.get_theta_r(EGO_S0)]
@@ -871,12 +923,42 @@ oa_merger_dream, od_merger_dream = 0.0, 0.0
 last_X_merger_dream = None
 path_changed_merger_dream = 2
 
+# ADA-world ego states (same initial conditions as DREAM world).
+X0_ada = [EGO_V0, 0.0, 0.0, EGO_S0, 0.0, 0.0]
+X0_g_ada = [path1c(EGO_S0)[0], path1c(EGO_S0)[1], path1c.get_theta_r(EGO_S0)]
+oa_ada, od_ada = 0.0, 0.0
+last_X_ada = None
+path_changed_ada = 0
+
+# ADA-world merger states (same initial as DREAM merger).
+X0_merger_ada = [MERGER_DREAM_V0, 0.0, 0.0, MERGER_DREAM_S0, 0.0, 0.0]
+X0_g_merger_ada = [path3c(MERGER_DREAM_S0)[0], path3c(MERGER_DREAM_S0)[1], path3c.get_theta_r(MERGER_DREAM_S0)]
+oa_merger_ada, od_merger_ada = 0.0, 0.0
+last_X_merger_ada = None
+path_changed_merger_ada = 2
+
+# APF-world ego states (same initial conditions as DREAM world).
+X0_apf = [EGO_V0, 0.0, 0.0, EGO_S0, 0.0, 0.0]
+X0_g_apf = [path1c(EGO_S0)[0], path1c(EGO_S0)[1], path1c.get_theta_r(EGO_S0)]
+oa_apf, od_apf = 0.0, 0.0
+last_X_apf = None
+path_changed_apf = 0
+
+# APF-world merger states (same initial as DREAM merger).
+X0_merger_apf = [MERGER_DREAM_V0, 0.0, 0.0, MERGER_DREAM_S0, 0.0, 0.0]
+X0_g_merger_apf = [path3c(MERGER_DREAM_S0)[0], path3c(MERGER_DREAM_S0)[1], path3c.get_theta_r(MERGER_DREAM_S0)]
+oa_merger_apf, od_merger_apf = 0.0, 0.0
+last_X_merger_apf = None
+path_changed_merger_apf = 2
+
 # Trucks (separate baseline and dream worlds, same dynamics/initial states).
 truck_dyn = Curved_Road_Vehicle(**surrounding_params())
 truck_x0 = path2c(TRUCK_S0)
 truck_psi0 = path2c.get_theta_r(TRUCK_S0)
-truck_row_base = np.array([TRUCK_S0, 0.0, 0.0, truck_x0[0], truck_x0[1], truck_psi0, TRUCK_V0, 0.0], dtype=float)
+truck_row_base  = np.array([TRUCK_S0, 0.0, 0.0, truck_x0[0], truck_x0[1], truck_psi0, TRUCK_V0, 0.0], dtype=float)
 truck_row_dream = np.array([TRUCK_S0, 0.0, 0.0, truck_x0[0], truck_x0[1], truck_psi0, TRUCK_V0, 0.0], dtype=float)
+truck_row_ada   = np.array([TRUCK_S0, 0.0, 0.0, truck_x0[0], truck_x0[1], truck_psi0, TRUCK_V0, 0.0], dtype=float)
+truck_row_apf   = np.array([TRUCK_S0, 0.0, 0.0, truck_x0[0], truck_x0[1], truck_psi0, TRUCK_V0, 0.0], dtype=float)
 
 # Left-lane blocker: slow IDM car forcing both planners to consider LC to centre
 blocker = LeftLaneBlocker(
@@ -910,6 +992,45 @@ warm_vehicles = [
     blocker.to_drift_vehicle(vid=3),   # blocker in DRIFT
 ]
 drift.warmup(warm_vehicles, ego_drift_init, dt=dt, duration=3.0, substeps=3)
+
+# DRIFT (ADA source)
+drift_ada = ada_controller.drift
+drift_ada.set_road_mask(road_mask)
+print("ADA-DRIFT warm-up (3 s)...")
+ego_drift_init_ada = drift_create_vehicle(
+    vid=0, x=X0_g_ada[0], y=X0_g_ada[1],
+    vx=X0_ada[0] * math.cos(X0_g_ada[2]),
+    vy=X0_ada[0] * math.sin(X0_g_ada[2]),
+    vclass="car"
+)
+ego_drift_init_ada["heading"] = X0_g_ada[2]
+warm_vehicles_ada = [
+    row_to_drift_vehicle(truck_row_ada, vid=1, vclass="truck"),
+    row_to_drift_vehicle(state_to_row(X0_merger_ada, X0_g_merger_ada), vid=2, vclass="car"),
+    blocker.to_drift_vehicle(vid=3),
+]
+drift_ada.warmup(warm_vehicles_ada, ego_drift_init_ada, dt=dt, duration=3.0, substeps=3,
+                 source_fn=compute_Q_ADA)
+print()
+
+# DRIFT (APF source)
+drift_apf = apf_controller.drift
+drift_apf.set_road_mask(road_mask)
+print("APF-DRIFT warm-up (3 s)...")
+ego_drift_init_apf = drift_create_vehicle(
+    vid=0, x=X0_g_apf[0], y=X0_g_apf[1],
+    vx=X0_apf[0] * math.cos(X0_g_apf[2]),
+    vy=X0_apf[0] * math.sin(X0_g_apf[2]),
+    vclass="car"
+)
+ego_drift_init_apf["heading"] = X0_g_apf[2]
+warm_vehicles_apf = [
+    row_to_drift_vehicle(truck_row_apf, vid=1, vclass="truck"),
+    row_to_drift_vehicle(state_to_row(X0_merger_apf, X0_g_merger_apf), vid=2, vclass="car"),
+    blocker.to_drift_vehicle(vid=3),
+]
+drift_apf.warmup(warm_vehicles_apf, ego_drift_init_apf, dt=dt, duration=3.0, substeps=3,
+                 source_fn=compute_Q_APF)
 print()
 
 print(f"Ego init left lane     s={EGO_S0:.1f}  vx={EGO_V0:.1f}")
@@ -925,9 +1046,9 @@ print()
 # ============================================================================
 
 bar = Bar(max=max(1, N_t - 1))
-risk_field = None
+risk_field = risk_field_ada = risk_field_apf = None
 
-plt.figure(figsize=(12, 10))
+plt.figure(figsize=(24, 8))
 
 # ============================================================================
 # METRIC BUFFERS
@@ -951,6 +1072,24 @@ dream_min_dist_sur = []
 base_merger_lane_hist = []
 dream_merger_lane_hist = []
 risk_at_ego_hist = []
+
+ada_s = []
+ada_vx = []
+ada_acc = []
+ada_lane_hist = []
+ada_dist_merger = []
+ada_min_dist_sur = []
+ada_merger_lane_hist = []
+risk_at_ego_ada_hist = []
+
+apf_s = []
+apf_vx = []
+apf_acc = []
+apf_lane_hist = []
+apf_dist_merger = []
+apf_min_dist_sur = []
+apf_merger_lane_hist = []
+risk_at_ego_apf_hist = []
 
 for i in range(N_t):
     bar.next()
@@ -1049,7 +1188,7 @@ for i in range(N_t):
     lane_right_dream = stack_rows([merger_dream_row] if merger_dream_lane == 2 else [])
 
     # ------------------------------------------------------------------------
-    # DRIFT step for DREAM world.
+    # DRIFT step (GVF) for DREAM world.
     # ------------------------------------------------------------------------
     ego_drift = drift_create_vehicle(
         vid=0, x=X0_g_dream[0], y=X0_g_dream[1],
@@ -1065,6 +1204,33 @@ for i in range(N_t):
         blocker.to_drift_vehicle(vid=3),
     ]
     risk_field = drift.step(drift_vehicles, ego_drift, dt=dt, substeps=3)
+
+    # ------------------------------------------------------------------------
+    # Build ADA world lanes.
+    # ------------------------------------------------------------------------
+    merger_ada_row = state_to_row(X0_merger_ada, X0_g_merger_ada)
+    merger_ada_lane = lane_from_global(X0_g_merger_ada)
+    lane_left_ada    = stack_rows([_bl_row] + ([merger_ada_row] if merger_ada_lane == 0 else []))
+    lane_center_ada  = stack_rows([truck_row_ada] + ([merger_ada_row] if merger_ada_lane == 1 else []))
+    lane_right_ada   = stack_rows([merger_ada_row] if merger_ada_lane == 2 else [])
+
+    # ------------------------------------------------------------------------
+    # DRIFT step (ADA) for ADA world.
+    # ------------------------------------------------------------------------
+    ego_drift_ada_v = drift_create_vehicle(
+        vid=0, x=X0_g_ada[0], y=X0_g_ada[1],
+        vx=X0_ada[0] * math.cos(X0_g_ada[2]) - X0_ada[1] * math.sin(X0_g_ada[2]),
+        vy=X0_ada[0] * math.sin(X0_g_ada[2]) + X0_ada[1] * math.cos(X0_g_ada[2]),
+        vclass="car"
+    )
+    ego_drift_ada_v["heading"] = X0_g_ada[2]
+    drift_vehicles_ada = [
+        row_to_drift_vehicle(truck_row_ada, vid=1, vclass="truck"),
+        row_to_drift_vehicle(merger_ada_row, vid=2, vclass="car"),
+        blocker.to_drift_vehicle(vid=3),
+    ]
+    risk_field_ada = drift_ada.step(drift_vehicles_ada, ego_drift_ada_v,
+                                    dt=dt, substeps=3, source_fn=compute_Q_ADA)
 
     # ------------------------------------------------------------------------
     # DREAM ego (risk-aware).
@@ -1137,6 +1303,171 @@ for i in range(N_t):
             )
 
     # ------------------------------------------------------------------------
+    # ADA ego (risk-aware, ADA source).
+    # ------------------------------------------------------------------------
+    ego_blocker_gap_ada = float(blocker.s) - float(X0_ada[3])
+    ego_ada_ready_for_center = (
+        i >= EGO_FORCE_CENTER_MIN_STEP and
+        X0_ada[3] > float(truck_row_ada[0]) + EGO_LC_OVERTAKE_MARGIN and
+        0.0 < ego_blocker_gap_ada < EGO_BLOCKER_TRIGGER_GAP
+    )
+    lane_ada_now = lane_from_global(X0_g_ada)
+    if lane_ada_now == 0:
+        force_ego_ada = 1 if ego_ada_ready_for_center else 0
+    else:
+        force_ego_ada = None
+    out_ada = dream_agent_step(
+        X0_ada, X0_g_ada, oa_ada, od_ada, last_X_ada, path_changed_ada,
+        ada_controller, ada_utils, decision_ada, dynamics,
+        lane_left_ada, lane_center_ada, lane_right_ada,
+        enable_decision_veto=config_integration.enable_decision_veto,
+        force_target_lane=force_ego_ada,
+        bypass_probe_guard=True,
+        force_ignore_veto=True
+    )
+    X0_ada, X0_g_ada = out_ada["X0"], out_ada["X0_g"]
+    oa_ada, od_ada = out_ada["oa"], out_ada["od"]
+    last_X_ada, path_changed_ada = out_ada["last_X"], out_ada["path_changed"]
+    if force_ego_ada is not None:
+        tgt = int(force_ego_ada)
+        if lane_from_global(X0_g_ada) != tgt:
+            blend = EGO_DREAM_ASSIST_BLEND if tgt == 1 else KEEP_LANE_ASSIST_BLEND
+            X0_ada, X0_g_ada = blend_state_toward_lane(X0_ada, X0_g_ada, tgt, blend)
+
+    # ------------------------------------------------------------------------
+    # ADA-world merger (IDEAM).
+    # ------------------------------------------------------------------------
+    ada_row = state_to_row(X0_ada, X0_g_ada)
+    ada_lane = lane_from_global(X0_g_ada)
+    lane_left_merger_ada   = stack_rows([_bl_row] + ([ada_row] if ada_lane == 0 else []))
+    lane_center_merger_ada = stack_rows([truck_row_ada] + ([ada_row] if ada_lane == 1 else []))
+    lane_right_merger_ada  = stack_rows([ada_row] if ada_lane == 2 else [])
+
+    merger_ada_ready_for_center = (
+        i >= MERGER_FORCE_CENTER_MIN_STEP and
+        X0_merger_ada[3] > float(truck_row_ada[0]) + MERGER_LC_OVERTAKE_MARGIN and
+        lane_from_global(X0_g_ada) == 1
+    )
+    lane_merger_ada_now = lane_from_global(X0_g_merger_ada)
+    if lane_merger_ada_now == 2:
+        force_merger_ada = 1 if merger_ada_ready_for_center else 2
+    else:
+        force_merger_ada = None
+    out_merger_ada = ideam_agent_step(
+        X0_merger_ada, X0_g_merger_ada,
+        oa_merger_ada, od_merger_ada, last_X_merger_ada, path_changed_merger_ada,
+        ada_merger_mpc, ada_merger_utils, decision_merger_ada, dynamics,
+        lane_left_merger_ada, lane_center_merger_ada, lane_right_merger_ada,
+        force_target_lane=force_merger_ada,
+        bypass_probe_guard=True
+    )
+    X0_merger_ada, X0_g_merger_ada = out_merger_ada["X0"], out_merger_ada["X0_g"]
+    oa_merger_ada, od_merger_ada = out_merger_ada["oa"], out_merger_ada["od"]
+    last_X_merger_ada, path_changed_merger_ada = out_merger_ada["last_X"], out_merger_ada["path_changed"]
+    if force_merger_ada is not None:
+        tgt = int(force_merger_ada)
+        if lane_from_global(X0_g_merger_ada) != tgt:
+            blend = MERGER_DREAM_ASSIST_BLEND if tgt == 1 else KEEP_LANE_ASSIST_BLEND
+            X0_merger_ada, X0_g_merger_ada = blend_state_toward_lane(
+                X0_merger_ada, X0_g_merger_ada, tgt, blend)
+
+    # ------------------------------------------------------------------------
+    # Build APF world lanes.
+    # ------------------------------------------------------------------------
+    merger_apf_row = state_to_row(X0_merger_apf, X0_g_merger_apf)
+    merger_apf_lane = lane_from_global(X0_g_merger_apf)
+    lane_left_apf    = stack_rows([_bl_row] + ([merger_apf_row] if merger_apf_lane == 0 else []))
+    lane_center_apf  = stack_rows([truck_row_apf] + ([merger_apf_row] if merger_apf_lane == 1 else []))
+    lane_right_apf   = stack_rows([merger_apf_row] if merger_apf_lane == 2 else [])
+
+    # ------------------------------------------------------------------------
+    # DRIFT step (APF) for APF world.
+    # ------------------------------------------------------------------------
+    ego_drift_apf_v = drift_create_vehicle(
+        vid=0, x=X0_g_apf[0], y=X0_g_apf[1],
+        vx=X0_apf[0] * math.cos(X0_g_apf[2]) - X0_apf[1] * math.sin(X0_g_apf[2]),
+        vy=X0_apf[0] * math.sin(X0_g_apf[2]) + X0_apf[1] * math.cos(X0_g_apf[2]),
+        vclass="car"
+    )
+    ego_drift_apf_v["heading"] = X0_g_apf[2]
+    drift_vehicles_apf = [
+        row_to_drift_vehicle(truck_row_apf, vid=1, vclass="truck"),
+        row_to_drift_vehicle(merger_apf_row, vid=2, vclass="car"),
+        blocker.to_drift_vehicle(vid=3),
+    ]
+    risk_field_apf = drift_apf.step(drift_vehicles_apf, ego_drift_apf_v,
+                                    dt=dt, substeps=3, source_fn=compute_Q_APF)
+
+    # ------------------------------------------------------------------------
+    # APF ego (risk-aware, APF source).
+    # ------------------------------------------------------------------------
+    ego_blocker_gap_apf = float(blocker.s) - float(X0_apf[3])
+    ego_apf_ready_for_center = (
+        i >= EGO_FORCE_CENTER_MIN_STEP and
+        X0_apf[3] > float(truck_row_apf[0]) + EGO_LC_OVERTAKE_MARGIN and
+        0.0 < ego_blocker_gap_apf < EGO_BLOCKER_TRIGGER_GAP
+    )
+    lane_apf_now = lane_from_global(X0_g_apf)
+    if lane_apf_now == 0:
+        force_ego_apf = 1 if ego_apf_ready_for_center else 0
+    else:
+        force_ego_apf = None
+    out_apf = dream_agent_step(
+        X0_apf, X0_g_apf, oa_apf, od_apf, last_X_apf, path_changed_apf,
+        apf_controller, apf_utils, decision_apf, dynamics,
+        lane_left_apf, lane_center_apf, lane_right_apf,
+        enable_decision_veto=config_integration.enable_decision_veto,
+        force_target_lane=force_ego_apf,
+        bypass_probe_guard=True,
+        force_ignore_veto=True
+    )
+    X0_apf, X0_g_apf = out_apf["X0"], out_apf["X0_g"]
+    oa_apf, od_apf = out_apf["oa"], out_apf["od"]
+    last_X_apf, path_changed_apf = out_apf["last_X"], out_apf["path_changed"]
+    if force_ego_apf is not None:
+        tgt = int(force_ego_apf)
+        if lane_from_global(X0_g_apf) != tgt:
+            blend = EGO_DREAM_ASSIST_BLEND if tgt == 1 else KEEP_LANE_ASSIST_BLEND
+            X0_apf, X0_g_apf = blend_state_toward_lane(X0_apf, X0_g_apf, tgt, blend)
+
+    # ------------------------------------------------------------------------
+    # APF-world merger (IDEAM).
+    # ------------------------------------------------------------------------
+    apf_row = state_to_row(X0_apf, X0_g_apf)
+    apf_lane = lane_from_global(X0_g_apf)
+    lane_left_merger_apf   = stack_rows([_bl_row] + ([apf_row] if apf_lane == 0 else []))
+    lane_center_merger_apf = stack_rows([truck_row_apf] + ([apf_row] if apf_lane == 1 else []))
+    lane_right_merger_apf  = stack_rows([apf_row] if apf_lane == 2 else [])
+
+    merger_apf_ready_for_center = (
+        i >= MERGER_FORCE_CENTER_MIN_STEP and
+        X0_merger_apf[3] > float(truck_row_apf[0]) + MERGER_LC_OVERTAKE_MARGIN and
+        lane_from_global(X0_g_apf) == 1
+    )
+    lane_merger_apf_now = lane_from_global(X0_g_merger_apf)
+    if lane_merger_apf_now == 2:
+        force_merger_apf = 1 if merger_apf_ready_for_center else 2
+    else:
+        force_merger_apf = None
+    out_merger_apf = ideam_agent_step(
+        X0_merger_apf, X0_g_merger_apf,
+        oa_merger_apf, od_merger_apf, last_X_merger_apf, path_changed_merger_apf,
+        apf_merger_mpc, apf_merger_utils, decision_merger_apf, dynamics,
+        lane_left_merger_apf, lane_center_merger_apf, lane_right_merger_apf,
+        force_target_lane=force_merger_apf,
+        bypass_probe_guard=True
+    )
+    X0_merger_apf, X0_g_merger_apf = out_merger_apf["X0"], out_merger_apf["X0_g"]
+    oa_merger_apf, od_merger_apf = out_merger_apf["oa"], out_merger_apf["od"]
+    last_X_merger_apf, path_changed_merger_apf = out_merger_apf["last_X"], out_merger_apf["path_changed"]
+    if force_merger_apf is not None:
+        tgt = int(force_merger_apf)
+        if lane_from_global(X0_g_merger_apf) != tgt:
+            blend = MERGER_DREAM_ASSIST_BLEND if tgt == 1 else KEEP_LANE_ASSIST_BLEND
+            X0_merger_apf, X0_g_merger_apf = blend_state_toward_lane(
+                X0_merger_apf, X0_g_merger_apf, tgt, blend)
+
+    # ------------------------------------------------------------------------
     # Update trucks in their own worlds.
     # ------------------------------------------------------------------------
     leaders_center_base = []
@@ -1153,12 +1484,28 @@ for i in range(N_t):
         leaders_center_dream.append(state_to_row(X0_merger_dream, X0_g_merger_dream))
     truck_row_dream = update_truck_state(truck_row_dream, truck_dyn, leaders_center_dream)
 
+    leaders_center_ada = []
+    if lane_from_global(X0_g_ada) == 1:
+        leaders_center_ada.append(state_to_row(X0_ada, X0_g_ada))
+    if lane_from_global(X0_g_merger_ada) == 1:
+        leaders_center_ada.append(state_to_row(X0_merger_ada, X0_g_merger_ada))
+    truck_row_ada = update_truck_state(truck_row_ada, truck_dyn, leaders_center_ada)
+
+    leaders_center_apf = []
+    if lane_from_global(X0_g_apf) == 1:
+        leaders_center_apf.append(state_to_row(X0_apf, X0_g_apf))
+    if lane_from_global(X0_g_merger_apf) == 1:
+        leaders_center_apf.append(state_to_row(X0_merger_apf, X0_g_merger_apf))
+    truck_row_apf = update_truck_state(truck_row_apf, truck_dyn, leaders_center_apf)
+
     # ------------------------------------------------------------------------
     # Metrics (sample after all agent/state updates).
     # ------------------------------------------------------------------------
     blocker_row_now = blocker.to_mpc_row()
-    merger_row_now_base = state_to_row(X0_merger_base, X0_g_merger_base)
+    merger_row_now_base  = state_to_row(X0_merger_base, X0_g_merger_base)
     merger_row_now_dream = state_to_row(X0_merger_dream, X0_g_merger_dream)
+    merger_row_now_ada   = state_to_row(X0_merger_ada, X0_g_merger_ada)
+    merger_row_now_apf   = state_to_row(X0_merger_apf, X0_g_merger_apf)
 
     time_hist.append(i * dt)
 
@@ -1199,6 +1546,48 @@ for i in range(N_t):
     except Exception:
         risk_at_ego_hist.append(float("nan"))
 
+    ada_s.append(progress_on_reference(X0_g_ada))
+    ada_vx.append(float(X0_ada[0]))
+    ada_lane_hist.append(int(lane_from_global(X0_g_ada)))
+    ada_merger_lane_hist.append(int(lane_from_global(X0_g_merger_ada)))
+    ada_dist_merger.append(float(math.hypot(
+        float(X0_g_ada[0]) - float(merger_row_now_ada[3]),
+        float(X0_g_ada[1]) - float(merger_row_now_ada[4]),
+    )))
+    ada_min_dist_sur.append(min_center_distance(
+        X0_g_ada, [truck_row_ada, merger_row_now_ada, blocker_row_now]
+    ))
+    if hasattr(oa_ada, "__len__"):
+        ada_acc.append(float(oa_ada[0]) if len(oa_ada) > 0 else 0.0)
+    else:
+        ada_acc.append(float(oa_ada))
+    try:
+        risk_at_ego_ada_hist.append(float(drift_ada.get_risk_cartesian(
+            float(X0_g_ada[0]), float(X0_g_ada[1]))))
+    except Exception:
+        risk_at_ego_ada_hist.append(float("nan"))
+
+    apf_s.append(progress_on_reference(X0_g_apf))
+    apf_vx.append(float(X0_apf[0]))
+    apf_lane_hist.append(int(lane_from_global(X0_g_apf)))
+    apf_merger_lane_hist.append(int(lane_from_global(X0_g_merger_apf)))
+    apf_dist_merger.append(float(math.hypot(
+        float(X0_g_apf[0]) - float(merger_row_now_apf[3]),
+        float(X0_g_apf[1]) - float(merger_row_now_apf[4]),
+    )))
+    apf_min_dist_sur.append(min_center_distance(
+        X0_g_apf, [truck_row_apf, merger_row_now_apf, blocker_row_now]
+    ))
+    if hasattr(oa_apf, "__len__"):
+        apf_acc.append(float(oa_apf[0]) if len(oa_apf) > 0 else 0.0)
+    else:
+        apf_acc.append(float(oa_apf))
+    try:
+        risk_at_ego_apf_hist.append(float(drift_apf.get_risk_cartesian(
+            float(X0_g_apf[0]), float(X0_g_apf[1]))))
+    except Exception:
+        risk_at_ego_apf_hist.append(float("nan"))
+
     # ------------------------------------------------------------------------
     # Horizons for plotting
     # ------------------------------------------------------------------------
@@ -1212,40 +1601,77 @@ for i in range(N_t):
         out_dream["path_d"], out_dream["sample"], out_dream["x_list"], out_dream["y_list"],
         dynamics, dt, boundary
     )
+    h_ada = build_horizon(
+        X0_ada, X0_g_ada, oa_ada, od_ada,
+        out_ada["path_d"], out_ada["sample"], out_ada["x_list"], out_ada["y_list"],
+        dynamics, dt, boundary
+    )
+    h_apf = build_horizon(
+        X0_apf, X0_g_apf, oa_apf, od_apf,
+        out_apf["path_d"], out_apf["sample"], out_apf["x_list"], out_apf["y_list"],
+        dynamics, dt, boundary
+    )
 
     # ------------------------------------------------------------------------
-    # Plot (top IDEAM, bottom DREAM+DRIFT)
+    # Plot (four panels: IDEAM | DREAM-GVF | DREAM-ADA | DREAM-APF)
     # ------------------------------------------------------------------------
     fig = plt.gcf()
     fig.clf()
-    ax_top = fig.add_subplot(2, 1, 1)
-    ax_bottom = fig.add_subplot(2, 1, 2)
+    ax_p1 = fig.add_subplot(1, 4, 1)
+    ax_p2 = fig.add_subplot(1, 4, 2)
+    ax_p3 = fig.add_subplot(1, 4, 3)
+    ax_p4 = fig.add_subplot(1, 4, 4)
 
-    xr_top = [X0_g_base[0] - x_area, X0_g_base[0] + x_area]
-    yr_top = [X0_g_base[1] - y_area, X0_g_base[1] + y_area]
-    xr_bottom = [X0_g_dream[0] - x_area, X0_g_dream[0] + x_area]
-    yr_bottom = [X0_g_dream[1] - y_area, X0_g_dream[1] + y_area]
+    xr_base  = [X0_g_base[0]  - x_area, X0_g_base[0]  + x_area]
+    yr_base  = [X0_g_base[1]  - y_area, X0_g_base[1]  + y_area]
+    xr_dream = [X0_g_dream[0] - x_area, X0_g_dream[0] + x_area]
+    yr_dream = [X0_g_dream[1] - y_area, X0_g_dream[1] + y_area]
+    xr_ada   = [X0_g_ada[0]   - x_area, X0_g_ada[0]   + x_area]
+    yr_ada   = [X0_g_ada[1]   - y_area, X0_g_ada[1]   + y_area]
+    xr_apf   = [X0_g_apf[0]   - x_area, X0_g_apf[0]   + x_area]
+    yr_apf   = [X0_g_apf[1]   - y_area, X0_g_apf[1]   + y_area]
 
-    merger_row_plot_base = state_to_row(X0_merger_base, X0_g_merger_base)
+    merger_row_plot_base  = state_to_row(X0_merger_base,  X0_g_merger_base)
     merger_row_plot_dream = state_to_row(X0_merger_dream, X0_g_merger_dream)
+    merger_row_plot_ada   = state_to_row(X0_merger_ada,   X0_g_merger_ada)
+    merger_row_plot_apf   = state_to_row(X0_merger_apf,   X0_g_merger_apf)
 
     draw_panel(
-        ax_top, X0_base, X0_g_base, truck_row_base, merger_row_plot_base, _bl_row,
+        ax_p1, X0_base, X0_g_base, truck_row_base, merger_row_plot_base, _bl_row,
         title="Baseline MPC-CBF",
-        x_range=xr_top, y_range=yr_top,
+        x_range=xr_base, y_range=yr_base,
         risk_field=None, horizon=h_base, ego_color=EGO_IDEAM_COLOR
     )
-    cf = draw_panel(
-        ax_bottom, X0_dream, X0_g_dream, truck_row_dream, merger_row_plot_dream, _bl_row,
-        title="DREAM (ours)",
-        x_range=xr_bottom, y_range=yr_bottom,
+    cf_gvf = draw_panel(
+        ax_p2, X0_dream, X0_g_dream, truck_row_dream, merger_row_plot_dream, _bl_row,
+        title="DREAM (GVF-DRIFT)",
+        x_range=xr_dream, y_range=yr_dream,
         risk_field=risk_field, horizon=h_dream, ego_color=EGO_DREAM_COLOR
     )
-    if cf is not None:
-        cbar = fig.colorbar(cf, ax=ax_bottom, orientation="vertical", pad=0.02, fraction=0.035)
+    cf_ada = draw_panel(
+        ax_p3, X0_ada, X0_g_ada, truck_row_ada, merger_row_plot_ada, _bl_row,
+        title="DREAM (ADA-DRIFT)",
+        x_range=xr_ada, y_range=yr_ada,
+        risk_field=risk_field_ada, horizon=h_ada, ego_color=EGO_ADA_COLOR
+    )
+    cf_apf = draw_panel(
+        ax_p4, X0_apf, X0_g_apf, truck_row_apf, merger_row_plot_apf, _bl_row,
+        title="DREAM (APF-DRIFT)",
+        x_range=xr_apf, y_range=yr_apf,
+        risk_field=risk_field_apf, horizon=h_apf, ego_color=EGO_APF_COLOR
+    )
+    if cf_gvf is not None:
+        cbar = fig.colorbar(cf_gvf, ax=ax_p2, orientation="vertical", pad=0.02, fraction=0.035)
         cbar.set_label("Risk Level", fontsize=9, weight="bold")
         cbar.ax.tick_params(labelsize=8, colors="black")
-    ax_top.tick_params(labelbottom=False)
+    if cf_ada is not None:
+        cbar2 = fig.colorbar(cf_ada, ax=ax_p3, orientation="vertical", pad=0.02, fraction=0.035)
+        cbar2.set_label("Risk Level", fontsize=9, weight="bold")
+        cbar2.ax.tick_params(labelsize=8, colors="black")
+    if cf_apf is not None:
+        cbar3 = fig.colorbar(cf_apf, ax=ax_p4, orientation="vertical", pad=0.02, fraction=0.035)
+        cbar3.set_label("Risk Level", fontsize=9, weight="bold")
+        cbar3.ax.tick_params(labelsize=8, colors="black")
 
     if SAVE_FRAMES:
         plt.savefig(os.path.join(save_dir, f"{i}.png"), dpi=SAVE_DPI)
@@ -1254,21 +1680,29 @@ for i in range(N_t):
         print(
             f"[{i:03d}] base_lane={lane_from_global(X0_g_base)} "
             f"dream_lane={lane_from_global(X0_g_dream)} "
-            f"base_merger_lane={lane_from_global(X0_g_merger_base)} "
-            f"base_merger_cmd={out_merger_base['path_dindex']} "
-            f"dream_merger_lane={lane_from_global(X0_g_merger_dream)} "
-            f"dream_merger_cmd={out_merger_dream['path_dindex']} "
-            f"truck_base_s={truck_row_base[0]:.1f} "
-            f"truck_dream_s={truck_row_dream[0]:.1f}"
+            f"ada_lane={lane_from_global(X0_g_ada)} "
+            f"apf_lane={lane_from_global(X0_g_apf)} "
+            f"base_merger={lane_from_global(X0_g_merger_base)} "
+            f"dream_merger={lane_from_global(X0_g_merger_dream)} "
+            f"ada_merger={lane_from_global(X0_g_merger_ada)} "
+            f"apf_merger={lane_from_global(X0_g_merger_apf)}"
         )
         if not out_base["ok"]:
             print(f"  [warn] baseline fallback: {out_base.get('error','')}")
         if not out_dream["ok"]:
             print(f"  [warn] dream fallback: {out_dream.get('error','')}")
+        if not out_ada["ok"]:
+            print(f"  [warn] ada fallback: {out_ada.get('error','')}")
+        if not out_apf["ok"]:
+            print(f"  [warn] apf fallback: {out_apf.get('error','')}")
         if not out_merger_base["ok"]:
-            print(f"  [warn] baseline merger fallback: {out_merger_base.get('error','')}")
+            print(f"  [warn] base merger fallback: {out_merger_base.get('error','')}")
         if not out_merger_dream["ok"]:
             print(f"  [warn] dream merger fallback: {out_merger_dream.get('error','')}")
+        if not out_merger_ada["ok"]:
+            print(f"  [warn] ada merger fallback: {out_merger_ada.get('error','')}")
+        if not out_merger_apf["ok"]:
+            print(f"  [warn] apf merger fallback: {out_merger_apf.get('error','')}")
 
 bar.finish()
 print()
@@ -1283,71 +1717,78 @@ else:
 # ============================================================================
 with plt.style.context(["science", "no-latex"]):
     fig_m, axes_m = plt.subplots(3, 2, figsize=(11, 12), constrained_layout=True)
-    fig_m.suptitle("Uncertainty Merger: IDEAM (baseline) vs DREAM", fontsize=13)
+    fig_m.suptitle("Uncertainty Merger: IDEAM vs DREAM-GVF vs DREAM-ADA vs DREAM-APF", fontsize=13)
 
-    _C = {"DREAM": "C0", "IDEAM": "C1"}
-    _LS = {"DREAM": "-", "IDEAM": "--"}
+    _C  = {"IDEAM": "C1", "DREAM": "C0", "ADA": "#9C27B0", "APF": "#009688"}
+    _LS = {"IDEAM": "--",  "DREAM": "-",   "ADA": "-.",     "APF": ":"}
     _t = np.asarray(time_hist, dtype=float)
-    _risk_t = _t[:len(risk_at_ego_hist)]
+    _risk_t     = _t[:len(risk_at_ego_hist)]
+    _risk_ada_t = _t[:len(risk_at_ego_ada_hist)]
+    _risk_apf_t = _t[:len(risk_at_ego_apf_hist)]
 
     # (0,0) Progress
     ax = axes_m[0, 0]
-    ax.plot(_t, base_s, color=_C["IDEAM"], ls=_LS["IDEAM"], label="IDEAM")
-    ax.plot(_t, dream_s, color=_C["DREAM"], ls=_LS["DREAM"], label="DREAM")
-    ax.set_xlabel("t [s]")
-    ax.set_ylabel("s [m]")
-    ax.set_title("Progress s(t)")
+    ax.plot(_t, base_s,  color=_C["IDEAM"], ls=_LS["IDEAM"], label="IDEAM")
+    ax.plot(_t, dream_s, color=_C["DREAM"], ls=_LS["DREAM"], label="DREAM (GVF)")
+    ax.plot(_t, ada_s,   color=_C["ADA"],   ls=_LS["ADA"],   label="DREAM (ADA)")
+    ax.plot(_t, apf_s,   color=_C["APF"],   ls=_LS["APF"],   label="DREAM (APF)")
+    ax.set_xlabel("t [s]"); ax.set_ylabel("s [m]"); ax.set_title("Progress s(t)")
     ax.legend(fontsize=8)
 
     # (0,1) Speed
     ax = axes_m[0, 1]
-    ax.plot(_t, base_vx, color=_C["IDEAM"], ls=_LS["IDEAM"], label="IDEAM")
-    ax.plot(_t, dream_vx, color=_C["DREAM"], ls=_LS["DREAM"], label="DREAM")
-    ax.set_xlabel("t [s]")
-    ax.set_ylabel("vx [m/s]")
-    ax.set_title("Speed vx(t)")
+    ax.plot(_t, base_vx,  color=_C["IDEAM"], ls=_LS["IDEAM"], label="IDEAM")
+    ax.plot(_t, dream_vx, color=_C["DREAM"], ls=_LS["DREAM"], label="DREAM (GVF)")
+    ax.plot(_t, ada_vx,   color=_C["ADA"],   ls=_LS["ADA"],   label="DREAM (ADA)")
+    ax.plot(_t, apf_vx,   color=_C["APF"],   ls=_LS["APF"],   label="DREAM (APF)")
+    ax.set_xlabel("t [s]"); ax.set_ylabel("vx [m/s]"); ax.set_title("Speed vx(t)")
     ax.legend(fontsize=8)
 
     # (1,0) Ego-to-merger distance
     ax = axes_m[1, 0]
-    ax.plot(_t, base_dist_merger, color=_C["IDEAM"], ls=_LS["IDEAM"], label="IDEAM")
-    ax.plot(_t, dream_dist_merger, color=_C["DREAM"], ls=_LS["DREAM"], label="DREAM")
-    ax.axhline(NEAR_COLLISION_DIST, color="orange", lw=1.0, ls="--", label=f"Near collision ({NEAR_COLLISION_DIST}m)")
-    ax.axhline(COLLISION_DIST, color="red", lw=1.0, ls="--", label=f"Collision ({COLLISION_DIST}m)")
-    ax.set_xlabel("t [s]")
-    ax.set_ylabel("distance [m]")
-    ax.set_title("Distance to Merger")
-    ax.set_ylim(bottom=0.0)
-    ax.legend(fontsize=7)
+    ax.plot(_t, base_dist_merger,  color=_C["IDEAM"], ls=_LS["IDEAM"], label="IDEAM")
+    ax.plot(_t, dream_dist_merger, color=_C["DREAM"], ls=_LS["DREAM"], label="DREAM (GVF)")
+    ax.plot(_t, ada_dist_merger,   color=_C["ADA"],   ls=_LS["ADA"],   label="DREAM (ADA)")
+    ax.plot(_t, apf_dist_merger,   color=_C["APF"],   ls=_LS["APF"],   label="DREAM (APF)")
+    ax.axhline(NEAR_COLLISION_DIST, color="orange", lw=1.0, ls="--",
+               label=f"Near collision ({NEAR_COLLISION_DIST}m)")
+    ax.axhline(COLLISION_DIST, color="red", lw=1.0, ls="--",
+               label=f"Collision ({COLLISION_DIST}m)")
+    ax.set_xlabel("t [s]"); ax.set_ylabel("distance [m]"); ax.set_title("Distance to Merger")
+    ax.set_ylim(bottom=0.0); ax.legend(fontsize=7)
 
-    # (1,1) DRIFT risk at DREAM ego
+    # (1,1) DRIFT risk at ego (GVF vs ADA vs APF)
     ax = axes_m[1, 1]
-    ax.plot(_risk_t, risk_at_ego_hist, color=_C["DREAM"], ls=_LS["DREAM"])
-    ax.fill_between(_risk_t, risk_at_ego_hist, color=_C["DREAM"], alpha=0.25)
-    ax.set_xlabel("t [s]")
-    ax.set_ylabel("R(ego)")
-    ax.set_title("DRIFT Risk at DREAM Ego")
+    ax.plot(_risk_t, risk_at_ego_hist,
+            color=_C["DREAM"], ls=_LS["DREAM"], label="GVF source")
+    ax.fill_between(_risk_t, risk_at_ego_hist, color=_C["DREAM"], alpha=0.20)
+    ax.plot(_risk_ada_t, risk_at_ego_ada_hist,
+            color=_C["ADA"], ls=_LS["ADA"], label="ADA source")
+    ax.plot(_risk_apf_t, risk_at_ego_apf_hist,
+            color=_C["APF"], ls=_LS["APF"], label="APF source")
+    ax.set_xlabel("t [s]"); ax.set_ylabel("R(ego)"); ax.set_title("DRIFT Risk at Ego")
+    ax.legend(fontsize=8)
 
     # (2,0) Longitudinal acceleration
     ax = axes_m[2, 0]
-    ax.plot(_t, base_acc, color=_C["IDEAM"], ls=_LS["IDEAM"], label="IDEAM")
-    ax.plot(_t, dream_acc, color=_C["DREAM"], ls=_LS["DREAM"], label="DREAM")
+    ax.plot(_t, base_acc,  color=_C["IDEAM"], ls=_LS["IDEAM"], label="IDEAM")
+    ax.plot(_t, dream_acc, color=_C["DREAM"], ls=_LS["DREAM"], label="DREAM (GVF)")
+    ax.plot(_t, ada_acc,   color=_C["ADA"],   ls=_LS["ADA"],   label="DREAM (ADA)")
+    ax.plot(_t, apf_acc,   color=_C["APF"],   ls=_LS["APF"],   label="DREAM (APF)")
     ax.axhline(0.0, color="black", lw=0.6)
-    ax.set_xlabel("t [s]")
-    ax.set_ylabel("ax [m/s^2]")
-    ax.set_title("Longitudinal Acceleration")
-    ax.legend(fontsize=8)
+    ax.set_xlabel("t [s]"); ax.set_ylabel("ax [m/s^2]")
+    ax.set_title("Longitudinal Acceleration"); ax.legend(fontsize=8)
 
     # (2,1) Minimum spacing to surrounding vehicles
     ax = axes_m[2, 1]
-    ax.plot(_t, base_min_dist_sur, color=_C["IDEAM"], ls=_LS["IDEAM"], label="IDEAM")
-    ax.plot(_t, dream_min_dist_sur, color=_C["DREAM"], ls=_LS["DREAM"], label="DREAM")
+    ax.plot(_t, base_min_dist_sur,  color=_C["IDEAM"], ls=_LS["IDEAM"], label="IDEAM")
+    ax.plot(_t, dream_min_dist_sur, color=_C["DREAM"], ls=_LS["DREAM"], label="DREAM (GVF)")
+    ax.plot(_t, ada_min_dist_sur,   color=_C["ADA"],   ls=_LS["ADA"],   label="DREAM (ADA)")
+    ax.plot(_t, apf_min_dist_sur,   color=_C["APF"],   ls=_LS["APF"],   label="DREAM (APF)")
     ax.axhline(NEAR_COLLISION_DIST, color="orange", lw=0.9, ls=":")
-    ax.set_xlabel("t [s]")
-    ax.set_ylabel("min center dist [m]")
+    ax.set_xlabel("t [s]"); ax.set_ylabel("min center dist [m]")
     ax.set_title("Minimum Distance to Nearby Vehicles")
-    ax.set_ylim(bottom=0.0)
-    ax.legend(fontsize=8)
+    ax.set_ylim(bottom=0.0); ax.legend(fontsize=8)
 
     metrics_png = os.path.join(save_dir, "metrics_uncertainty_merger.png")
     plt.savefig(metrics_png, dpi=300, bbox_inches="tight")
@@ -1358,29 +1799,49 @@ np.save(metrics_npy, {
     "time": np.asarray(time_hist, dtype=float),
     "base_s": np.asarray(base_s, dtype=float),
     "dream_s": np.asarray(dream_s, dtype=float),
+    "ada_s": np.asarray(ada_s, dtype=float),
+    "apf_s": np.asarray(apf_s, dtype=float),
     "base_vx": np.asarray(base_vx, dtype=float),
     "dream_vx": np.asarray(dream_vx, dtype=float),
+    "ada_vx": np.asarray(ada_vx, dtype=float),
+    "apf_vx": np.asarray(apf_vx, dtype=float),
     "base_acc": np.asarray(base_acc, dtype=float),
     "dream_acc": np.asarray(dream_acc, dtype=float),
+    "ada_acc": np.asarray(ada_acc, dtype=float),
+    "apf_acc": np.asarray(apf_acc, dtype=float),
     "base_lane": np.asarray(base_lane_hist, dtype=int),
     "dream_lane": np.asarray(dream_lane_hist, dtype=int),
+    "ada_lane": np.asarray(ada_lane_hist, dtype=int),
+    "apf_lane": np.asarray(apf_lane_hist, dtype=int),
     "base_merger_lane": np.asarray(base_merger_lane_hist, dtype=int),
     "dream_merger_lane": np.asarray(dream_merger_lane_hist, dtype=int),
+    "ada_merger_lane": np.asarray(ada_merger_lane_hist, dtype=int),
+    "apf_merger_lane": np.asarray(apf_merger_lane_hist, dtype=int),
     "base_dist_merger": np.asarray(base_dist_merger, dtype=float),
     "dream_dist_merger": np.asarray(dream_dist_merger, dtype=float),
+    "ada_dist_merger": np.asarray(ada_dist_merger, dtype=float),
+    "apf_dist_merger": np.asarray(apf_dist_merger, dtype=float),
     "base_min_dist_sur": np.asarray(base_min_dist_sur, dtype=float),
     "dream_min_dist_sur": np.asarray(dream_min_dist_sur, dtype=float),
+    "ada_min_dist_sur": np.asarray(ada_min_dist_sur, dtype=float),
+    "apf_min_dist_sur": np.asarray(apf_min_dist_sur, dtype=float),
     "risk_at_ego": np.asarray(risk_at_ego_hist, dtype=float),
+    "risk_at_ego_ada": np.asarray(risk_at_ego_ada_hist, dtype=float),
+    "risk_at_ego_apf": np.asarray(risk_at_ego_apf_hist, dtype=float),
     "near_collision_dist": float(NEAR_COLLISION_DIST),
     "collision_dist": float(COLLISION_DIST),
 })
 
-_base_min_merger = float(np.nanmin(base_dist_merger)) if len(base_dist_merger) else float("nan")
+_base_min_merger  = float(np.nanmin(base_dist_merger))  if len(base_dist_merger)  else float("nan")
 _dream_min_merger = float(np.nanmin(dream_dist_merger)) if len(dream_dist_merger) else float("nan")
-_base_min_sur = float(np.nanmin(base_min_dist_sur)) if len(base_min_dist_sur) else float("nan")
-_dream_min_sur = float(np.nanmin(dream_min_dist_sur)) if len(dream_min_dist_sur) else float("nan")
+_ada_min_merger   = float(np.nanmin(ada_dist_merger))   if len(ada_dist_merger)   else float("nan")
+_apf_min_merger   = float(np.nanmin(apf_dist_merger))   if len(apf_dist_merger)   else float("nan")
+_base_min_sur     = float(np.nanmin(base_min_dist_sur)) if len(base_min_dist_sur) else float("nan")
+_dream_min_sur    = float(np.nanmin(dream_min_dist_sur))if len(dream_min_dist_sur)else float("nan")
+_ada_min_sur      = float(np.nanmin(ada_min_dist_sur))  if len(ada_min_dist_sur)  else float("nan")
+_apf_min_sur      = float(np.nanmin(apf_min_dist_sur))  if len(apf_min_dist_sur)  else float("nan")
 
 print(f"Metrics plot: {metrics_png}")
 print(f"Metrics data: {metrics_npy}")
-print(f"Min ego-merger distance   IDEAM={_base_min_merger:.2f} m  DREAM={_dream_min_merger:.2f} m")
-print(f"Min ego-surround distance IDEAM={_base_min_sur:.2f} m  DREAM={_dream_min_sur:.2f} m")
+print(f"Min ego-merger distance   IDEAM={_base_min_merger:.2f}m  DREAM(GVF)={_dream_min_merger:.2f}m  DREAM(ADA)={_ada_min_merger:.2f}m  DREAM(APF)={_apf_min_merger:.2f}m")
+print(f"Min ego-surround distance IDEAM={_base_min_sur:.2f}m  DREAM(GVF)={_dream_min_sur:.2f}m  DREAM(ADA)={_ada_min_sur:.2f}m  DREAM(APF)={_apf_min_sur:.2f}m")
