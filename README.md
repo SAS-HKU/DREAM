@@ -1,4 +1,5 @@
 # DREAM: Defensive Risk-Aware Enhanced Autonomous Vehicles Maneuver Planning in Heterogeneous Traffic
+DREAM is a heterogeneous-traffic, occlusion-aware, safety-critical planning framework that couples dynamic PDE risk transport with maneuver-level decision and MPC-CBF control, explicitly capturing heavy-vehicle asymmetry and blind-zone hazards.
 
 This repository is built upon the [Risk Field Modeling Comparative Study](https://github.com/SAS-HKU/Riskfield_Benchmark.git) and [DRIFT](https://github.com/SAS-HKU/DRIFT.git): Dynamic Risk Inference via Field Transport for Human-like Autonomous Driving.
 
