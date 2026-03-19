@@ -149,7 +149,6 @@ You should see elevated risk (red zones) in:
 
 - **Frame generation**: ~2-3 seconds per frame (depends on grid size)
 - **Full simulation**: ~15-20 minutes for 400 frames
-- **Memory**: ~500MB for storing risk fields (if enabled)
 ---
 
 ## 📈 Example Workflow
