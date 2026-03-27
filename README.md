@@ -195,6 +195,20 @@ python video_generation.py \
   --fps 20
 ```
 
+### Baseline parallel simulations (simulations in high-density traffic):
+```
+# All 5 arms (default)
+python uncertainty_test_DREAM.py
+
+# Specific arms
+python uncertainty_test_DREAM.py --models DREAM IDEAM
+python uncertainty_test_DREAM.py --models OA-CMPC IDEAM
+python uncertainty_test_DREAM.py --models DREAM ADA APF OA-CMPC IDEAM
+
+# Override run mode too
+python uncertainty_test_DREAM.py --models DREAM IDEAM --mode batch
+```
+
 ## Demonstrations:
 
 ![simple snapshot for quick understanding](assests/DREAM_demo2.gif)
