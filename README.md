@@ -229,7 +229,7 @@ The results show that baseline planner is over aggressive as near collision with
 ### The BEV dataset visualizations:
 [drone-dataset-tools](https://github.com/ika-rwth-aachen/drone-dataset-tools.git)
 
-### The baseline planner:
+### The baseline IDEAM (MPC-CBF) planner:
 Corresponding paper:
 ```
 @article{shu2025agile,
@@ -242,7 +242,7 @@ Corresponding paper:
 ```
 (Referenced coding package: [IDEAM](https://github.com/YimingShu-teay/IDEAM.git))
 
-### The baseline APF modeling:
+### The baseline Artificial Potential Field (APF) modeling:
 Corresponding paper:
 ```
 @article{gao2025trajectory,
@@ -256,7 +256,7 @@ Corresponding paper:
 ```
 (Referenced coding package: [Artificial-Potential-Field](https://github.com/liuxuexun/Artificial-Potential-Field.git))
 
-### The baseline GVF modeling:
+### The baseline Gaussian Velocity Field (GVF) modeling:
 ```
 @article{zhang2021spatiotemporal,
   title={Spatiotemporal learning of multivehicle interaction patterns in lane-change scenarios},
@@ -271,7 +271,7 @@ Corresponding paper:
 ```
 (Referenced coding package: [Gaussian Velocity Field (GVF)](https://github.com/Chengyuan-Zhang/Gaussian_Velocity_Field.git))
 
-### The baseline asymmetric driving aggressiveness modeling:
+### The baseline Asymmetric Driving Aggressiveness (ADA) modeling:
 ```
 @article{hu2025socially,
   title={Socially Game-Theoretic Lane-Change for Autonomous Heavy Vehicle based on Asymmetric Driving Aggressiveness},
