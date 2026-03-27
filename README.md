@@ -288,3 +288,14 @@ Corresponding paper:
   publisher={IEEE}
 }
 ```
+### The baseline occlusion-aware contingency MPC (OA-CMPC):
+```
+@article{zhengocclusion,
+  title={Occlusion-Aware Contingency Safety-Critical Planning for Autonomous Driving},
+  author={Zheng, Lei and Yang, Rui and Zheng, Minzhe and Peng, Zengqi and Wang, Michael Yu and Ma, Jun},
+  journal={IEEE transactions on cybernetics},
+  pages={1-14},
+  year={2026},
+  publisher={IEEE}
+}
+```
