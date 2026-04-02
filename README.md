@@ -300,11 +300,11 @@ Corresponding paper:
 }
 
 ```
-# Citation (preprint):
+## Citation (preprint):
 ```
 @article{zianDREAM,
   title={DREAM: Defensive Risk-Aware Enhanced Maneuver Planning for Autonomous Vehicles in Heterogeneous Traffic},
-  author={Zian, Wang and Yiming, Shu and Zejian, Deng and Guoshun, Cai and Jiahui, Xu and Jiwei, Tang and Dongpu, Cao and Chen, Chen},
+  author={Zian, Wang and Yiming, Shu and Zejian, Deng and Guoshun, Cai and Jiahui, Xu and Jiwei, Tang and Dongpu, Cao and Sun, Chen},
   year={2026},
   doi={https://doi.org/10.2139/ssrn.6500569},
   journal={SSRN Preprint}
