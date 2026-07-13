@@ -6,7 +6,7 @@ This repository is built upon the [Risk Field Modeling Comparative Study](https:
 
 ### proposed framework:
 
-![Methodology graph](assests/DREAM_fig1_v2.png)
+![Methodology graph](assests/methodology.jpg)
 
 
 ## 🚀 Quick Start
