@@ -1,0 +1,155 @@
+"""Explicit, non-oracle DRIFT field-component ablations.
+
+These variants are deliberately implemented through injected source, velocity,
+and diffusion functions.  They do not monkey-patch global PDE functions and
+they never add a geometrically hidden ground-truth actor to the PDE input.
+"""
+
+from __future__ import annotations
+
+from dataclasses import dataclass
+from typing import Callable, Mapping
+
+import numpy as np
+
+from config import Config as cfg
+from pde_solver import (
+    compute_Q_merge,
+    compute_Q_occlusion,
+    compute_Q_vehicle,
+    compute_diffusion_field,
+)
+
+
+SourceFunction = Callable[[list[dict], dict, np.ndarray, np.ndarray], tuple]
+VelocityFunction = Callable[[list[dict], dict, np.ndarray, np.ndarray], tuple]
+DiffusionFunction = Callable[[np.ndarray, np.ndarray, np.ndarray, list[dict], dict], np.ndarray]
+
+
+@dataclass(frozen=True)
+class FieldVariant:
+    """One pre-registered field formulation for the component suite."""
+
+    key: str
+    label: str
+    description: str
+    source_fn: SourceFunction | None = None
+    velocity_fn: VelocityFunction | None = None
+    diffusion_fn: DiffusionFunction | None = None
+
+    def manifest(self) -> Mapping[str, object]:
+        return {
+            "key": self.key,
+            "label": self.label,
+            "description": self.description,
+            "source_injected": self.source_fn is not None,
+            "velocity_injected": self.velocity_fn is not None,
+            "diffusion_injected": self.diffusion_fn is not None,
+        }
+
+
+def _zero_advection(
+    _vehicles: list[dict], _ego: dict, x_grid: np.ndarray, y_grid: np.ndarray
+) -> tuple[np.ndarray, np.ndarray]:
+    """Keep source/diffusion intact while removing field transport only."""
+
+    return np.zeros_like(x_grid, dtype=float), np.zeros_like(y_grid, dtype=float)
+
+
+def _without_occlusion_source(
+    vehicles: list[dict], ego: dict, x_grid: np.ndarray, y_grid: np.ndarray
+) -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
+    """Remove Q_occ but retain visible-vehicle and merge sources."""
+
+    q_vehicle = compute_Q_vehicle(vehicles, ego, x_grid, y_grid)
+    q_merge = compute_Q_merge(vehicles, ego, x_grid, y_grid)
+    q_occ = np.zeros_like(x_grid, dtype=float)
+    occ_mask = np.zeros_like(x_grid, dtype=bool)
+    return q_vehicle + q_merge, q_vehicle, q_occ, occ_mask
+
+
+def _without_occlusion_diffusion(
+    _occ_mask: np.ndarray,
+    x_grid: np.ndarray,
+    y_grid: np.ndarray,
+    vehicles: list[dict],
+    ego: dict,
+) -> np.ndarray:
+    """Retain non-occlusion diffusion effects (e.g., braking) only."""
+
+    return compute_diffusion_field(
+        np.zeros_like(x_grid, dtype=bool), x_grid, y_grid, vehicles, ego
+    )
+
+
+def make_static_trailer_source(initial_trailer: Mapping[str, object]) -> SourceFunction:
+    """Create the no-dynamic-coupling source with a frozen trailer geometry.
+
+    The visible truck still enters the normal vehicle source at its actual
+    state.  Only the *occlusion field* is anchored to the initial trailer
+    pose, removing trailer-motion/occlusion coupling while retaining a
+    comparably sized uncertainty source.
+    """
+
+    trailer = dict(initial_trailer)
+
+    def _source(
+        vehicles: list[dict], ego: dict, x_grid: np.ndarray, y_grid: np.ndarray
+    ) -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
+        q_vehicle = compute_Q_vehicle(vehicles, ego, x_grid, y_grid)
+        q_merge = compute_Q_merge(vehicles, ego, x_grid, y_grid)
+        q_occ, occ_mask = compute_Q_occlusion([trailer], ego, x_grid, y_grid)
+        return q_vehicle + q_occ + q_merge, q_vehicle, q_occ, occ_mask
+
+    return _source
+
+
+def standard_field_variants(initial_trailer: Mapping[str, object]) -> tuple[FieldVariant, ...]:
+    """Return the frozen field-component registry used in the benchmark."""
+
+    return (
+        FieldVariant(
+            key="field_full",
+            label="Full field",
+            description=(
+                "Vehicle, trailer-induced occlusion, diffusion, and advection "
+                "are all active."
+            ),
+        ),
+        FieldVariant(
+            key="field_no_advection",
+            label="No advection",
+            description=(
+                "Sets the PDE transport velocity to zero while retaining the "
+                "same source and diffusion fields."
+            ),
+            velocity_fn=_zero_advection,
+        ),
+        FieldVariant(
+            key="field_no_occ_source",
+            label="No occlusion source",
+            description=(
+                "Removes only Q_occ; the visible trailer remains in the normal "
+                "vehicle source and the diffusion formulation is unchanged."
+            ),
+            source_fn=_without_occlusion_source,
+        ),
+        FieldVariant(
+            key="field_no_occ_diffusion",
+            label="No occlusion diffusion",
+            description=(
+                "Retains Q_occ but removes the diffusion increment generated by "
+                "the occlusion mask."
+            ),
+            diffusion_fn=_without_occlusion_diffusion,
+        ),
+        FieldVariant(
+            key="field_static_trailer_occ",
+            label="Static trailer-occlusion source",
+            description=(
+                "Retains an occlusion source but freezes its trailer pose, "
+                "removing dynamic trailer-field coupling."
+            ),
+            source_fn=make_static_trailer_source(initial_trailer),
+        ),
+    )

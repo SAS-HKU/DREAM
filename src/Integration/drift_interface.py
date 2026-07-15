@@ -107,7 +107,8 @@ class DRIFTInterface:
         self.last_vx = None
         self.last_vy = None
 
-    def warmup(self, vehicles, ego, dt=0.1, duration=5.0, substeps=3):
+    def warmup(self, vehicles, ego, dt=0.1, duration=5.0, substeps=3,
+               source_fn=None, velocity_fn=None, diffusion_fn=None):
         """
         Warm up risk field by pre-evolving PDE to quasi-equilibrium.
 
@@ -121,6 +122,15 @@ class DRIFTInterface:
             dt: Timestep [s]
             duration: Warm-up duration [s]
             substeps: PDE substeps per timestep
+            source_fn: Optional callable replacing compute_total_Q.
+                       Signature: source_fn(vehicles, ego, X, Y)
+                       Returns (Q_total, Q_veh, Q_occ, occ_mask).
+            velocity_fn: Optional callable replacing compute_velocity_field.
+                         It receives (vehicles, ego, X, Y) and may return
+                         either (vx, vy) or the standard six-value output.
+            diffusion_fn: Optional callable replacing compute_diffusion_field.
+                          Signature: diffusion_fn(occ_mask, X, Y, vehicles,
+                          ego), returning a diffusion field.
 
         Returns:
             final_risk: Risk field after warm-up
@@ -131,7 +141,9 @@ class DRIFTInterface:
         for i in range(n_steps):
             # Evolve PDE with current vehicle configuration
             # (vehicles are static during warm-up)
-            _ = self.step(vehicles, ego, dt=dt, substeps=substeps)
+            _ = self.step(vehicles, ego, dt=dt, substeps=substeps,
+                          source_fn=source_fn, velocity_fn=velocity_fn,
+                          diffusion_fn=diffusion_fn)
 
             # Progress indicator
             if (i + 1) % max(1, n_steps // 5) == 0:
@@ -146,7 +158,8 @@ class DRIFTInterface:
 
         return self.solver.R.copy()
 
-    def step(self, vehicles, ego, dt=0.1, substeps=3):
+    def step(self, vehicles, ego, dt=0.1, substeps=3, source_fn=None,
+             velocity_fn=None, diffusion_fn=None):
         """
         Advance the PDE one timestep.
 
@@ -156,24 +169,53 @@ class DRIFTInterface:
             ego: Ego vehicle dict
             dt: Time step [s]
             substeps: Number of sub-steps for numerical stability
+            source_fn: Optional callable replacing compute_total_Q.
+                       Signature: source_fn(vehicles, ego, X, Y)
+                       Returns (Q_total, Q_veh, Q_occ, occ_mask).
+                       When None (default) the standard GVF formulation is used.
+            velocity_fn: Optional callable replacing compute_velocity_field.
+                         It receives (vehicles, ego, X, Y) and may return
+                         either (vx, vy) or the standard six-value output.
+            diffusion_fn: Optional callable replacing compute_diffusion_field.
+                          Signature: diffusion_fn(occ_mask, X, Y, vehicles,
+                          ego), returning a diffusion field.
 
         Returns:
             R: Updated risk field (2D array on cfg.X, cfg.Y grid)
         """
         # Compute source terms Q(x,t)
-        Q_total, Q_veh, Q_occ, occ_mask = compute_total_Q(
-            vehicles, ego, self.X, self.Y
-        )
+        if source_fn is None:
+            Q_total, Q_veh, Q_occ, occ_mask = compute_total_Q(
+                vehicles, ego, self.X, self.Y
+            )
+        else:
+            Q_total, Q_veh, Q_occ, occ_mask = source_fn(
+                vehicles, ego, self.X, self.Y
+            )
         self.last_Q = Q_total
 
         # Compute velocity field for advection
-        vx, vy, vx_flow, vy_flow, vx_topo, vy_topo = compute_velocity_field(
-            vehicles, ego, self.X, self.Y
-        )
+        if velocity_fn is None:
+            velocity_output = compute_velocity_field(
+                vehicles, ego, self.X, self.Y
+            )
+        else:
+            velocity_output = velocity_fn(vehicles, ego, self.X, self.Y)
+        if len(velocity_output) == 2:
+            vx, vy = velocity_output
+        elif len(velocity_output) == 6:
+            vx, vy, _, _, _, _ = velocity_output
+        else:
+            raise ValueError(
+                "velocity_fn must return (vx, vy) or the standard six-value output"
+            )
         self.last_vx, self.last_vy = vx, vy
 
         # Compute spatially-varying diffusion coefficient (with braking-enhanced diffusion)
-        D = compute_diffusion_field(occ_mask, self.X, self.Y, vehicles, ego)
+        if diffusion_fn is None:
+            D = compute_diffusion_field(occ_mask, self.X, self.Y, vehicles, ego)
+        else:
+            D = diffusion_fn(occ_mask, self.X, self.Y, vehicles, ego)
         self.last_D = D
 
         # Advance PDE with sub-stepping for stability
@@ -482,7 +524,8 @@ class DRIFTInterface:
     # IDEAM INTEGRATION HELPERS
     # =====================================================================
 
-    def get_cbf_margin_modulation(self, x, y, base_a, base_b, alpha=0.3, max_scale=2.0):
+    def get_cbf_margin_modulation(self, x, y, base_a, base_b, alpha=0.3, max_scale=2.0,
+                                   risk_norm=1.5):
         """
         Modulate CBF ellipse margins based on local risk.
 
@@ -493,14 +536,16 @@ class DRIFTInterface:
             base_a, base_b: Base ellipse semi-axes
             alpha: Modulation factor (0-1), higher = more responsive
             max_scale: Maximum scaling factor
+            risk_norm: Risk saturation reference. Scale = 1+alpha when risk = risk_norm.
+                       Increase for dense traffic to prevent permanent saturation.
 
         Returns:
             a_mod, b_mod: Modulated ellipse parameters
         """
         risk = self.get_risk_cartesian(x, y)
 
-        # Normalize risk to [0, 1] range (saturates at risk ~ 1.5)
-        risk_normalized = np.clip(risk / 1.5, 0, 1)
+        # Normalize risk to [0, 1] range; saturates at risk_norm
+        risk_normalized = np.clip(risk / risk_norm, 0, 1)
 
         # Compute scale factor
         scale = 1 + alpha * risk_normalized
@@ -512,7 +557,7 @@ class DRIFTInterface:
         return float(a_mod), float(b_mod)
 
     def get_cbf_margin_modulation_frenet(self, s, ey, path_index, base_a, base_b,
-                                          alpha=0.3, max_scale=2.0):
+                                          alpha=0.3, max_scale=2.0, risk_norm=2.0):
         """
         Modulate CBF ellipse margins based on local risk (Frenet input).
 
@@ -522,12 +567,13 @@ class DRIFTInterface:
             base_a, base_b: Base ellipse semi-axes
             alpha: Modulation factor
             max_scale: Maximum scaling factor
+            risk_norm: Risk saturation reference (same semantics as Cartesian variant).
 
         Returns:
             a_mod, b_mod: Modulated ellipse parameters
         """
         risk = self.get_risk_frenet(s, ey, path_index)
-        risk_normalized = np.clip(risk / 2.0, 0, 1)
+        risk_normalized = np.clip(risk / risk_norm, 0, 1)
 
         scale = 1 + alpha * risk_normalized
         scale = np.clip(scale, 1.0, max_scale)
@@ -537,7 +583,8 @@ class DRIFTInterface:
 
         return float(a_mod), float(b_mod)
 
-    def get_headway_modulation(self, x, y, base_Th, base_d0, beta=0.5, max_scale=2.0):
+    def get_headway_modulation(self, x, y, base_Th, base_d0, beta=0.5, max_scale=2.0,
+                               risk_norm=1.5):
         """
         Modulate time headway and min distance based on local risk.
 
@@ -549,12 +596,13 @@ class DRIFTInterface:
             base_d0: Base minimum distance [m]
             beta: Modulation factor
             max_scale: Maximum scaling factor
+            risk_norm: Risk saturation reference.
 
         Returns:
             Th_mod, d0_mod: Modulated parameters
         """
         risk = self.get_risk_cartesian(x, y)
-        risk_normalized = np.clip(risk / 1.5, 0, 1)
+        risk_normalized = np.clip(risk / risk_norm, 0, 1)
 
         scale = 1 + beta * risk_normalized
         scale = np.clip(scale, 1.0, max_scale)
@@ -669,6 +717,53 @@ class DRIFTInterface:
         """
         for idx, path in paths_dict.items():
             self.register_path(idx, path)
+
+    # =====================================================================
+    # RL QUERY HELPERS (Stage 2 additions)
+    # =====================================================================
+
+    def get_risk_corridor(self, x_start: float, y_lane: float, heading: float,
+                          length: float = 25.0, n_samples: int = 6) -> float:
+        """
+        Return the maximum risk along a forward corridor centred on a lane.
+
+        Samples `n_samples` points spaced evenly from x_start to
+        x_start + length, all at lateral position y_lane.  The heading
+        argument is reserved for future curved-road support; for the
+        straight-highway scenario pass 0.0.
+
+        Args:
+            x_start  : Longitudinal start of the corridor [m]
+            y_lane   : Lateral position (lane centre y) [m]
+            heading  : Road heading at this point [rad] (unused for straight road)
+            length   : Corridor look-ahead length [m]
+            n_samples: Number of sample points
+
+        Returns:
+            max_risk : Maximum R along the corridor (scalar float)
+        """
+        if self._interpolator is None:
+            return 0.0
+
+        # Uniform samples along x, constant y
+        xs = np.linspace(x_start, x_start + length, n_samples)
+        ys = np.full(n_samples, y_lane)
+        points = np.column_stack([ys, xs])  # (y, x) convention
+        vals = self._interpolator(points)
+        return float(np.max(vals))
+
+    def get_risk_gradient(self, x: float, y: float) -> tuple:
+        """
+        Return (dR/dx, dR/dy) at a Cartesian point.  Thin alias over
+        get_risk_gradient_cartesian for convenience in RL observation code.
+
+        Args:
+            x, y: Cartesian position [m]
+
+        Returns:
+            (grad_x, grad_y): Risk gradient components (floats)
+        """
+        return self.get_risk_gradient_cartesian(x, y)
 
     # =====================================================================
     # PROPERTIES
