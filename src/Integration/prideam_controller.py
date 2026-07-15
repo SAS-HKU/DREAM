@@ -46,6 +46,11 @@ class RiskWeights:
         self.max_cbf_scale = 2.0
         self.max_headway_scale = 2.0
 
+        # Risk saturation reference for all modulation functions.
+        # At risk = cbf_risk_normalization the CBF/headway scale reaches its maximum.
+        # Increase this for dense-traffic scenarios where aggregate risk is high.
+        self.cbf_risk_normalization = 1.5
+
     def to_dict(self):
         return {
             'mpc_cost': self.mpc_cost,
@@ -54,6 +59,7 @@ class RiskWeights:
             'decision_threshold': self.decision_threshold,
             'max_cbf_scale': self.max_cbf_scale,
             'max_headway_scale': self.max_headway_scale,
+            'cbf_risk_normalization': self.cbf_risk_normalization,
         }
 
     @classmethod
@@ -123,6 +129,15 @@ class PRIDEAMController:
         self.last_risk_along_horizon = None
         self.last_modulated_params = None
         self.last_decision_risk = None
+        # Per-solve provenance for claim-bearing benchmark runners.  Earlier
+        # versions silently converted an internal MPC failure into a zero
+        # control trajectory, making it impossible for an evaluator to
+        # distinguish a genuine controller outcome from a fallback.
+        self.last_solve_status = {
+            'success': None,
+            'fallback_used': False,
+            'fallback_reason': None,
+        }
 
         # Statistics
         self.stats = {
@@ -337,12 +352,14 @@ class PRIDEAMController:
         a_l, b_l = self.drift.get_cbf_margin_modulation(
             x, y, self._orig_a_l, self._orig_b_l,
             alpha=self.weights.cbf_modulation,
-            max_scale=self.weights.max_cbf_scale
+            max_scale=self.weights.max_cbf_scale,
+            risk_norm=self.weights.cbf_risk_normalization,
         )
         a_f, b_f = self.drift.get_cbf_margin_modulation(
             x, y, self._orig_a_f, self._orig_b_f,
             alpha=self.weights.cbf_modulation,
-            max_scale=self.weights.max_cbf_scale
+            max_scale=self.weights.max_cbf_scale,
+            risk_norm=self.weights.cbf_risk_normalization,
         )
 
         # Modulate headway parameters
@@ -351,7 +368,8 @@ class PRIDEAMController:
         Th, d0 = self.drift.get_headway_modulation(
             x, y, base_Th, base_d0,
             beta=self.weights.headway_modulation,
-            max_scale=self.weights.max_headway_scale
+            max_scale=self.weights.max_headway_scale,
+            risk_norm=self.weights.cbf_risk_normalization,
         )
 
         params = {
@@ -439,6 +457,12 @@ class PRIDEAMController:
         Returns:
             oa, od, ovx, ovy, owz, oS, oey, oepsi: MPC solution
         """
+        self.last_solve_status = {
+            'success': False,
+            'fallback_used': False,
+            'fallback_reason': None,
+        }
+
         # 1. COMPUTE PREDICTED TRAJECTORY for risk query
         # Use last solution as warm-start if available
         if last_X and last_X[3] is not None:
@@ -480,6 +504,10 @@ class PRIDEAMController:
             # Handle MPC failure - use fallback from last_X if available
             if oa is None:
                 print("[PRIDEAM] MPC failed, using fallback trajectory")
+                self.last_solve_status.update({
+                    'fallback_used': True,
+                    'fallback_reason': 'MPC returned no acceleration sequence',
+                })
                 T = self.mpc.T
                 if last_X is not None and last_X[0] is not None:
                     ovx, ovy, owz, oS, oey, oepsi = last_X
@@ -506,6 +534,17 @@ class PRIDEAMController:
                     self.last_risk_along_horizon = None
 
             self.stats['mpc_solves'] += 1
+            self.last_solve_status['success'] = not bool(
+                self.last_solve_status['fallback_used']
+            )
+
+        except Exception as error:
+            self.last_solve_status.update({
+                'success': False,
+                'fallback_used': False,
+                'fallback_reason': f'MPC solve exception: {error}',
+            })
+            raise
 
         finally:
             # Always restore original parameters
