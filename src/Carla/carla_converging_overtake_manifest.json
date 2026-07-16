@@ -1,0 +1,211 @@
+{
+  "schema_version": "carla_converging_scene_template_v1",
+  "scenario_family": "town06_converging_dual_overtake_firetruck_v1",
+  "description": "Matched converging-overtake construction: the ego passes a large rigid firetruck on the left while a sensor-occluded challenge vehicle passes it on the right; both request the centre lane ahead of the firetruck, with IDM traffic ahead of and behind the conflict.",
+  "map": "Town06",
+  "road_id": 40,
+  "road_station_limit_m": 460.0,
+  "duration_s": 6.0,
+  "physics_dt_s": 0.05,
+  "measurement_preroll_s": 1.0,
+  "nominal_lane_width_m": 3.5,
+  "weather": "ClearNoon",
+  "lane_map": {
+    "left": -4,
+    "centre": -5,
+    "right": -6
+  },
+  "planner_lane_map": {
+    "left": 0,
+    "centre": 1,
+    "right": 2
+  },
+  "actor_prototypes": {
+    "ego": {
+      "blueprint": "vehicle.lincoln.mkz_2020",
+      "nominal_dimensions_m": {
+        "length": 4.97,
+        "width": 1.93,
+        "height": 1.48
+      }
+    },
+    "occluder": {
+      "blueprint": "vehicle.carlamotors.firetruck",
+      "nominal_dimensions_m": {
+        "length": 8.55,
+        "width": 2.55,
+        "height": 3.4
+      }
+    },
+    "latent_vehicle": {
+      "blueprint": "vehicle.dodge.charger_2020",
+      "nominal_dimensions_m": {
+        "length": 5.04,
+        "width": 1.95,
+        "height": 1.48
+      }
+    },
+    "traffic_blueprints": [
+      "vehicle.tesla.model3",
+      "vehicle.audi.a2",
+      "vehicle.mercedes.coupe_2020",
+      "vehicle.nissan.patrol_2021"
+    ]
+  },
+  "traffic_layout": {
+    "front_leader_lanes": [
+      "left",
+      "centre",
+      "right"
+    ],
+    "trailing_counts": {
+      "left": 4,
+      "centre": 1,
+      "right": 0
+    }
+  },
+  "sampling": {
+    "occluder_station_m": [
+      180.0,
+      195.0
+    ],
+    "occluder_speed_mps": [
+      18.0,
+      20.0
+    ],
+    "ego_speed_advantage_mps": [
+      13.0,
+      14.5
+    ],
+    "hidden_speed_advantage_mps": [
+      8.5,
+      9.5
+    ],
+    "nominal_conflict_time_s": [
+      3.2,
+      3.5
+    ],
+    "arrival_time_offset_hidden_minus_ego_s": [
+      -0.18,
+      -0.02
+    ],
+    "conflict_clearance_ahead_occluder_m": [
+      32.0,
+      33.5
+    ],
+    "ego_lane_change_duration_s": [
+      2.8,
+      3.2
+    ],
+    "hidden_lane_change_duration_s": [
+      2.8,
+      3.2
+    ],
+    "front_npc_offset_after_conflict_m": [
+      22.0,
+      32.0
+    ],
+    "front_npc_desired_speed_offset_mps": [
+      -1.5,
+      0.5
+    ],
+    "front_npc_initial_speed_offset_mps": [
+      -1.0,
+      0.25
+    ],
+    "follower_desired_speed_offset_mps": [
+      -1.0,
+      2.0
+    ],
+    "follower_initial_speed_offset_mps": [
+      -1.0,
+      0.5
+    ],
+    "follower_spacing_scale": [
+      0.92,
+      1.08
+    ],
+    "idm_time_headway_s": [
+      0.85,
+      1.2
+    ],
+    "idm_minimum_gap_m": [
+      1.5,
+      2.6
+    ],
+    "idm_maximum_acceleration_mps2": [
+      1.1,
+      1.8
+    ],
+    "idm_comfortable_deceleration_mps2": [
+      1.8,
+      2.8
+    ]
+  },
+  "traffic_control": {
+    "model": "IDM",
+    "equation": "complete_idm",
+    "update_interval_s": 0.05,
+    "leader_assignment": "nearest_forward_actor_in_current_lane",
+    "lane_change_actors": [
+      "ego",
+      "latent_vehicle"
+    ],
+    "per_tick_random_noise": false,
+    "trace_layout": "long_actor_trace",
+    "front_leaders_use_free_road_term_when_unled": true
+  },
+  "semantic_lidar": {
+    "x_m": 1.2,
+    "z_m": 1.8,
+    "channels": 32,
+    "range_m": 120.0,
+    "points_per_second": 640000,
+    "rotation_frequency_hz": 20,
+    "upper_fov_deg": 10.0,
+    "lower_fov_deg": -22.0,
+    "horizontal_fov_deg": 360.0,
+    "sensor_tick_s": 0.05,
+    "reveal_arming_delay_s": 0.25,
+    "minimum_actor_hits": 5,
+    "consecutive_frames": 2
+  },
+  "rgb_camera": {
+    "x_m": 1.4,
+    "z_m": 1.55,
+    "pitch_deg": -2.0,
+    "width_px": 1920,
+    "height_px": 1080,
+    "fov_deg": 90.0,
+    "sensor_tick_s": 0.05,
+    "recording_start_s": 0.25
+  },
+  "evaluation_metrics": {
+    "near_collision_clearance_m": 0.5,
+    "near_collision_ttc_2d_s": 1.0,
+    "ttc_2d_horizon_s": 5.0,
+    "physical_reveal_alignment": true,
+    "log_all_actor_states_long_format": true
+  },
+  "qualification": {
+    "minimum_initial_occlusion_s": 0.75,
+    "earliest_reveal_s": 0.8,
+    "latest_reveal_s": 5.3,
+    "maximum_cut_in_lateral_error_m": 0.75,
+    "maximum_initial_station_error_m": 3.0,
+    "maximum_actor_speed_error_mps": 1.0,
+    "minimum_pass_clearance_m": 10.0,
+    "minimum_occluder_length_m": 7.5,
+    "minimum_occluder_height_m": 3.0,
+    "nominal_occluder_projection_inset_m": 0.0,
+    "require_identical_construction_hash_across_arms": true
+  },
+  "notes": [
+    "The stock CARLA firetruck is a large rigid occluding vehicle, not an articulated truck-trailer; manuscript terminology must reflect this asset limitation.",
+    "The ego and latent challenge vehicle are both faster than the firetruck and enter the centre lane only after passing its front clearance gate.",
+    "Every seed resolves all positions, speeds, lane-change timings, front traffic, follower traffic, and actor-specific IDM parameters before any controller is run.",
+    "The empty-shadow intervention removes only the latent vehicle; the frozen manifest and every IDM draw remain identical across all four arms.",
+    "No right-lane trailing follower is included because its pre-reveal response to the latent vehicle would create an indirect condition cue in the empty-shadow twin.",
+    "The statistical runner must support actors.idm_npcs, dynamic lane-based leader assignment, and long-format actor traces before this template is used for evidence runs."
+  ]
+}

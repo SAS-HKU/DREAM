@@ -1,0 +1,39 @@
+{
+  "carla_command": [
+    "C:\\CARLA_0.9.14\\WindowsNoEditor\\CarlaUE4\\Binaries\\Win64\\CarlaUE4-Win64-Shipping.exe",
+    "CarlaUE4",
+    "-carla-port=3210",
+    "-RenderOffScreen",
+    "-nosound",
+    "-quality-level=Low",
+    "-ResX=1280",
+    "-ResY=720"
+  ],
+  "construction_hash": "64d4027dc9bedc3faa34eb04aedb0151a2117a61cf68b0435eac585d4e3541b4",
+  "evaluator_actor_states": "<DREAM_ROOT>\\outputs\\carla_converging_final_n5_v19\\town06_converging_dual_overtake_firetruck_v1_seed001003_64d4027dc9be\\ideam_true_threat_seed1003_20260716_203834\\evaluator_actor_states.jsonl",
+  "evaluator_actor_states_are_planner_inaccessible": true,
+  "experiment_command": "<DREAM_ROOT>\\evaluation\\carla_overtaking_trial.py --condition true_threat --controller IDEAM --seed 1003 --manifest <DREAM_ROOT>\\outputs\\carla_converging_bank_final_n5_v19\\manifests\\scene_0003_seed1003.json --output-root <DREAM_ROOT>\\outputs\\carla_converging_final_n5_v19\\town06_converging_dual_overtake_firetruck_v1_seed001003_64d4027dc9be --carla-port 3210 --planner-port 10210 --quality-level Low --launch-server --pace-realtime --planner-python <PLANNER_PYTHON>",
+  "generator_version": "carla_converging_scene_resolver_v19",
+  "manifest_source": "<DREAM_ROOT>\\outputs\\carla_converging_bank_final_n5_v19\\manifests\\scene_0003_seed1003.json",
+  "manifest_source_schema": "carla_overtaking_manifest_v1",
+  "manifest_source_sha256": "0d16a85cc1b6f49bf3c9f8d4fdb8d053527c6517d96d5af5acf1b6aeae0daa58",
+  "npc_trace": "<DREAM_ROOT>\\outputs\\carla_converging_final_n5_v19\\town06_converging_dual_overtake_firetruck_v1_seed001003_64d4027dc9be\\ideam_true_threat_seed1003_20260716_203834\\npc_trace.csv",
+  "output_dir": "<DREAM_ROOT>\\outputs\\carla_converging_final_n5_v19\\town06_converging_dual_overtake_firetruck_v1_seed001003_64d4027dc9be\\ideam_true_threat_seed1003_20260716_203834",
+  "planner_command": [
+    "<PLANNER_PYTHON>",
+    "<DREAM_ROOT>\\Integration\\carla_external_planner.py",
+    "--host",
+    "127.0.0.1",
+    "--port",
+    "10210",
+    "--timeout-s",
+    "120.0"
+  ],
+  "planner_episode_id": "town06_converging_dual_overtake_firetruck_v1_seed001003_64d4027dc9be_seed1003",
+  "pre_reveal_npc_hidden_coupling_policy": "cue_suppressed_until_ego_semantic_lidar_reveal",
+  "resolved_manifest": "<DREAM_ROOT>\\outputs\\carla_converging_final_n5_v19\\town06_converging_dual_overtake_firetruck_v1_seed001003_64d4027dc9be\\ideam_true_threat_seed1003_20260716_203834\\resolved_manifest.json",
+  "run_id": "ideam_true_threat_seed1003_20260716_203834",
+  "scenario_family": "town06_converging_dual_overtake_firetruck_v1",
+  "scene_seed": 1003,
+  "tick_trace": "<DREAM_ROOT>\\outputs\\carla_converging_final_n5_v19\\town06_converging_dual_overtake_firetruck_v1_seed001003_64d4027dc9be\\ideam_true_threat_seed1003_20260716_203834\\tick_trace.csv"
+}

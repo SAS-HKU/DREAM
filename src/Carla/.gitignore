@@ -1,0 +1,9 @@
+__pycache__/
+.pytest_cache/
+*.py[cod]
+reproduced_analysis/
+new_frozen_bank/
+new_runs/
+single_run/
+visual_replays/
+paper_figures/

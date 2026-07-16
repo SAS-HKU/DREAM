@@ -1,0 +1,76 @@
+% Submission-ready content except for the final section, table, figure, and
+% line numbers, which should be inserted after manuscript integration.
+
+\noindent\textbf{Response to the comments on computational time, sudden
+occlusion reveals, and empty-shadow braking.}
+
+We agree that the submitted timing results did not demonstrate execution at
+the nominal 10-Hz planning rate and that describing an asynchronous
+high-level/low-level architecture without implementing and measuring it was
+insufficient.  We also agree that the empty-shadow case and its effect on
+following traffic must be evaluated rather than inferred from the
+true-threat examples.  We therefore added a closed-loop CARLA experiment with
+an implemented asynchronous planner service.  The scenario contains a large
+rigid fire-engine occluder, an ego vehicle passing on its left, and a second
+vehicle passing on its right; the ego and hidden vehicle then request the same
+centre-lane merge region ahead of the occluder.  Nine surrounding vehicles
+use an intelligent-driver-model controller.  For each of five fixed traffic
+seeds, we ran DREAM and IDEAM in matched true-threat and empty-shadow
+conditions (20 eligible runs).  All paired arms share the same initial state,
+traffic trace, and hashed manifest.  A true-threat run is accepted only when
+the entire projected hidden-vehicle footprint is occluded throughout the
+pre-specified 0.25--0.75-s interval and semantic LiDAR confirms its causal
+reveal.  Cameras are disabled in all timing runs and are used only for a
+separate illustrative replay.
+
+The new measurements confirm the reviewer's timing concern.  DREAM's
+high-level optimizer required 451.4 ms on average, 533.1 ms at the mean
+per-run 95th percentile, and 579.3 ms at the observed maximum.  At the
+measured mean ego speed of 30.03 m/s, these durations correspond to
+approximately 13.6, 16.0, and 17.4 m of travel.  Pending optimizer requests
+are therefore coalesced, producing an effective 2.30-Hz high-level rate and a
+76.8\% superseded-request fraction.  The revised manuscript no longer implies
+that the current high-level optimizer executes at 10 Hz.  Instead, it presents
+the system as an asynchronous proof of concept: a separate low-level process
+tracks the latest time-stamped plan at 10 Hz, rejects expired plans, and
+retains lane-hold and visible-actor emergency-braking fallbacks.  Its mean,
+95th-percentile, and maximum execution times were 1.456, 1.826, and 3.556 ms,
+with no 100-ms deadline miss; the 20-Hz physics/control loop also had no
+50-ms deadline miss.  The reveal-to-application delay for a hidden-aware DREAM
+plan was 0.89 s [0.82, 0.97].  We have added this delay explicitly because the
+10-Hz low-level loop alone does not establish safety while a new high-level
+trajectory is being computed, and we do not claim a formal guarantee for an
+arbitrarily aggressive reveal.
+
+The matched true-threat pilot nevertheless provides a closed-loop consistency
+check.  DREAM had 0/5 collisions and 0/5 near collisions, whereas IDEAM had
+2/5 collisions and 5/5 near collisions.  The paired DREAM--IDEAM differences
+were $-0.40$ [$-0.80$, 0.00] for collision incidence and $-1.00$
+[$-1.00$, $-1.00$] for near-collision incidence.  DREAM also increased the
+minimum hidden-vehicle oriented-box clearance by 1.50 m [0.92, 2.03] and the
+minimum two-dimensional TTC by 0.96 s [0.54, 1.29].  Because the validation
+contains five matched scene blocks, these are descriptive scene-block
+bootstrap intervals rather than population-level significance tests.
+
+The empty-shadow arm quantifies the false-positive cost requested by the
+reviewer.  DREAM's mean ego speed was 30.09 m/s, compared with 31.39 m/s for
+IDEAM, giving $CT_v=1.30$ m/s [1.22, 1.39] (approximately 4.68 km/h).  We
+therefore report a measurable conservatism cost rather than claiming that
+empty occlusion is cost free.  Within the 6-s evaluation horizon, the paired
+additional maximum speed loss of the nearest follower was only
+$1.9\times10^{-6}$ m/s [$0.4\times10^{-6}$,
+$3.4\times10^{-6}$], and the paired number of hard-braking traffic actors was
+unchanged.  The additional integrated traffic speed deficit was 0.219
+vehicle-m [0.175, 0.268].  We consequently state only that no additional
+short-horizon follower disturbance was attributable to DREAM in these trials;
+we do not claim that the experiment excludes longer-horizon phantom traffic
+jams.
+
+These additions appear in Section~[X], Tables~[X--Y], and
+Figs.~[X--Y].  The original Python results in Figs.~6 and~8 are retained as
+mechanism-level visualizations of the risk field.  The new CARLA experiment
+serves a different role by testing closed-loop behavior, causal sensor reveal,
+following traffic, and the measured asynchronous execution path.  The
+reproducible scenario manifests, controller service, analysis scripts, and
+plotting code are provided at
+\url{https://github.com/SAS-HKU/DREAM/tree/codex/carla-occlusion-validation/src/Carla}.
