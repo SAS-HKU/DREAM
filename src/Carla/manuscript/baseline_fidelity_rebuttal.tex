@@ -1,0 +1,132 @@
+% Baseline-fidelity response and corresponding manuscript text.
+% Fill the result macros only from the frozen CARLA-bank analysis.  Do not
+% replace them with trajectory-level impressions or unpaired summaries.
+% Replace only this repository macro after the prepared local release tree has
+% been committed and published. The current PC lacks the required `gh` CLI.
+\providecommand{\BaselineCodeCommit}{\textbf{[INSERT IMMUTABLE PUBLIC COMMIT URL AFTER PUBLISHING]}}
+\providecommand{\CarlaSceneCount}{five matched scene blocks (40 valid runs)}
+\providecommand{\CarlaEmptyShadowFinding}{All retained controllers had 0/5
+collisions and 0/5 near collisions in the empty-shadow condition.  DREAM's
+mean-speed conservatism tax relative to IDEAM was 1.22~m\,s$^{-1}$ [1.13,
+1.32].  Its maximum follower speed loss differed from IDEAM by only
+$5.7\times10^{-6}$~m\,s$^{-1}$ [$-1.23\times10^{-3}$,
+$1.25\times10^{-3}$], and the paired hard-braking actor count was unchanged.}
+\providecommand{\CarlaThreatFinding}{In the true-threat condition, DREAM had
+0/5 collisions and 2/5 near collisions, whereas IDEAM had 4/5 and 5/5.  The
+ADA-sourced and APF-sourced controls remained collision-free but had 5/5 and
+4/5 near collisions.  DREAM increased the mean episode-minimum signed
+clearance by 1.19~m [0.89, 1.56], 0.67~m [0.52, 0.82], and 0.19~m [0.02,
+0.39] relative to IDEAM, ADA-sourced, and APF-sourced, respectively.}
+\providecommand{\CarlaFigureNumber}{\ref{fig:carla-two-condition-profiles}}
+\providecommand{\BaselineFidelityTableNumber}{\ref{tab:baseline_fidelity}}
+
+\noindent\textbf{Reviewer comment.}
+\emph{Baseline fairness requires clarification. The baselines are
+re-implemented on the authors' MPC--CBF backbone. In particular, OA-CMPC
+appears to be stripped of its original dual-branch contingency structure,
+which may affect its intended performance. The authors should document the
+fidelity of each re-implementation, justify the modifications, and ideally
+release the baseline code.}
+
+\medskip
+\noindent\textbf{Response.}
+We agree with the reviewer.  Our audit confirmed that the submitted
+OA-CMPC-labelled arm was not a faithful implementation of the published
+OA-CMPC optimizer.  It retained only the tangent-line occlusion geometry and
+time-to-collision-based reachable-set circles, rendered these circles as a
+risk source $Q(\mathbf{x},t)$, and propagated that source through the DREAM
+field and MPC--CBF stack.  It replaced the published dual-/multi-branch
+optimizer by one worst-case branch.  Consequently, it did not implement
+distinct nominal/exploration and contingency trajectories, branch-specific
+decision variables, their shared-horizon consensus constraints, the ADMM
+coordination updates, or the native OA-CMPC risk-boundary constraints.  These
+omissions alter the method being compared and cannot be justified as a
+performance-neutral implementation detail.
+
+We therefore withdrew the OA-CMPC method-level comparison.  The revised
+CARLA figure, aggregate statistics, and associated discussion contain no
+OA-CMPC curve or ranking, and the earlier OA-CMPC panels and comparative
+claims have been removed.  The archived adapter is now described only as an
+``OA-inspired single-branch risk-source surrogate'' and is not used as
+evidence about OA-CMPC.  A future native implementation would require the
+published branch structure and solver; it is outside the evidential scope of
+this revision.
+
+We also revised the names and inferential scope of the retained comparison
+arms.  IDEAM is the native no-field reference: it retains the IDEAM gap and
+decision logic and its LMPC--CBF controller, while disabling the risk field
+and all three DREAM-to-controller coupling channels.  The two other arms are
+now named the \emph{ADA-sourced shared-backbone control} and the
+\emph{APF-sourced shared-backbone control}.  They are controlled
+source-substitution experiments, not end-to-end reproductions of the cited
+ADA or APF planners.  In both arms, the CARLA observation adapter, IDEAM
+decision/MPC--CBF backbone, field propagation equation, and the decision-veto,
+MPC-cost, and CBF-modulation channels are held fixed.  Only the instantaneous
+spatial source supplied to the propagation equation is changed.  The ADA
+control uses the asymmetric momentum-wave source after per-class integral
+matching and contains no explicit occlusion-shadow source.  The APF control
+uses the repulsive potential after per-class integral matching; it omits an
+attractive goal term because route generation and tracking remain common to
+all arms, and it likewise contains no explicit occlusion-shadow source.  The
+common propagation equation still transports and retains both substituted
+sources over time.  All retained CARLA arms also share the same 10-Hz
+trajectory tracker, lane-hold fallback, and visible-actor safety supervisor;
+the comparison changes the high-level plan delivered to this common execution
+layer.
+
+Table~\BaselineFidelityTableNumber{} now records, for every retained arm and
+the withdrawn OA surrogate, the method-specific element, common components,
+adaptations, omissions, and valid interpretation.  The paired CARLA comparison
+uses the same frozen nominal
+scene manifest, stochastic seed, actor definitions, and traffic-control laws
+for all retained arms.  Realized initial states must pass common predeclared
+tolerances, and true-threat reveal is determined causally from semantic LiDAR
+rather than imposed by a controller-specific schedule.  Controller order is
+randomized within scene, and the scene seed is the sampling unit.  It comprises
+\CarlaSceneCount{} across the empty-shadow and true-threat conditions.
+Brackets denote descriptive 95\% complete-scene-block bootstrap intervals from
+10,000 resamples; no population-level hypothesis test is claimed.  The
+observed results are reported without extrapolation as follows:
+\CarlaEmptyShadowFinding{}
+\CarlaThreatFinding{} The revised code map, frozen manifests, runner, and
+analysis scripts have been assembled in the local release tree.  The
+immutable public URL to insert after publishing is \BaselineCodeCommit{}.
+
+\medskip
+\noindent\textbf{Corresponding manuscript edit (baseline definition).}
+
+\begin{quote}
+\textbf{Comparator scope and implementation fidelity.}
+IDEAM is used as a native no-field reference and retains its gap-based
+decision module and LMPC--CBF controller under the same vehicle model, route
+request, and CARLA observation interface as DREAM.  The ADA-sourced and
+APF-sourced arms are source-substitution controls rather than end-to-end
+reproductions of the corresponding planners.  For these controls, field
+transport and the three downstream couplings---decision veto, MPC field cost,
+and risk-dependent CBF modulation---are retained, while only the spatial
+source term is replaced.  The ADA source is an integral-matched asymmetric
+momentum-wave field without an explicit shadow term.  The APF source is an
+integral-matched repulsive potential without an explicit shadow term; its
+attractive term is excluded because route generation and tracking are held
+common.  Table~\ref{tab:baseline_fidelity} documents these adaptations and
+their inferential scope.  An OA-inspired adapter was excluded because it maps
+tangent-line reachable-set circles into a single risk source but does not
+implement the published OA-CMPC dual-/multi-branch trajectories, consensus
+constraints, ADMM coordination, or native risk-boundary constraints.
+\end{quote}
+
+\noindent\textbf{Corresponding manuscript edit (CARLA comparison).}
+
+\begin{quote}
+The matched CARLA experiment compares DREAM with the IDEAM no-field reference
+and the ADA-sourced and APF-sourced controls.  Each controller receives the
+same frozen nominal scene construction within a seed in both the empty-shadow
+and true-threat conditions, and every realized initial state must satisfy the
+same qualification gates.  Figure~\CarlaFigureNumber{} reports ego speed and
+signed minimum oriented-box clearance relative to the semantic-LiDAR reveal
+in each true-threat arm; its matching empty-shadow trace uses that
+controller--seed reveal only as the common time origin.  Aggregate outcomes
+treat the scene seed, rather than individual
+simulation ticks, as the sampling unit.  \CarlaEmptyShadowFinding{}
+\CarlaThreatFinding{}
+\end{quote}

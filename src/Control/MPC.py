@@ -1,3 +1,5 @@
+import os
+import sys
 import numpy as np
 import cvxpy
 import openpyxl
@@ -8,6 +10,26 @@ from Model.params import params
 from Control.HOCBF import *
 # ecos_time = prob.solver_stats.solve_time  # 求解时间（单位：秒）
 # wb = openpyxl.load_workbook("solver_times.xlsx")
+
+# Make rl/utils/timing.py importable from Control/.
+_REPO_ROOT_FOR_TIMING = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+if _REPO_ROOT_FOR_TIMING not in sys.path:
+    sys.path.insert(0, _REPO_ROOT_FOR_TIMING)
+try:
+    from rl.utils.timing import get_timer, CATEGORY_MPC_CBF
+    _TIMER_OK = True
+except ImportError:
+    _TIMER_OK = False
+
+
+def _timed_solve(prob, **kwargs):
+    """Solve a CVXPY problem and record wall time under CATEGORY_MPC_CBF."""
+    if _TIMER_OK:
+        with get_timer().measure(CATEGORY_MPC_CBF):
+            prob.solve(**kwargs)
+    else:
+        prob.solve(**kwargs)
+    return prob
 class LMPC:
     def __init__(self,NX,NU,T,TARGET_SPEED,MAX_ACCEL,MIN_ACCEL,
                  MAX_SPEED,MIN_SPEED,MAX_STEER,MIN_STEER,MAX_DACCEL,
@@ -73,6 +95,26 @@ class LMPC:
         self.risk_cost_vector = None
         self.risk_weight = 0.0
 
+        # RL target-speed override. When set (not None), reference speed
+        # generation uses this value instead of self.TARGET_SPEED. The RL
+        # decision policy re-sets it each step via set_target_speed_override().
+        self.target_speed_override = None
+
+    def set_target_speed_override(self, v_target):
+        """Set a one-shot target speed for the next MPC solve.
+
+        Args:
+            v_target: desired longitudinal reference speed [m/s], or None
+                      to clear the override.
+        """
+        self.target_speed_override = None if v_target is None else float(v_target)
+
+    def _effective_target_speed(self):
+        """Return the target speed to use for reference generation."""
+        if self.target_speed_override is not None:
+            return self.target_speed_override
+        return self.TARGET_SPEED
+
 ############################################ functions for MPC #####################
     def get_refer_path_info(self,path_d,x0,dt):
         s_refer_path = np.zeros(self.T+2)
@@ -109,13 +151,13 @@ class LMPC:
             refs += x0[0]*dt  
             refey = 0.0 
             refepsi = 0.0 
-            reference[0,i+1] = self.TARGET_SPEED
+            reference[0,i+1] = self._effective_target_speed()
             reference[1,i+1] = refvy
             reference[2,i+1] = refw
             reference[3,i+1] = refs
             reference[4,i+1] = refey
             reference[5,i+1] = refepsi
-            
+
             estimation[0,i+1] = refvx
             if psi_refer_path[i+1] == 0 or psi_refer_path[i+1] == np.pi/2 or psi_refer_path[i+1] == np.pi or psi_refer_path[i+1] == -np.pi/2 or psi_refer_path[i+1] == -np.pi:
                 estimation[1,i+1] = 0.0
@@ -252,7 +294,7 @@ class LMPC:
 
 
         prob = cvxpy.Problem(cvxpy.Minimize(cost), constraints)
-        prob.solve(solver=cvxpy.OSQP, verbose=True)
+        _timed_solve(prob, solver=cvxpy.OSQP, verbose=True)
         if prob.status == cvxpy.OPTIMAL or prob.status == cvxpy.OPTIMAL_INACCURATE:
             ovx = get_nparray_from_matrix(x.value[0, :])
             ovy = get_nparray_from_matrix(x.value[1, :])
@@ -296,13 +338,13 @@ class LMPC:
             dref[1, i] = 0.0
             k_profile[0, i] = path_d.get_k(xbar[3, i])
             
-            refvx = 18.0
-            refvy = 0.0 
-            refw = 0.0 
+            refvx = self._effective_target_speed()
+            refvy = 0.0
+            refw = 0.0
             refs += x0[0]*dt
-            refey = 0.0 
-            refepsi = 0.0 
-            reference[0,i] = 18.0
+            refey = 0.0
+            refepsi = 0.0
+            reference[0,i] = self._effective_target_speed()
             reference[1,i] = refvy
             reference[2,i] = refw
             reference[3,i] = refs
@@ -632,11 +674,11 @@ class LMPC:
         # constraints += [x[5,:] <= np.pi]
         
         prob = cvxpy.Problem(cvxpy.Minimize(cost), constraints)
-        try:            
-            prob.solve(solver=cvxpy.ECOS, verbose=False)
+        try:
+            _timed_solve(prob, solver=cvxpy.ECOS, verbose=False)
         except:
             print("Error: Cannot solve mpc..")
-            ovx, ovy, owz, os, oey, oepsi, oa, odelta   = None, None, None, None, None, None, None, None            
+            ovx, ovy, owz, os, oey, oepsi, oa, odelta   = None, None, None, None, None, None, None, None
         if prob.status == cvxpy.OPTIMAL or prob.status == cvxpy.OPTIMAL_INACCURATE:
             ovx = get_nparray_from_matrix(x.value[0, :])
             ovy = get_nparray_from_matrix(x.value[1, :])
@@ -853,7 +895,7 @@ class LMPC:
 
         
         prob = cvxpy.Problem(cvxpy.Minimize(cost), constraints)
-        prob.solve(solver=cvxpy.ECOS, verbose=False)
+        _timed_solve(prob, solver=cvxpy.ECOS, verbose=False)
         if prob.status == cvxpy.OPTIMAL or prob.status == cvxpy.OPTIMAL_INACCURATE:
             ovx = get_nparray_from_matrix(x.value[0, :])
             ovy = get_nparray_from_matrix(x.value[1, :])
@@ -1174,11 +1216,11 @@ class LMPC:
         # constraints += [x[5,:] <= np.pi]
         
         prob = cvxpy.Problem(cvxpy.Minimize(cost), constraints)
-        try:            
-            prob.solve(solver=cvxpy.ECOS, verbose=False)
+        try:
+            _timed_solve(prob, solver=cvxpy.ECOS, verbose=False)
         except:
             print("Error: Cannot solve mpc..")
-            ovx, ovy, owz, os, oey, oepsi, oa, odelta   = None, None, None, None, None, None, None, None            
+            ovx, ovy, owz, os, oey, oepsi, oa, odelta   = None, None, None, None, None, None, None, None
         if prob.status == cvxpy.OPTIMAL or prob.status == cvxpy.OPTIMAL_INACCURATE:
             ovx = get_nparray_from_matrix(x.value[0, :])
             ovy = get_nparray_from_matrix(x.value[1, :])

@@ -16,6 +16,10 @@ The scientific comparison has two matched conditions:
     The latent vehicle is absent; every other actor, command, route request,
     sensor, and seed is unchanged.  DREAM receives no oracle empty flag.
 
+The supported planners are DREAM, IDEAM, ADA-field MPC-CBF, and APF-MPC-CBF.
+OA-CMPC is intentionally excluded because the repository's OA adapter does
+not reproduce the published dual-branch contingency optimizer.
+
 The script records ground truth, sensor visibility, asynchronous plan age,
 low-level commands, follower response, collisions, synchronized composite
 frames, and a JSON summary.  It is a pilot runner, not a statistical result by
@@ -101,7 +105,7 @@ except ImportError as error:  # pragma: no cover
 
 
 CONDITIONS = ("true_threat", "empty_shadow")
-CONTROLLERS = ("DREAM", "IDEAM")
+CONTROLLERS = ("DREAM", "IDEAM", "ADA", "APF")
 PLANNER_LANE_CENTRES_Y = (-201.75, -205.25, -208.75)
 PLANNER_PATH_TRANSLATION_X = -200.0
 COMPOSITE_SIZE = (1920, 1440)
@@ -1276,8 +1280,11 @@ def _render_bev_surface(lidar_array, route_frame, actor_items, ego, hidden_visib
             label_point = bev_point(packet["local_x_m"], packet["local_y_m"])
             _draw_text(surface, small, label, (label_point[0] + 7, label_point[1] - 18))
 
-    if field and str(telemetry.get("controller", "")).upper() == "DREAM":
-        title_text = "Metric-scale BEV | DREAM risk field + semantic LiDAR"
+    field_controller = str(telemetry.get("controller", "")).upper()
+    if field and field_controller in ("DREAM", "ADA", "APF"):
+        title_text = "Metric-scale BEV | {} planning field + semantic LiDAR".format(
+            field_controller
+        )
     elif field:
         title_text = "Metric-scale BEV | planning field + semantic LiDAR"
     else:
@@ -3455,8 +3462,7 @@ def _parse_args():
     parser.add_argument("--planner-timeout-s", type=float, default=120.0)
     parser.add_argument(
         "--planner-python",
-        required=True,
-        help="Python executable for the modern DREAM planner environment",
+        default="C:\\Users\\ymshu\\anaconda3\\python.exe",
     )
     return parser.parse_args()
 

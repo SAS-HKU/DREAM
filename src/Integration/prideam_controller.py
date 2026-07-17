@@ -172,6 +172,19 @@ class PRIDEAMController:
         return self.mpc.vehicle_width
 
     # =====================================================================
+    # RL DECISION-LAYER OVERRIDES (set per step by the RL decision policy)
+    # =====================================================================
+
+    def set_target_speed_override(self, v_target):
+        """Override the MPC reference speed for the next solve.
+
+        Used by the decision-level RL policy to set the cruise-speed
+        target that the MPC tracker follows. Passing None clears the
+        override and restores the default TARGET_SPEED.
+        """
+        self.mpc.set_target_speed_override(v_target)
+
+    # =====================================================================
     # RISK FIELD UPDATE
     # =====================================================================
 

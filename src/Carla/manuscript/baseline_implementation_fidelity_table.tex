@@ -1,0 +1,45 @@
+% Requires \usepackage{booktabs,tabularx}.
+\begin{table*}[t]
+  \centering
+  \caption{Implementation fidelity and inferential scope of the comparison
+  arms. ``Shared backbone'' denotes the common CARLA observation interface,
+  route request, vehicle model, 10-Hz trajectory tracker, lane-hold and
+  visible-actor safety fallbacks, and IDEAM LMPC--CBF stack.  For the
+  source-substitution controls, it additionally includes the DREAM field
+  propagation equation and all three downstream coupling channels.}
+  \label{tab:baseline_fidelity}
+  \begingroup
+  \scriptsize
+  \setlength{\tabcolsep}{4pt}
+  \renewcommand{\arraystretch}{1.10}
+  \begin{tabularx}{\textwidth}{@{}p{0.14\textwidth}p{0.21\textwidth}p{0.31\textwidth}X@{}}
+    \toprule
+    Arm and study role & Method-specific element retained & Shared components, adaptations, and omissions & Permitted interpretation \\
+    \midrule
+    IDEAM
+    \newline Native no-field reference
+    & IDEAM gap construction, decision logic, vehicle dynamics, and LMPC--CBF controller
+    & Uses the shared CARLA actor adapter, ego footprint, route request, planning horizon, controller parameters, 10-Hz tracker, and safety fallbacks.  The risk field and the decision-veto, MPC-field-cost, and risk-dependent CBF-modulation channels are disabled.
+    & Estimates the incremental effect of adding the complete field-mediated DREAM stack on the shared physical setup; it does not isolate an individual field component. \\
+
+    ADA-sourced
+    \newline Source-substitution control
+    & Asymmetric momentum-wave source evaluated on the world-frame field grid
+    & The source is integral-matched by vehicle class.  DREAM field transport and all three downstream couplings are retained.  The source has no explicit occlusion-shadow injection.  No end-to-end ADA behavior planner or controller is claimed.
+    & Isolates sensitivity to spatial source construction under the shared DREAM propagation and controller stack; it is not evidence about the performance of a complete ADA planner. \\
+
+    APF-sourced
+    \newline Source-substitution control
+    & Repulsive artificial-potential source evaluated on the world-frame field grid
+    & The repulsive source is integral-matched by vehicle class.  DREAM field transport and all three downstream couplings are retained.  The attractive goal term and an explicit occlusion-shadow source are absent because routing and tracking are held common.  No end-to-end APF planner is claimed.
+    & Isolates sensitivity to a geometric repulsive source under the shared DREAM propagation and controller stack; it is not evidence about the performance of a complete APF planner. \\
+
+    OA-inspired single-branch surrogate
+    \newline Withdrawn; not evaluated
+    & Tangent-line shadow geometry and TTC-based reachable-set circles, combined with shared visible-vehicle and merge sources
+    & Renders one worst-case branch as $Q(\mathbf{x},t)$ and uses the DREAM propagation/MPC--CBF stack.  It omits dual-/multi-branch trajectories, branch-specific variables, shared-horizon consensus constraints, ADMM coordination, and native OA-CMPC risk-boundary constraints.
+    & No method-level OA-CMPC inference is permitted.  This arm is excluded from the revised figures, statistics, and comparative claims. \\
+    \bottomrule
+  \end{tabularx}
+  \endgroup
+\end{table*}

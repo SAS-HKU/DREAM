@@ -1,0 +1,241 @@
+{
+  "arm_order_version": "matched_controller_condition_randomization_v2",
+  "bank_id": "converging_bank_2efd0ce2a79a425b",
+  "generator_version": "carla_converging_scene_resolver_v19",
+  "manifest_policy": "one_byte_identical_frozen_manifest_per_8_arm_scene",
+  "matched_block_factors": {
+    "condition": [
+      "true_threat",
+      "empty_shadow"
+    ],
+    "controller": [
+      "DREAM",
+      "IDEAM",
+      "ADA",
+      "APF"
+    ]
+  },
+  "planned_run_count": 40,
+  "randomization_seed": 20260717,
+  "scene_count": 5,
+  "scenes": [
+    {
+      "arm_count": 8,
+      "arm_order": [
+        {
+          "condition": "empty_shadow",
+          "controller": "DREAM"
+        },
+        {
+          "condition": "true_threat",
+          "controller": "APF"
+        },
+        {
+          "condition": "true_threat",
+          "controller": "ADA"
+        },
+        {
+          "condition": "empty_shadow",
+          "controller": "IDEAM"
+        },
+        {
+          "condition": "true_threat",
+          "controller": "IDEAM"
+        },
+        {
+          "condition": "true_threat",
+          "controller": "DREAM"
+        },
+        {
+          "condition": "empty_shadow",
+          "controller": "ADA"
+        },
+        {
+          "condition": "empty_shadow",
+          "controller": "APF"
+        }
+      ],
+      "construction_hash_sha256": "76d7e32b2ca849634caa69400150615164a35868619c2640bd7215787abb8571",
+      "manifest_file_sha256": "56ef21a1c16065f0055729eba9be0b0028ee629382681c07eaddc87c4e3fd3aa",
+      "manifest_path": "manifests/scene_0001_seed1001.json",
+      "ordinal": 1,
+      "scene_id": "town06_converging_dual_overtake_firetruck_v1_seed001001_76d7e32b2ca8",
+      "seed": 1001
+    },
+    {
+      "arm_count": 8,
+      "arm_order": [
+        {
+          "condition": "true_threat",
+          "controller": "DREAM"
+        },
+        {
+          "condition": "empty_shadow",
+          "controller": "APF"
+        },
+        {
+          "condition": "true_threat",
+          "controller": "APF"
+        },
+        {
+          "condition": "empty_shadow",
+          "controller": "ADA"
+        },
+        {
+          "condition": "true_threat",
+          "controller": "IDEAM"
+        },
+        {
+          "condition": "true_threat",
+          "controller": "ADA"
+        },
+        {
+          "condition": "empty_shadow",
+          "controller": "IDEAM"
+        },
+        {
+          "condition": "empty_shadow",
+          "controller": "DREAM"
+        }
+      ],
+      "construction_hash_sha256": "57bd7ad37b5dffbb0f0b6c6eca3282401e47bf4c8b260567b19916ccaeeb1149",
+      "manifest_file_sha256": "56cf3349cecb520e9d22304a4e3368f3e1ea130c5af1861ac2f67ac7e1996f1d",
+      "manifest_path": "manifests/scene_0002_seed1002.json",
+      "ordinal": 2,
+      "scene_id": "town06_converging_dual_overtake_firetruck_v1_seed001002_57bd7ad37b5d",
+      "seed": 1002
+    },
+    {
+      "arm_count": 8,
+      "arm_order": [
+        {
+          "condition": "true_threat",
+          "controller": "ADA"
+        },
+        {
+          "condition": "empty_shadow",
+          "controller": "IDEAM"
+        },
+        {
+          "condition": "empty_shadow",
+          "controller": "ADA"
+        },
+        {
+          "condition": "empty_shadow",
+          "controller": "APF"
+        },
+        {
+          "condition": "true_threat",
+          "controller": "IDEAM"
+        },
+        {
+          "condition": "true_threat",
+          "controller": "APF"
+        },
+        {
+          "condition": "empty_shadow",
+          "controller": "DREAM"
+        },
+        {
+          "condition": "true_threat",
+          "controller": "DREAM"
+        }
+      ],
+      "construction_hash_sha256": "64d4027dc9bedc3faa34eb04aedb0151a2117a61cf68b0435eac585d4e3541b4",
+      "manifest_file_sha256": "0d16a85cc1b6f49bf3c9f8d4fdb8d053527c6517d96d5af5acf1b6aeae0daa58",
+      "manifest_path": "manifests/scene_0003_seed1003.json",
+      "ordinal": 3,
+      "scene_id": "town06_converging_dual_overtake_firetruck_v1_seed001003_64d4027dc9be",
+      "seed": 1003
+    },
+    {
+      "arm_count": 8,
+      "arm_order": [
+        {
+          "condition": "empty_shadow",
+          "controller": "DREAM"
+        },
+        {
+          "condition": "true_threat",
+          "controller": "DREAM"
+        },
+        {
+          "condition": "empty_shadow",
+          "controller": "IDEAM"
+        },
+        {
+          "condition": "true_threat",
+          "controller": "APF"
+        },
+        {
+          "condition": "true_threat",
+          "controller": "IDEAM"
+        },
+        {
+          "condition": "empty_shadow",
+          "controller": "ADA"
+        },
+        {
+          "condition": "empty_shadow",
+          "controller": "APF"
+        },
+        {
+          "condition": "true_threat",
+          "controller": "ADA"
+        }
+      ],
+      "construction_hash_sha256": "6d07bc9a0c61e4816a417e64f24997dc7ceaa6217cfcc01e13fcfdd1ddf80c18",
+      "manifest_file_sha256": "56e30466e7389623f5ae85d7b777a2d381c63550c0fab780c07aadc759d41742",
+      "manifest_path": "manifests/scene_0004_seed1004.json",
+      "ordinal": 4,
+      "scene_id": "town06_converging_dual_overtake_firetruck_v1_seed001004_6d07bc9a0c61",
+      "seed": 1004
+    },
+    {
+      "arm_count": 8,
+      "arm_order": [
+        {
+          "condition": "true_threat",
+          "controller": "ADA"
+        },
+        {
+          "condition": "empty_shadow",
+          "controller": "ADA"
+        },
+        {
+          "condition": "empty_shadow",
+          "controller": "IDEAM"
+        },
+        {
+          "condition": "true_threat",
+          "controller": "APF"
+        },
+        {
+          "condition": "true_threat",
+          "controller": "DREAM"
+        },
+        {
+          "condition": "empty_shadow",
+          "controller": "APF"
+        },
+        {
+          "condition": "true_threat",
+          "controller": "IDEAM"
+        },
+        {
+          "condition": "empty_shadow",
+          "controller": "DREAM"
+        }
+      ],
+      "construction_hash_sha256": "c1df7bf640026aadbf78a8bbede5333689d9e59654c058fdf44aac5d3ab63fd6",
+      "manifest_file_sha256": "574721aff607eed74e88fdff2d3817028a0f926f8302e44f82b506985eb710b3",
+      "manifest_path": "manifests/scene_0005_seed1005.json",
+      "ordinal": 5,
+      "scene_id": "town06_converging_dual_overtake_firetruck_v1_seed001005_c1df7bf64002",
+      "seed": 1005
+    }
+  ],
+  "schema_version": "carla_converging_scene_bank_v1",
+  "template_sha256": "09f255d47d179afc039e3a041a31570782305db1f6387d8a20f0ef625bc872fa",
+  "template_source": "carla_converging_overtake_manifest.json"
+}

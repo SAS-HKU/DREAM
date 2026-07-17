@@ -1,0 +1,3915 @@
+{
+  "alignment": {
+    "empty_shadow_policy": "aligned to the true-threat reveal from the same scene and controller",
+    "event": "semantic-LiDAR reveal in the matched true-threat arm",
+    "grid_end_s": 4.8,
+    "grid_start_s": -0.8,
+    "grid_step_s": 0.050000000000000044,
+    "number_of_grid_points": 113
+  },
+  "analysis_unit": "condition-blind physical scene construction",
+  "artifacts": {
+    "aligned_profiles_csv": "<DREAM_ROOT>\\outputs\\carla_field_baselines_n5_v20\\figure6_analysis\\aligned_profiles.csv",
+    "episode_metrics_csv": "<DREAM_ROOT>\\outputs\\carla_field_baselines_n5_v20\\figure6_analysis\\episode_metrics.csv",
+    "figure_pdf": "<DREAM_ROOT>\\outputs\\carla_field_baselines_n5_v20\\figure6_analysis\\figure6_carla_speed_clearance.pdf",
+    "figure_png_300dpi": "<DREAM_ROOT>\\outputs\\carla_field_baselines_n5_v20\\figure6_analysis\\figure6_carla_speed_clearance.png",
+    "latex_results_table": "<DREAM_ROOT>\\outputs\\carla_field_baselines_n5_v20\\figure6_analysis\\carla_figure6_results_table.tex"
+  },
+  "bootstrap": {
+    "confidence_level": 0.95,
+    "purpose": "descriptive uncertainty interval; no p-values are produced",
+    "random_seed": 20260717,
+    "resamples": 10000,
+    "resampling_unit": "complete physical scene block"
+  },
+  "by_condition_and_controller": {
+    "empty_shadow": {
+      "ADA": {
+        "collision_count": 0,
+        "collision_or_near_count": 0,
+        "display_label": "ADA-sourced",
+        "mean_episode_mean_ego_speed_mps": {
+          "bootstrap_95_lower": 30.829261462941343,
+          "bootstrap_95_upper": 31.28582613769539,
+          "mean": 31.057543800318363
+        },
+        "mean_episode_minimum_clearance_first_3s_after_reference_m": {
+          "bootstrap_95_lower": 1.1138801032221695,
+          "bootstrap_95_upper": 1.2392046066207079,
+          "mean": 1.1806586932454557
+        },
+        "mean_episode_minimum_oriented_clearance_m": {
+          "bootstrap_95_lower": 1.1065664100476025,
+          "bootstrap_95_upper": 1.2057856360836623,
+          "mean": 1.1609909946189287
+        },
+        "near_collision_count": 0,
+        "number_of_independent_scenes": 5,
+        "section_4_4_metrics": {
+          "ego_maximum_speed_loss_mps": {
+            "bootstrap_95_lower": 3.4378119893800076,
+            "bootstrap_95_upper": 3.550676587165063,
+            "interval_status": "complete_scene_block_descriptive_interval",
+            "maximum_observed": 3.555384314370947,
+            "mean": 3.4942442882725353,
+            "minimum_observed": 3.410449271428508,
+            "number_observed": 5,
+            "number_of_scenes": 5
+          },
+          "ego_peak_deceleration_mps2": {
+            "bootstrap_95_lower": -2.5238994571789704,
+            "bootstrap_95_upper": -2.4291786249618212,
+            "interval_status": "complete_scene_block_descriptive_interval",
+            "maximum_observed": -2.408406879165028,
+            "mean": -2.47649796435509,
+            "minimum_observed": -2.527588433172099,
+            "number_observed": 5,
+            "number_of_scenes": 5
+          },
+          "low_level_deadline_miss_count": {
+            "bootstrap_95_lower": 0.0,
+            "bootstrap_95_upper": 0.0,
+            "interval_status": "complete_scene_block_descriptive_interval",
+            "maximum_observed": 0.0,
+            "mean": 0.0,
+            "minimum_observed": 0.0,
+            "number_observed": 5,
+            "number_of_scenes": 5
+          },
+          "low_level_deadline_miss_fraction": {
+            "bootstrap_95_lower": 0.0,
+            "bootstrap_95_upper": 0.0,
+            "interval_status": "complete_scene_block_descriptive_interval",
+            "maximum_observed": 0.0,
+            "mean": 0.0,
+            "minimum_observed": 0.0,
+            "number_observed": 5,
+            "number_of_scenes": 5
+          },
+          "low_level_maximum_time_s": {
+            "bootstrap_95_lower": 0.0023837399999990794,
+            "bootstrap_95_upper": 0.0032567600000007247,
+            "interval_status": "complete_scene_block_descriptive_interval",
+            "maximum_observed": 0.003303200000001283,
+            "mean": 0.0028421799999996723,
+            "minimum_observed": 0.0020424999999981708,
+            "number_observed": 5,
+            "number_of_scenes": 5
+          },
+          "low_level_mean_time_s": {
+            "bootstrap_95_lower": 0.0013079472500001368,
+            "bootstrap_95_upper": 0.0013793583333332649,
+            "interval_status": "complete_scene_block_descriptive_interval",
+            "maximum_observed": 0.0013978449999999753,
+            "mean": 0.0013476096666666612,
+            "minimum_observed": 0.0012714633333335593,
+            "number_observed": 5,
+            "number_of_scenes": 5
+          },
+          "low_level_p95_time_s": {
+            "bootstrap_95_lower": 0.0016772920000008538,
+            "bootstrap_95_upper": 0.0019314209999992816,
+            "interval_status": "complete_scene_block_descriptive_interval",
+            "maximum_observed": 0.0019639149999990824,
+            "mean": 0.0018227020000004396,
+            "minimum_observed": 0.0015327250000003899,
+            "number_observed": 5,
+            "number_of_scenes": 5
+          },
+          "maximum_follower_speed_loss_mps": {
+            "bootstrap_95_lower": 1.6265980807310911,
+            "bootstrap_95_upper": 2.381184119636213,
+            "interval_status": "complete_scene_block_descriptive_interval",
+            "maximum_observed": 2.5457936249951985,
+            "mean": 2.013854954750767,
+            "minimum_observed": 1.4081816406325594,
+            "number_observed": 5,
+            "number_of_scenes": 5
+          },
+          "minimum_clearance_first_3s_after_reference_m": {
+            "bootstrap_95_lower": 1.1138801032221695,
+            "bootstrap_95_upper": 1.2392046066207079,
+            "interval_status": "complete_scene_block_descriptive_interval",
+            "maximum_observed": 1.2590724176689045,
+            "mean": 1.1806586932454557,
+            "minimum_observed": 1.0553821397286078,
+            "number_observed": 5,
+            "number_of_scenes": 5
+          },
+          "minimum_hidden_oriented_clearance_m": {
+            "bootstrap_95_lower": null,
+            "bootstrap_95_upper": null,
+            "interval_status": "not_available_no_observations",
+            "maximum_observed": null,
+            "mean": null,
+            "minimum_observed": null,
+            "number_observed": 0,
+            "number_of_scenes": 5
+          },
+          "minimum_hidden_ttc_2d_s": {
+            "bootstrap_95_lower": null,
+            "bootstrap_95_upper": null,
+            "interval_status": "not_available_no_observations",
+            "maximum_observed": null,
+            "mean": null,
+            "minimum_observed": null,
+            "number_observed": 0,
+            "number_of_scenes": 5
+          },
+          "physics_loop_deadline_miss_count": {
+            "bootstrap_95_lower": 0.0,
+            "bootstrap_95_upper": 0.0,
+            "interval_status": "complete_scene_block_descriptive_interval",
+            "maximum_observed": 0.0,
+            "mean": 0.0,
+            "minimum_observed": 0.0,
+            "number_observed": 5,
+            "number_of_scenes": 5
+          },
+          "physics_loop_deadline_miss_fraction": {
+            "bootstrap_95_lower": 0.0,
+            "bootstrap_95_upper": 0.0,
+            "interval_status": "complete_scene_block_descriptive_interval",
+            "maximum_observed": 0.0,
+            "mean": 0.0,
+            "minimum_observed": 0.0,
+            "number_observed": 5,
+            "number_of_scenes": 5
+          },
+          "physics_loop_maximum_cycle_time_s": {
+            "bootstrap_95_lower": 0.017246340000001227,
+            "bootstrap_95_upper": 0.022944739999999797,
+            "interval_status": "complete_scene_block_descriptive_interval",
+            "maximum_observed": 0.026471600000000706,
+            "mean": 0.019396420000000348,
+            "minimum_observed": 0.016726000000002017,
+            "number_observed": 5,
+            "number_of_scenes": 5
+          },
+          "physics_loop_mean_cycle_time_s": {
+            "bootstrap_95_lower": 0.011388572166666625,
+            "bootstrap_95_upper": 0.011570374166667032,
+            "interval_status": "complete_scene_block_descriptive_interval",
+            "maximum_observed": 0.011621105000000782,
+            "mean": 0.011488560000000153,
+            "minimum_observed": 0.011307889166666415,
+            "number_observed": 5,
+            "number_of_scenes": 5
+          },
+          "physics_loop_p95_cycle_time_s": {
+            "bootstrap_95_lower": 0.014790783999998568,
+            "bootstrap_95_upper": 0.01566936599999934,
+            "interval_status": "complete_scene_block_descriptive_interval",
+            "maximum_observed": 0.01585796499999752,
+            "mean": 0.015230074999998955,
+            "minimum_observed": 0.014536354999998835,
+            "number_observed": 5,
+            "number_of_scenes": 5
+          },
+          "planner_dropped_request_fraction": {
+            "bootstrap_95_lower": 0.8305084745762713,
+            "bootstrap_95_upper": 0.8508474576271187,
+            "interval_status": "complete_scene_block_descriptive_interval",
+            "maximum_observed": 0.864406779661017,
+            "mean": 0.8372881355932205,
+            "minimum_observed": 0.8305084745762712,
+            "number_observed": 5,
+            "number_of_scenes": 5
+          },
+          "planner_effective_completed_update_rate_hz": {
+            "bootstrap_95_lower": 1.4666666666666666,
+            "bootstrap_95_upper": 1.6666666666666667,
+            "interval_status": "complete_scene_block_descriptive_interval",
+            "maximum_observed": 1.6666666666666667,
+            "mean": 1.6,
+            "minimum_observed": 1.3333333333333333,
+            "number_observed": 5,
+            "number_of_scenes": 5
+          },
+          "planner_maximum_total_s": {
+            "bootstrap_95_lower": 1.11315602,
+            "bootstrap_95_upper": 1.7345196,
+            "interval_status": "complete_scene_block_descriptive_interval",
+            "maximum_observed": 2.1435811,
+            "mean": 1.32451864,
+            "minimum_observed": 1.1082845,
+            "number_observed": 5,
+            "number_of_scenes": 5
+          },
+          "planner_mean_total_s": {
+            "bootstrap_95_lower": 0.5926150139999999,
+            "bootstrap_95_upper": 0.698418086,
+            "interval_status": "complete_scene_block_descriptive_interval",
+            "maximum_observed": 0.7645890499999999,
+            "mean": 0.6303246699999999,
+            "minimum_observed": 0.58631649,
+            "number_observed": 5,
+            "number_of_scenes": 5
+          },
+          "planner_p95_total_s": {
+            "bootstrap_95_lower": 0.9873519679999996,
+            "bootstrap_95_upper": 1.4596495619999996,
+            "interval_status": "complete_scene_block_descriptive_interval",
+            "maximum_observed": 1.7715844399999994,
+            "mean": 1.1476361099999997,
+            "minimum_observed": 0.9813974149999997,
+            "number_observed": 5,
+            "number_of_scenes": 5
+          },
+          "planner_reveal_to_hidden_aware_plan_applied_s": {
+            "bootstrap_95_lower": null,
+            "bootstrap_95_upper": null,
+            "interval_status": "not_available_no_observations",
+            "maximum_observed": null,
+            "mean": null,
+            "minimum_observed": null,
+            "number_observed": 0,
+            "number_of_scenes": 5
+          },
+          "traffic_hard_braking_actor_count": {
+            "bootstrap_95_lower": 0.0,
+            "bootstrap_95_upper": 0.6,
+            "interval_status": "complete_scene_block_descriptive_interval",
+            "maximum_observed": 1.0,
+            "mean": 0.2,
+            "minimum_observed": 0.0,
+            "number_observed": 5,
+            "number_of_scenes": 5
+          },
+          "traffic_total_integrated_speed_deficit_vehicle_m": {
+            "bootstrap_95_lower": 55.08038099052146,
+            "bootstrap_95_upper": 70.08540562835722,
+            "interval_status": "complete_scene_block_descriptive_interval",
+            "maximum_observed": 75.50606907592785,
+            "mean": 62.58289330943935,
+            "minimum_observed": 52.777901097275425,
+            "number_observed": 5,
+            "number_of_scenes": 5
+          }
+        }
+      },
+      "APF": {
+        "collision_count": 0,
+        "collision_or_near_count": 0,
+        "display_label": "APF-sourced",
+        "mean_episode_mean_ego_speed_mps": {
+          "bootstrap_95_lower": 30.94494345569016,
+          "bootstrap_95_upper": 31.37097414034435,
+          "mean": 31.157958798017255
+        },
+        "mean_episode_minimum_clearance_first_3s_after_reference_m": {
+          "bootstrap_95_lower": 1.1276350516044862,
+          "bootstrap_95_upper": 1.2390683221154013,
+          "mean": 1.1856919356188862
+        },
+        "mean_episode_minimum_oriented_clearance_m": {
+          "bootstrap_95_lower": 1.1210545031635752,
+          "bootstrap_95_upper": 1.205718276800347,
+          "mean": 1.1661095017776804
+        },
+        "near_collision_count": 0,
+        "number_of_independent_scenes": 5,
+        "section_4_4_metrics": {
+          "ego_maximum_speed_loss_mps": {
+            "bootstrap_95_lower": 3.19562375933939,
+            "bootstrap_95_upper": 3.369937657973606,
+            "interval_status": "complete_scene_block_descriptive_interval",
+            "maximum_observed": 3.4214605895024093,
+            "mean": 3.2823456071372576,
+            "minimum_observed": 3.1794806716677044,
+            "number_observed": 5,
+            "number_of_scenes": 5
+          },
+          "ego_peak_deceleration_mps2": {
+            "bootstrap_95_lower": -2.46701873165523,
+            "bootstrap_95_upper": -2.393799224044102,
+            "interval_status": "complete_scene_block_descriptive_interval",
+            "maximum_observed": -2.351507908514563,
+            "mean": -2.4392445284829876,
+            "minimum_observed": -2.4742063385026825,
+            "number_observed": 5,
+            "number_of_scenes": 5
+          },
+          "low_level_deadline_miss_count": {
+            "bootstrap_95_lower": 0.0,
+            "bootstrap_95_upper": 0.0,
+            "interval_status": "complete_scene_block_descriptive_interval",
+            "maximum_observed": 0.0,
+            "mean": 0.0,
+            "minimum_observed": 0.0,
+            "number_observed": 5,
+            "number_of_scenes": 5
+          },
+          "low_level_deadline_miss_fraction": {
+            "bootstrap_95_lower": 0.0,
+            "bootstrap_95_upper": 0.0,
+            "interval_status": "complete_scene_block_descriptive_interval",
+            "maximum_observed": 0.0,
+            "mean": 0.0,
+            "minimum_observed": 0.0,
+            "number_observed": 5,
+            "number_of_scenes": 5
+          },
+          "low_level_maximum_time_s": {
+            "bootstrap_95_lower": 0.0021275799999997957,
+            "bootstrap_95_upper": 0.002721440000000541,
+            "interval_status": "complete_scene_block_descriptive_interval",
+            "maximum_observed": 0.002992100000000164,
+            "mean": 0.0024065200000002564,
+            "minimum_observed": 0.0020206999999992092,
+            "number_observed": 5,
+            "number_of_scenes": 5
+          },
+          "low_level_mean_time_s": {
+            "bootstrap_95_lower": 0.0012555403333333953,
+            "bootstrap_95_upper": 0.00131209299999977,
+            "interval_status": "complete_scene_block_descriptive_interval",
+            "maximum_observed": 0.0013387149999994463,
+            "mean": 0.0012812686666666077,
+            "minimum_observed": 0.001241265000000169,
+            "number_observed": 5,
+            "number_of_scenes": 5
+          },
+          "low_level_p95_time_s": {
+            "bootstrap_95_lower": 0.0015550820000007795,
+            "bootstrap_95_upper": 0.0020763059999994123,
+            "interval_status": "complete_scene_block_descriptive_interval",
+            "maximum_observed": 0.002287059999997609,
+            "mean": 0.0017889120000002374,
+            "minimum_observed": 0.0015194200000012248,
+            "number_observed": 5,
+            "number_of_scenes": 5
+          },
+          "maximum_follower_speed_loss_mps": {
+            "bootstrap_95_lower": 1.6265980807327858,
+            "bootstrap_95_upper": 2.381574742752252,
+            "interval_status": "complete_scene_block_descriptive_interval",
+            "maximum_observed": 2.5467701827839626,
+            "mean": 2.0140502663092628,
+            "minimum_observed": 1.4081816406349397,
+            "number_observed": 5,
+            "number_of_scenes": 5
+          },
+          "minimum_clearance_first_3s_after_reference_m": {
+            "bootstrap_95_lower": 1.1276350516044862,
+            "bootstrap_95_upper": 1.2390683221154013,
+            "interval_status": "complete_scene_block_descriptive_interval",
+            "maximum_observed": 1.2590061307802796,
+            "mean": 1.1856919356188862,
+            "minimum_observed": 1.0811651348156741,
+            "number_observed": 5,
+            "number_of_scenes": 5
+          },
+          "minimum_hidden_oriented_clearance_m": {
+            "bootstrap_95_lower": null,
+            "bootstrap_95_upper": null,
+            "interval_status": "not_available_no_observations",
+            "maximum_observed": null,
+            "mean": null,
+            "minimum_observed": null,
+            "number_observed": 0,
+            "number_of_scenes": 5
+          },
+          "minimum_hidden_ttc_2d_s": {
+            "bootstrap_95_lower": null,
+            "bootstrap_95_upper": null,
+            "interval_status": "not_available_no_observations",
+            "maximum_observed": null,
+            "mean": null,
+            "minimum_observed": null,
+            "number_observed": 0,
+            "number_of_scenes": 5
+          },
+          "physics_loop_deadline_miss_count": {
+            "bootstrap_95_lower": 0.0,
+            "bootstrap_95_upper": 0.0,
+            "interval_status": "complete_scene_block_descriptive_interval",
+            "maximum_observed": 0.0,
+            "mean": 0.0,
+            "minimum_observed": 0.0,
+            "number_observed": 5,
+            "number_of_scenes": 5
+          },
+          "physics_loop_deadline_miss_fraction": {
+            "bootstrap_95_lower": 0.0,
+            "bootstrap_95_upper": 0.0,
+            "interval_status": "complete_scene_block_descriptive_interval",
+            "maximum_observed": 0.0,
+            "mean": 0.0,
+            "minimum_observed": 0.0,
+            "number_observed": 5,
+            "number_of_scenes": 5
+          },
+          "physics_loop_maximum_cycle_time_s": {
+            "bootstrap_95_lower": 0.01608298000000019,
+            "bootstrap_95_upper": 0.01967441999999977,
+            "interval_status": "complete_scene_block_descriptive_interval",
+            "maximum_observed": 0.021641299999998864,
+            "mean": 0.017678000000000083,
+            "minimum_observed": 0.015539499999999151,
+            "number_observed": 5,
+            "number_of_scenes": 5
+          },
+          "physics_loop_mean_cycle_time_s": {
+            "bootstrap_95_lower": 0.01140312400000027,
+            "bootstrap_95_upper": 0.011779084000000026,
+            "interval_status": "complete_scene_block_descriptive_interval",
+            "maximum_observed": 0.011869260833333535,
+            "mean": 0.011591104000000147,
+            "minimum_observed": 0.011330001666667163,
+            "number_observed": 5,
+            "number_of_scenes": 5
+          },
+          "physics_loop_p95_cycle_time_s": {
+            "bootstrap_95_lower": 0.014587511000001144,
+            "bootstrap_95_upper": 0.01484078099999955,
+            "interval_status": "complete_scene_block_descriptive_interval",
+            "maximum_observed": 0.014888019999999356,
+            "mean": 0.014714146000000348,
+            "minimum_observed": 0.014508144999999927,
+            "number_observed": 5,
+            "number_of_scenes": 5
+          },
+          "planner_dropped_request_fraction": {
+            "bootstrap_95_lower": 0.840677966101695,
+            "bootstrap_95_upper": 0.8711864406779661,
+            "interval_status": "complete_scene_block_descriptive_interval",
+            "maximum_observed": 0.8813559322033898,
+            "mean": 0.8576271186440678,
+            "minimum_observed": 0.8305084745762712,
+            "number_observed": 5,
+            "number_of_scenes": 5
+          },
+          "planner_effective_completed_update_rate_hz": {
+            "bootstrap_95_lower": 1.2666666666666666,
+            "bootstrap_95_upper": 1.5666666666666669,
+            "interval_status": "complete_scene_block_descriptive_interval",
+            "maximum_observed": 1.6666666666666667,
+            "mean": 1.4,
+            "minimum_observed": 1.1666666666666667,
+            "number_observed": 5,
+            "number_of_scenes": 5
+          },
+          "planner_maximum_total_s": {
+            "bootstrap_95_lower": 1.3611139,
+            "bootstrap_95_upper": 1.89747578,
+            "interval_status": "complete_scene_block_descriptive_interval",
+            "maximum_observed": 2.0250253,
+            "mean": 1.6597256599999999,
+            "minimum_observed": 1.1035427,
+            "number_observed": 5,
+            "number_of_scenes": 5
+          },
+          "planner_mean_total_s": {
+            "bootstrap_95_lower": 0.6283987341666666,
+            "bootstrap_95_upper": 0.7377281139285714,
+            "interval_status": "complete_scene_block_descriptive_interval",
+            "maximum_observed": 0.7538084875,
+            "mean": 0.6885525473809524,
+            "minimum_observed": 0.57204705,
+            "number_observed": 5,
+            "number_of_scenes": 5
+          },
+          "planner_p95_total_s": {
+            "bootstrap_95_lower": 1.1744215369999995,
+            "bootstrap_95_upper": 1.6307130499999996,
+            "interval_status": "complete_scene_block_descriptive_interval",
+            "maximum_observed": 1.7511826599999991,
+            "mean": 1.4156322649999997,
+            "minimum_observed": 0.9490415899999997,
+            "number_observed": 5,
+            "number_of_scenes": 5
+          },
+          "planner_reveal_to_hidden_aware_plan_applied_s": {
+            "bootstrap_95_lower": null,
+            "bootstrap_95_upper": null,
+            "interval_status": "not_available_no_observations",
+            "maximum_observed": null,
+            "mean": null,
+            "minimum_observed": null,
+            "number_observed": 0,
+            "number_of_scenes": 5
+          },
+          "traffic_hard_braking_actor_count": {
+            "bootstrap_95_lower": 0.0,
+            "bootstrap_95_upper": 0.6,
+            "interval_status": "complete_scene_block_descriptive_interval",
+            "maximum_observed": 1.0,
+            "mean": 0.2,
+            "minimum_observed": 0.0,
+            "number_observed": 5,
+            "number_of_scenes": 5
+          },
+          "traffic_total_integrated_speed_deficit_vehicle_m": {
+            "bootstrap_95_lower": 55.04335951567536,
+            "bootstrap_95_upper": 70.0332474762549,
+            "interval_status": "complete_scene_block_descriptive_interval",
+            "maximum_observed": 75.49088734670482,
+            "mean": 62.53830349596514,
+            "minimum_observed": 52.75073375909758,
+            "number_observed": 5,
+            "number_of_scenes": 5
+          }
+        }
+      },
+      "DREAM": {
+        "collision_count": 0,
+        "collision_or_near_count": 0,
+        "display_label": "DREAM",
+        "mean_episode_mean_ego_speed_mps": {
+          "bootstrap_95_lower": 29.898912094134158,
+          "bootstrap_95_upper": 30.34409030880037,
+          "mean": 30.120843472012474
+        },
+        "mean_episode_minimum_clearance_first_3s_after_reference_m": {
+          "bootstrap_95_lower": 1.1136685788498926,
+          "bootstrap_95_upper": 1.2393628841922422,
+          "mean": 1.1806376127901412
+        },
+        "mean_episode_minimum_oriented_clearance_m": {
+          "bootstrap_95_lower": 1.1063004510919412,
+          "bootstrap_95_upper": 1.2058313901376068,
+          "mean": 1.1609233189428658
+        },
+        "near_collision_count": 0,
+        "number_of_independent_scenes": 5,
+        "section_4_4_metrics": {
+          "ego_maximum_speed_loss_mps": {
+            "bootstrap_95_lower": 4.975107882201267,
+            "bootstrap_95_upper": 5.21308043631881,
+            "interval_status": "complete_scene_block_descriptive_interval",
+            "maximum_observed": 5.242207810368317,
+            "mean": 5.106389946838048,
+            "minimum_observed": 4.858289511626985,
+            "number_observed": 5,
+            "number_of_scenes": 5
+          },
+          "ego_peak_deceleration_mps2": {
+            "bootstrap_95_lower": -2.582187581185323,
+            "bootstrap_95_upper": -2.4473248627524953,
+            "interval_status": "complete_scene_block_descriptive_interval",
+            "maximum_observed": -2.408422362707512,
+            "mean": -2.5093234721176714,
+            "minimum_observed": -2.6422100815899086,
+            "number_observed": 5,
+            "number_of_scenes": 5
+          },
+          "low_level_deadline_miss_count": {
+            "bootstrap_95_lower": 0.0,
+            "bootstrap_95_upper": 0.0,
+            "interval_status": "complete_scene_block_descriptive_interval",
+            "maximum_observed": 0.0,
+            "mean": 0.0,
+            "minimum_observed": 0.0,
+            "number_observed": 5,
+            "number_of_scenes": 5
+          },
+          "low_level_deadline_miss_fraction": {
+            "bootstrap_95_lower": 0.0,
+            "bootstrap_95_upper": 0.0,
+            "interval_status": "complete_scene_block_descriptive_interval",
+            "maximum_observed": 0.0,
+            "mean": 0.0,
+            "minimum_observed": 0.0,
+            "number_observed": 5,
+            "number_of_scenes": 5
+          },
+          "low_level_maximum_time_s": {
+            "bootstrap_95_lower": 0.0021603399999975182,
+            "bootstrap_95_upper": 0.0028286999999949103,
+            "interval_status": "complete_scene_block_descriptive_interval",
+            "maximum_observed": 0.0029623999999941475,
+            "mean": 0.002518019999996568,
+            "minimum_observed": 0.0018352999999962094,
+            "number_observed": 5,
+            "number_of_scenes": 5
+          },
+          "low_level_mean_time_s": {
+            "bootstrap_95_lower": 0.0013141593333331277,
+            "bootstrap_95_upper": 0.00142420800000032,
+            "interval_status": "complete_scene_block_descriptive_interval",
+            "maximum_observed": 0.001447776666667148,
+            "mean": 0.0013691836666667237,
+            "minimum_observed": 0.0012852599999997475,
+            "number_observed": 5,
+            "number_of_scenes": 5
+          },
+          "low_level_p95_time_s": {
+            "bootstrap_95_lower": 0.001730784000001151,
+            "bootstrap_95_upper": 0.0024122229999992578,
+            "interval_status": "complete_scene_block_descriptive_interval",
+            "maximum_observed": 0.0026482449999978277,
+            "mean": 0.002056108000000236,
+            "minimum_observed": 0.0016344550000036758,
+            "number_observed": 5,
+            "number_of_scenes": 5
+          },
+          "maximum_follower_speed_loss_mps": {
+            "bootstrap_95_lower": 1.62618687314609,
+            "bootstrap_95_upper": 2.381106299445542,
+            "interval_status": "complete_scene_block_descriptive_interval",
+            "maximum_observed": 2.545599074517188,
+            "mean": 2.013404837055075,
+            "minimum_observed": 1.408181640670282,
+            "number_observed": 5,
+            "number_of_scenes": 5
+          },
+          "minimum_clearance_first_3s_after_reference_m": {
+            "bootstrap_95_lower": 1.1136685788498926,
+            "bootstrap_95_upper": 1.2393628841922422,
+            "interval_status": "complete_scene_block_descriptive_interval",
+            "maximum_observed": 1.2592271401261155,
+            "mean": 1.1806376127901412,
+            "minimum_observed": 1.0549191372194988,
+            "number_observed": 5,
+            "number_of_scenes": 5
+          },
+          "minimum_hidden_oriented_clearance_m": {
+            "bootstrap_95_lower": null,
+            "bootstrap_95_upper": null,
+            "interval_status": "not_available_no_observations",
+            "maximum_observed": null,
+            "mean": null,
+            "minimum_observed": null,
+            "number_observed": 0,
+            "number_of_scenes": 5
+          },
+          "minimum_hidden_ttc_2d_s": {
+            "bootstrap_95_lower": null,
+            "bootstrap_95_upper": null,
+            "interval_status": "not_available_no_observations",
+            "maximum_observed": null,
+            "mean": null,
+            "minimum_observed": null,
+            "number_observed": 0,
+            "number_of_scenes": 5
+          },
+          "physics_loop_deadline_miss_count": {
+            "bootstrap_95_lower": 0.0,
+            "bootstrap_95_upper": 0.0,
+            "interval_status": "complete_scene_block_descriptive_interval",
+            "maximum_observed": 0.0,
+            "mean": 0.0,
+            "minimum_observed": 0.0,
+            "number_observed": 5,
+            "number_of_scenes": 5
+          },
+          "physics_loop_deadline_miss_fraction": {
+            "bootstrap_95_lower": 0.0,
+            "bootstrap_95_upper": 0.0,
+            "interval_status": "complete_scene_block_descriptive_interval",
+            "maximum_observed": 0.0,
+            "mean": 0.0,
+            "minimum_observed": 0.0,
+            "number_observed": 5,
+            "number_of_scenes": 5
+          },
+          "physics_loop_maximum_cycle_time_s": {
+            "bootstrap_95_lower": 0.016905839999998305,
+            "bootstrap_95_upper": 0.018713520000000018,
+            "interval_status": "complete_scene_block_descriptive_interval",
+            "maximum_observed": 0.01936889999999991,
+            "mean": 0.017788939999999087,
+            "minimum_observed": 0.01623949999999752,
+            "number_observed": 5,
+            "number_of_scenes": 5
+          },
+          "physics_loop_mean_cycle_time_s": {
+            "bootstrap_95_lower": 0.011581369000000024,
+            "bootstrap_95_upper": 0.011871544999999959,
+            "interval_status": "complete_scene_block_descriptive_interval",
+            "maximum_observed": 0.012050845833333193,
+            "mean": 0.011684657333333353,
+            "minimum_observed": 0.011579786666666703,
+            "number_observed": 5,
+            "number_of_scenes": 5
+          },
+          "physics_loop_p95_cycle_time_s": {
+            "bootstrap_95_lower": 0.014643045000001857,
+            "bootstrap_95_upper": 0.015342572000001909,
+            "interval_status": "complete_scene_block_descriptive_interval",
+            "maximum_observed": 0.015517450000004372,
+            "mean": 0.015004167000002192,
+            "minimum_observed": 0.014438985000000671,
+            "number_observed": 5,
+            "number_of_scenes": 5
+          },
+          "planner_dropped_request_fraction": {
+            "bootstrap_95_lower": 0.7466101694915255,
+            "bootstrap_95_upper": 0.7567796610169492,
+            "interval_status": "complete_scene_block_descriptive_interval",
+            "maximum_observed": 0.7627118644067796,
+            "mean": 0.7508474576271187,
+            "minimum_observed": 0.7457627118644068,
+            "number_observed": 5,
+            "number_of_scenes": 5
+          },
+          "planner_effective_completed_update_rate_hz": {
+            "bootstrap_95_lower": 2.4000000000000004,
+            "bootstrap_95_upper": 2.5,
+            "interval_status": "complete_scene_block_descriptive_interval",
+            "maximum_observed": 2.5,
+            "mean": 2.466666666666667,
+            "minimum_observed": 2.3333333333333335,
+            "number_observed": 5,
+            "number_of_scenes": 5
+          },
+          "planner_maximum_total_s": {
+            "bootstrap_95_lower": 0.51036348,
+            "bootstrap_95_upper": 0.5586326,
+            "interval_status": "complete_scene_block_descriptive_interval",
+            "maximum_observed": 0.5836166,
+            "mean": 0.53005236,
+            "minimum_observed": 0.5031534,
+            "number_observed": 5,
+            "number_of_scenes": 5
+          },
+          "planner_mean_total_s": {
+            "bootstrap_95_lower": 0.4180740373333333,
+            "bootstrap_95_upper": 0.42743874628571427,
+            "interval_status": "complete_scene_block_descriptive_interval",
+            "maximum_observed": 0.43266225714285717,
+            "mean": 0.42190214342857146,
+            "minimum_observed": 0.4173390333333334,
+            "number_observed": 5,
+            "number_of_scenes": 5
+          },
+          "planner_p95_total_s": {
+            "bootstrap_95_lower": 0.5083400439999999,
+            "bootstrap_95_upper": 0.5287969470000001,
+            "interval_status": "complete_scene_block_descriptive_interval",
+            "maximum_observed": 0.537869405,
+            "mean": 0.5183971589999999,
+            "minimum_observed": 0.50280319,
+            "number_observed": 5,
+            "number_of_scenes": 5
+          },
+          "planner_reveal_to_hidden_aware_plan_applied_s": {
+            "bootstrap_95_lower": null,
+            "bootstrap_95_upper": null,
+            "interval_status": "not_available_no_observations",
+            "maximum_observed": null,
+            "mean": null,
+            "minimum_observed": null,
+            "number_observed": 0,
+            "number_of_scenes": 5
+          },
+          "traffic_hard_braking_actor_count": {
+            "bootstrap_95_lower": 0.0,
+            "bootstrap_95_upper": 0.6,
+            "interval_status": "complete_scene_block_descriptive_interval",
+            "maximum_observed": 1.0,
+            "mean": 0.2,
+            "minimum_observed": 0.0,
+            "number_observed": 5,
+            "number_of_scenes": 5
+          },
+          "traffic_total_integrated_speed_deficit_vehicle_m": {
+            "bootstrap_95_lower": 55.18887625376891,
+            "bootstrap_95_upper": 70.17861459115136,
+            "interval_status": "complete_scene_block_descriptive_interval",
+            "maximum_observed": 75.57718422662819,
+            "mean": 62.68374542246013,
+            "minimum_observed": 52.83444362383542,
+            "number_observed": 5,
+            "number_of_scenes": 5
+          }
+        }
+      },
+      "IDEAM": {
+        "collision_count": 0,
+        "collision_or_near_count": 0,
+        "display_label": "IDEAM",
+        "mean_episode_mean_ego_speed_mps": {
+          "bootstrap_95_lower": 31.1981723724199,
+          "bootstrap_95_upper": 31.485015642798817,
+          "mean": 31.34489506455686
+        },
+        "mean_episode_minimum_clearance_first_3s_after_reference_m": {
+          "bootstrap_95_lower": 1.176487340455636,
+          "bootstrap_95_upper": 1.2391770288208073,
+          "mean": 1.2061292708959428
+        },
+        "mean_episode_minimum_oriented_clearance_m": {
+          "bootstrap_95_lower": 1.1629440512713969,
+          "bootstrap_95_upper": 1.2063028281799817,
+          "mean": 1.1836436134217092
+        },
+        "near_collision_count": 0,
+        "number_of_independent_scenes": 5,
+        "section_4_4_metrics": {
+          "ego_maximum_speed_loss_mps": {
+            "bootstrap_95_lower": 3.016029167001905,
+            "bootstrap_95_upper": 3.163250193734227,
+            "interval_status": "complete_scene_block_descriptive_interval",
+            "maximum_observed": 3.2154079876925508,
+            "mean": 3.089639680368066,
+            "minimum_observed": 2.975717691698037,
+            "number_observed": 5,
+            "number_of_scenes": 5
+          },
+          "ego_peak_deceleration_mps2": {
+            "bootstrap_95_lower": -2.3163386030440023,
+            "bootstrap_95_upper": -2.256737179747631,
+            "interval_status": "complete_scene_block_descriptive_interval",
+            "maximum_observed": -2.2435142066482427,
+            "mean": -2.283845979580491,
+            "minimum_observed": -2.3469264788925415,
+            "number_observed": 5,
+            "number_of_scenes": 5
+          },
+          "low_level_deadline_miss_count": {
+            "bootstrap_95_lower": 0.0,
+            "bootstrap_95_upper": 0.0,
+            "interval_status": "complete_scene_block_descriptive_interval",
+            "maximum_observed": 0.0,
+            "mean": 0.0,
+            "minimum_observed": 0.0,
+            "number_observed": 5,
+            "number_of_scenes": 5
+          },
+          "low_level_deadline_miss_fraction": {
+            "bootstrap_95_lower": 0.0,
+            "bootstrap_95_upper": 0.0,
+            "interval_status": "complete_scene_block_descriptive_interval",
+            "maximum_observed": 0.0,
+            "mean": 0.0,
+            "minimum_observed": 0.0,
+            "number_observed": 5,
+            "number_of_scenes": 5
+          },
+          "low_level_maximum_time_s": {
+            "bootstrap_95_lower": 0.00224127999999979,
+            "bootstrap_95_upper": 0.0031478000000014104,
+            "interval_status": "complete_scene_block_descriptive_interval",
+            "maximum_observed": 0.003239300000000611,
+            "mean": 0.002736960000000721,
+            "minimum_observed": 0.0018391999999991526,
+            "number_observed": 5,
+            "number_of_scenes": 5
+          },
+          "low_level_mean_time_s": {
+            "bootstrap_95_lower": 0.001249806000000196,
+            "bootstrap_95_upper": 0.0013290433999999822,
+            "interval_status": "complete_scene_block_descriptive_interval",
+            "maximum_observed": 0.001362963333333352,
+            "mean": 0.0012894156666667556,
+            "minimum_observed": 0.0012235016666670262,
+            "number_observed": 5,
+            "number_of_scenes": 5
+          },
+          "low_level_p95_time_s": {
+            "bootstrap_95_lower": 0.0015626189999995786,
+            "bootstrap_95_upper": 0.0019510590000007967,
+            "interval_status": "complete_scene_block_descriptive_interval",
+            "maximum_observed": 0.002137105000001327,
+            "mean": 0.0017364099999998216,
+            "minimum_observed": 0.0014699900000003652,
+            "number_observed": 5,
+            "number_of_scenes": 5
+          },
+          "maximum_follower_speed_loss_mps": {
+            "bootstrap_95_lower": 1.6265976992068374,
+            "bootstrap_95_upper": 2.3802724087889793,
+            "interval_status": "complete_scene_block_descriptive_interval",
+            "maximum_observed": 2.543516255227953,
+            "mean": 2.0133990993091215,
+            "minimum_observed": 1.4081816405424163,
+            "number_observed": 5,
+            "number_of_scenes": 5
+          },
+          "minimum_clearance_first_3s_after_reference_m": {
+            "bootstrap_95_lower": 1.176487340455636,
+            "bootstrap_95_upper": 1.2391770288208073,
+            "interval_status": "complete_scene_block_descriptive_interval",
+            "maximum_observed": 1.2557128476237833,
+            "mean": 1.2061292708959428,
+            "minimum_observed": 1.152650163607952,
+            "number_observed": 5,
+            "number_of_scenes": 5
+          },
+          "minimum_hidden_oriented_clearance_m": {
+            "bootstrap_95_lower": null,
+            "bootstrap_95_upper": null,
+            "interval_status": "not_available_no_observations",
+            "maximum_observed": null,
+            "mean": null,
+            "minimum_observed": null,
+            "number_observed": 0,
+            "number_of_scenes": 5
+          },
+          "minimum_hidden_ttc_2d_s": {
+            "bootstrap_95_lower": null,
+            "bootstrap_95_upper": null,
+            "interval_status": "not_available_no_observations",
+            "maximum_observed": null,
+            "mean": null,
+            "minimum_observed": null,
+            "number_observed": 0,
+            "number_of_scenes": 5
+          },
+          "physics_loop_deadline_miss_count": {
+            "bootstrap_95_lower": 0.0,
+            "bootstrap_95_upper": 0.0,
+            "interval_status": "complete_scene_block_descriptive_interval",
+            "maximum_observed": 0.0,
+            "mean": 0.0,
+            "minimum_observed": 0.0,
+            "number_observed": 5,
+            "number_of_scenes": 5
+          },
+          "physics_loop_deadline_miss_fraction": {
+            "bootstrap_95_lower": 0.0,
+            "bootstrap_95_upper": 0.0,
+            "interval_status": "complete_scene_block_descriptive_interval",
+            "maximum_observed": 0.0,
+            "mean": 0.0,
+            "minimum_observed": 0.0,
+            "number_observed": 5,
+            "number_of_scenes": 5
+          },
+          "physics_loop_maximum_cycle_time_s": {
+            "bootstrap_95_lower": 0.017022559999999486,
+            "bootstrap_95_upper": 0.020013779999997892,
+            "interval_status": "complete_scene_block_descriptive_interval",
+            "maximum_observed": 0.021230100000000363,
+            "mean": 0.018346619999999092,
+            "minimum_observed": 0.016421199999999914,
+            "number_observed": 5,
+            "number_of_scenes": 5
+          },
+          "physics_loop_mean_cycle_time_s": {
+            "bootstrap_95_lower": 0.011165010666666765,
+            "bootstrap_95_upper": 0.011675205666666648,
+            "interval_status": "complete_scene_block_descriptive_interval",
+            "maximum_observed": 0.011810807499999824,
+            "mean": 0.011420108166666706,
+            "minimum_observed": 0.011021481666666826,
+            "number_observed": 5,
+            "number_of_scenes": 5
+          },
+          "physics_loop_p95_cycle_time_s": {
+            "bootstrap_95_lower": 0.014636730999998165,
+            "bootstrap_95_upper": 0.015358200999999311,
+            "interval_status": "complete_scene_block_descriptive_interval",
+            "maximum_observed": 0.015705709999999404,
+            "mean": 0.014966298999998812,
+            "minimum_observed": 0.014503654999997905,
+            "number_observed": 5,
+            "number_of_scenes": 5
+          },
+          "planner_dropped_request_fraction": {
+            "bootstrap_95_lower": 0.8067796610169491,
+            "bootstrap_95_upper": 0.8288700564971752,
+            "interval_status": "complete_scene_block_descriptive_interval",
+            "maximum_observed": 0.8333333333333334,
+            "mean": 0.818135593220339,
+            "minimum_observed": 0.7966101694915254,
+            "number_observed": 5,
+            "number_of_scenes": 5
+          },
+          "planner_effective_completed_update_rate_hz": {
+            "bootstrap_95_lower": 1.7,
+            "bootstrap_95_upper": 1.9,
+            "interval_status": "complete_scene_block_descriptive_interval",
+            "maximum_observed": 2.0,
+            "mean": 1.8,
+            "minimum_observed": 1.6666666666666667,
+            "number_observed": 5,
+            "number_of_scenes": 5
+          },
+          "planner_maximum_total_s": {
+            "bootstrap_95_lower": 0.96531238,
+            "bootstrap_95_upper": 1.48422894,
+            "interval_status": "complete_scene_block_descriptive_interval",
+            "maximum_observed": 1.7652292,
+            "mean": 1.1705702,
+            "minimum_observed": 0.8969263,
+            "number_observed": 5,
+            "number_of_scenes": 5
+          },
+          "planner_mean_total_s": {
+            "bootstrap_95_lower": 0.5462512060000001,
+            "bootstrap_95_upper": 0.61111559,
+            "interval_status": "complete_scene_block_descriptive_interval",
+            "maximum_observed": 0.6433709299999999,
+            "mean": 0.574968264121212,
+            "minimum_observed": 0.5293338833333334,
+            "number_observed": 5,
+            "number_of_scenes": 5
+          },
+          "planner_p95_total_s": {
+            "bootstrap_95_lower": 0.8456030179999999,
+            "bootstrap_95_upper": 1.1415357579999994,
+            "interval_status": "complete_scene_block_descriptive_interval",
+            "maximum_observed": 1.3066870299999989,
+            "mean": 0.9614460149999997,
+            "minimum_observed": 0.80854545,
+            "number_observed": 5,
+            "number_of_scenes": 5
+          },
+          "planner_reveal_to_hidden_aware_plan_applied_s": {
+            "bootstrap_95_lower": null,
+            "bootstrap_95_upper": null,
+            "interval_status": "not_available_no_observations",
+            "maximum_observed": null,
+            "mean": null,
+            "minimum_observed": null,
+            "number_observed": 0,
+            "number_of_scenes": 5
+          },
+          "traffic_hard_braking_actor_count": {
+            "bootstrap_95_lower": 0.0,
+            "bootstrap_95_upper": 0.6,
+            "interval_status": "complete_scene_block_descriptive_interval",
+            "maximum_observed": 1.0,
+            "mean": 0.2,
+            "minimum_observed": 0.0,
+            "number_observed": 5,
+            "number_of_scenes": 5
+          },
+          "traffic_total_integrated_speed_deficit_vehicle_m": {
+            "bootstrap_95_lower": 54.98321150298525,
+            "bootstrap_95_upper": 69.97868506324929,
+            "interval_status": "complete_scene_block_descriptive_interval",
+            "maximum_observed": 75.4527209983952,
+            "mean": 62.48094828311728,
+            "minimum_observed": 52.700362188734125,
+            "number_observed": 5,
+            "number_of_scenes": 5
+          }
+        }
+      }
+    },
+    "true_threat": {
+      "ADA": {
+        "collision_count": 0,
+        "collision_or_near_count": 5,
+        "display_label": "ADA-sourced",
+        "mean_episode_mean_ego_speed_mps": {
+          "bootstrap_95_lower": 28.88708433550159,
+          "bootstrap_95_upper": 29.91062547841056,
+          "mean": 29.376865632380788
+        },
+        "mean_episode_minimum_clearance_first_3s_after_reference_m": {
+          "bootstrap_95_lower": 1.1138801032221695,
+          "bootstrap_95_upper": 1.2396765116690995,
+          "mean": 1.1808946457696516
+        },
+        "mean_episode_minimum_oriented_clearance_m": {
+          "bootstrap_95_lower": 0.20260820646518862,
+          "bootstrap_95_upper": 0.6086999473528673,
+          "mean": 0.40565407690902805
+        },
+        "near_collision_count": 5,
+        "number_of_independent_scenes": 5,
+        "section_4_4_metrics": {
+          "ego_maximum_speed_loss_mps": {
+            "bootstrap_95_lower": 7.47693433753804,
+            "bootstrap_95_upper": 13.630367579171272,
+            "interval_status": "complete_scene_block_descriptive_interval",
+            "maximum_observed": 13.824544748357024,
+            "mean": 10.867484194071007,
+            "minimum_observed": 5.1603480727006925,
+            "number_observed": 5,
+            "number_of_scenes": 5
+          },
+          "ego_peak_deceleration_mps2": {
+            "bootstrap_95_lower": -9.430749023241333,
+            "bootstrap_95_upper": -6.512378686903659,
+            "interval_status": "complete_scene_block_descriptive_interval",
+            "maximum_observed": -5.220592252279559,
+            "mean": -8.159060811066198,
+            "minimum_observed": -9.709258014606519,
+            "number_observed": 5,
+            "number_of_scenes": 5
+          },
+          "low_level_deadline_miss_count": {
+            "bootstrap_95_lower": 0.0,
+            "bootstrap_95_upper": 0.0,
+            "interval_status": "complete_scene_block_descriptive_interval",
+            "maximum_observed": 0.0,
+            "mean": 0.0,
+            "minimum_observed": 0.0,
+            "number_observed": 5,
+            "number_of_scenes": 5
+          },
+          "low_level_deadline_miss_fraction": {
+            "bootstrap_95_lower": 0.0,
+            "bootstrap_95_upper": 0.0,
+            "interval_status": "complete_scene_block_descriptive_interval",
+            "maximum_observed": 0.0,
+            "mean": 0.0,
+            "minimum_observed": 0.0,
+            "number_observed": 5,
+            "number_of_scenes": 5
+          },
+          "low_level_maximum_time_s": {
+            "bootstrap_95_lower": 0.002140220000000426,
+            "bootstrap_95_upper": 0.0028095199999995657,
+            "interval_status": "complete_scene_block_descriptive_interval",
+            "maximum_observed": 0.0031359000000001913,
+            "mean": 0.002473359999999758,
+            "minimum_observed": 0.002021300000002668,
+            "number_observed": 5,
+            "number_of_scenes": 5
+          },
+          "low_level_mean_time_s": {
+            "bootstrap_95_lower": 0.001413915666666649,
+            "bootstrap_95_upper": 0.001462417000000009,
+            "interval_status": "complete_scene_block_descriptive_interval",
+            "maximum_observed": 0.0014787833333333702,
+            "mean": 0.0014380996666666708,
+            "minimum_observed": 0.0014111983333332744,
+            "number_observed": 5,
+            "number_of_scenes": 5
+          },
+          "low_level_p95_time_s": {
+            "bootstrap_95_lower": 0.0016883430000004286,
+            "bootstrap_95_upper": 0.0018280039999994807,
+            "interval_status": "complete_scene_block_descriptive_interval",
+            "maximum_observed": 0.0018661349999995018,
+            "mean": 0.0017644799999998277,
+            "minimum_observed": 0.0016250000000013634,
+            "number_observed": 5,
+            "number_of_scenes": 5
+          },
+          "maximum_follower_speed_loss_mps": {
+            "bootstrap_95_lower": 1.6265980807470548,
+            "bootstrap_95_upper": 2.381106299444472,
+            "interval_status": "complete_scene_block_descriptive_interval",
+            "maximum_observed": 2.545599074515845,
+            "mean": 2.013816044660218,
+            "minimum_observed": 1.4081816406591656,
+            "number_observed": 5,
+            "number_of_scenes": 5
+          },
+          "minimum_clearance_first_3s_after_reference_m": {
+            "bootstrap_95_lower": 1.1138801032221695,
+            "bootstrap_95_upper": 1.2396765116690995,
+            "interval_status": "complete_scene_block_descriptive_interval",
+            "maximum_observed": 1.2602521802898836,
+            "mean": 1.1808946457696516,
+            "minimum_observed": 1.0553821397286078,
+            "number_observed": 5,
+            "number_of_scenes": 5
+          },
+          "minimum_hidden_oriented_clearance_m": {
+            "bootstrap_95_lower": 0.20260820646518862,
+            "bootstrap_95_upper": 0.6086999473528673,
+            "interval_status": "complete_scene_block_descriptive_interval",
+            "maximum_observed": 0.7013576162958781,
+            "mean": 0.40565407690902805,
+            "minimum_observed": 0.17578525507024004,
+            "number_observed": 5,
+            "number_of_scenes": 5
+          },
+          "minimum_hidden_ttc_2d_s": {
+            "bootstrap_95_lower": 0.6558570946089862,
+            "bootstrap_95_upper": 0.8297327318443651,
+            "interval_status": "complete_scene_block_descriptive_interval",
+            "maximum_observed": 0.8704619782992584,
+            "mean": 0.7427949132266757,
+            "minimum_observed": 0.6446330186383896,
+            "number_observed": 5,
+            "number_of_scenes": 5
+          },
+          "physics_loop_deadline_miss_count": {
+            "bootstrap_95_lower": 0.0,
+            "bootstrap_95_upper": 0.0,
+            "interval_status": "complete_scene_block_descriptive_interval",
+            "maximum_observed": 0.0,
+            "mean": 0.0,
+            "minimum_observed": 0.0,
+            "number_observed": 5,
+            "number_of_scenes": 5
+          },
+          "physics_loop_deadline_miss_fraction": {
+            "bootstrap_95_lower": 0.0,
+            "bootstrap_95_upper": 0.0,
+            "interval_status": "complete_scene_block_descriptive_interval",
+            "maximum_observed": 0.0,
+            "mean": 0.0,
+            "minimum_observed": 0.0,
+            "number_observed": 5,
+            "number_of_scenes": 5
+          },
+          "physics_loop_maximum_cycle_time_s": {
+            "bootstrap_95_lower": 0.018932500000001084,
+            "bootstrap_95_upper": 0.019959099999999806,
+            "interval_status": "complete_scene_block_descriptive_interval",
+            "maximum_observed": 0.02011010000000013,
+            "mean": 0.019508160000000885,
+            "minimum_observed": 0.018400700000000825,
+            "number_observed": 5,
+            "number_of_scenes": 5
+          },
+          "physics_loop_mean_cycle_time_s": {
+            "bootstrap_95_lower": 0.0122268863333335,
+            "bootstrap_95_upper": 0.012820225333333286,
+            "interval_status": "complete_scene_block_descriptive_interval",
+            "maximum_observed": 0.012878047499999894,
+            "mean": 0.01254658850000005,
+            "minimum_observed": 0.011954824166666917,
+            "number_observed": 5,
+            "number_of_scenes": 5
+          },
+          "physics_loop_p95_cycle_time_s": {
+            "bootstrap_95_lower": 0.01590380899999943,
+            "bootstrap_95_upper": 0.016308665000000604,
+            "interval_status": "complete_scene_block_descriptive_interval",
+            "maximum_observed": 0.016391319999999786,
+            "mean": 0.016106237000000013,
+            "minimum_observed": 0.01572583499999869,
+            "number_observed": 5,
+            "number_of_scenes": 5
+          },
+          "planner_dropped_request_fraction": {
+            "bootstrap_95_lower": 0.7966101694915254,
+            "bootstrap_95_upper": 0.8101694915254238,
+            "interval_status": "complete_scene_block_descriptive_interval",
+            "maximum_observed": 0.8135593220338984,
+            "mean": 0.8033898305084746,
+            "minimum_observed": 0.7966101694915254,
+            "number_observed": 5,
+            "number_of_scenes": 5
+          },
+          "planner_effective_completed_update_rate_hz": {
+            "bootstrap_95_lower": 1.8666666666666665,
+            "bootstrap_95_upper": 2.0,
+            "interval_status": "complete_scene_block_descriptive_interval",
+            "maximum_observed": 2.0,
+            "mean": 1.9333333333333331,
+            "minimum_observed": 1.8333333333333333,
+            "number_observed": 5,
+            "number_of_scenes": 5
+          },
+          "planner_maximum_total_s": {
+            "bootstrap_95_lower": 1.1054275599999999,
+            "bootstrap_95_upper": 1.14508336,
+            "interval_status": "complete_scene_block_descriptive_interval",
+            "maximum_observed": 1.1471805,
+            "mean": 1.1263024,
+            "minimum_observed": 1.0911874,
+            "number_observed": 5,
+            "number_of_scenes": 5
+          },
+          "planner_mean_total_s": {
+            "bootstrap_95_lower": 0.5183197133333334,
+            "bootstrap_95_upper": 0.5447171906060606,
+            "interval_status": "complete_scene_block_descriptive_interval",
+            "maximum_observed": 0.5495479636363636,
+            "mean": 0.531518451969697,
+            "minimum_observed": 0.5134288,
+            "number_observed": 5,
+            "number_of_scenes": 5
+          },
+          "planner_p95_total_s": {
+            "bootstrap_95_lower": 0.9294984889999997,
+            "bootstrap_95_upper": 0.9717004139999998,
+            "interval_status": "complete_scene_block_descriptive_interval",
+            "maximum_observed": 0.9951904,
+            "mean": 0.9465746879999998,
+            "minimum_observed": 0.9262212449999997,
+            "number_observed": 5,
+            "number_of_scenes": 5
+          },
+          "planner_reveal_to_hidden_aware_plan_applied_s": {
+            "bootstrap_95_lower": 0.7200000000000001,
+            "bootstrap_95_upper": 0.9,
+            "interval_status": "complete_scene_block_descriptive_interval",
+            "maximum_observed": 0.9500000000000001,
+            "mean": 0.8100000000000002,
+            "minimum_observed": 0.7000000000000001,
+            "number_observed": 5,
+            "number_of_scenes": 5
+          },
+          "traffic_hard_braking_actor_count": {
+            "bootstrap_95_lower": 0.0,
+            "bootstrap_95_upper": 0.6,
+            "interval_status": "complete_scene_block_descriptive_interval",
+            "maximum_observed": 1.0,
+            "mean": 0.2,
+            "minimum_observed": 0.0,
+            "number_observed": 5,
+            "number_of_scenes": 5
+          },
+          "traffic_total_integrated_speed_deficit_vehicle_m": {
+            "bootstrap_95_lower": 55.17554268877109,
+            "bootstrap_95_upper": 70.1836952204944,
+            "interval_status": "complete_scene_block_descriptive_interval",
+            "maximum_observed": 75.59337247694374,
+            "mean": 62.679618954632744,
+            "minimum_observed": 52.8554999948663,
+            "number_observed": 5,
+            "number_of_scenes": 5
+          }
+        }
+      },
+      "APF": {
+        "collision_count": 0,
+        "collision_or_near_count": 4,
+        "display_label": "APF-sourced",
+        "mean_episode_mean_ego_speed_mps": {
+          "bootstrap_95_lower": 29.95792968612064,
+          "bootstrap_95_upper": 30.66820095877941,
+          "mean": 30.31132049443578
+        },
+        "mean_episode_minimum_clearance_first_3s_after_reference_m": {
+          "bootstrap_95_lower": 1.1277673262361723,
+          "bootstrap_95_upper": 1.2390683221154013,
+          "mean": 1.1857360271627815
+        },
+        "mean_episode_minimum_oriented_clearance_m": {
+          "bootstrap_95_lower": 0.697190240183899,
+          "bootstrap_95_upper": 1.0697588026723883,
+          "mean": 0.8860831690019682
+        },
+        "near_collision_count": 4,
+        "number_of_independent_scenes": 5,
+        "section_4_4_metrics": {
+          "ego_maximum_speed_loss_mps": {
+            "bootstrap_95_lower": 4.411886813299553,
+            "bootstrap_95_upper": 7.711899463535554,
+            "interval_status": "complete_scene_block_descriptive_interval",
+            "maximum_observed": 8.908254584809754,
+            "mean": 5.995390384835038,
+            "minimum_observed": 3.189858383440761,
+            "number_observed": 5,
+            "number_of_scenes": 5
+          },
+          "ego_peak_deceleration_mps2": {
+            "bootstrap_95_lower": -7.298286606673173,
+            "bootstrap_95_upper": -4.076706792265057,
+            "interval_status": "complete_scene_block_descriptive_interval",
+            "maximum_observed": -2.351507908514563,
+            "mean": -6.029000019606542,
+            "minimum_observed": -7.364134552920092,
+            "number_observed": 5,
+            "number_of_scenes": 5
+          },
+          "low_level_deadline_miss_count": {
+            "bootstrap_95_lower": 0.0,
+            "bootstrap_95_upper": 0.0,
+            "interval_status": "complete_scene_block_descriptive_interval",
+            "maximum_observed": 0.0,
+            "mean": 0.0,
+            "minimum_observed": 0.0,
+            "number_observed": 5,
+            "number_of_scenes": 5
+          },
+          "low_level_deadline_miss_fraction": {
+            "bootstrap_95_lower": 0.0,
+            "bootstrap_95_upper": 0.0,
+            "interval_status": "complete_scene_block_descriptive_interval",
+            "maximum_observed": 0.0,
+            "mean": 0.0,
+            "minimum_observed": 0.0,
+            "number_observed": 5,
+            "number_of_scenes": 5
+          },
+          "low_level_maximum_time_s": {
+            "bootstrap_95_lower": 0.0025406600000010826,
+            "bootstrap_95_upper": 0.003717991500000682,
+            "interval_status": "complete_scene_block_descriptive_interval",
+            "maximum_observed": 0.003998400000000402,
+            "mean": 0.003215180000000828,
+            "minimum_observed": 0.0019342000000008852,
+            "number_observed": 5,
+            "number_of_scenes": 5
+          },
+          "low_level_mean_time_s": {
+            "bootstrap_95_lower": 0.001451890333333831,
+            "bootstrap_95_upper": 0.0016301526666665112,
+            "interval_status": "complete_scene_block_descriptive_interval",
+            "maximum_observed": 0.0017099649999994546,
+            "mean": 0.0015320490000002708,
+            "minimum_observed": 0.0014006283333337422,
+            "number_observed": 5,
+            "number_of_scenes": 5
+          },
+          "low_level_p95_time_s": {
+            "bootstrap_95_lower": 0.001778417000001724,
+            "bootstrap_95_upper": 0.0026148090000004476,
+            "interval_status": "complete_scene_block_descriptive_interval",
+            "maximum_observed": 0.002819319999999514,
+            "mean": 0.002196613000001086,
+            "minimum_observed": 0.0015794450000012003,
+            "number_observed": 5,
+            "number_of_scenes": 5
+          },
+          "maximum_follower_speed_loss_mps": {
+            "bootstrap_95_lower": 1.6265980807327858,
+            "bootstrap_95_upper": 2.3811062994450047,
+            "interval_status": "complete_scene_block_descriptive_interval",
+            "maximum_observed": 2.545599074515845,
+            "mean": 2.013816044655639,
+            "minimum_observed": 1.4081816406349397,
+            "number_observed": 5,
+            "number_of_scenes": 5
+          },
+          "minimum_clearance_first_3s_after_reference_m": {
+            "bootstrap_95_lower": 1.1277673262361723,
+            "bootstrap_95_upper": 1.2390683221154013,
+            "interval_status": "complete_scene_block_descriptive_interval",
+            "maximum_observed": 1.2590061307802796,
+            "mean": 1.1857360271627815,
+            "minimum_observed": 1.0813855925351512,
+            "number_observed": 5,
+            "number_of_scenes": 5
+          },
+          "minimum_hidden_oriented_clearance_m": {
+            "bootstrap_95_lower": 0.697190240183899,
+            "bootstrap_95_upper": 1.0769839545862683,
+            "interval_status": "complete_scene_block_descriptive_interval",
+            "maximum_observed": 1.165710295180209,
+            "mean": 0.8896957449589081,
+            "minimum_observed": 0.5993965556074995,
+            "number_observed": 5,
+            "number_of_scenes": 5
+          },
+          "minimum_hidden_ttc_2d_s": {
+            "bootstrap_95_lower": 0.8618850000707987,
+            "bootstrap_95_upper": 0.9875479994663579,
+            "interval_status": "complete_scene_block_descriptive_interval",
+            "maximum_observed": 1.0242140932151123,
+            "mean": 0.9315582643927834,
+            "minimum_observed": 0.8074915863026374,
+            "number_observed": 5,
+            "number_of_scenes": 5
+          },
+          "physics_loop_deadline_miss_count": {
+            "bootstrap_95_lower": 0.0,
+            "bootstrap_95_upper": 0.0,
+            "interval_status": "complete_scene_block_descriptive_interval",
+            "maximum_observed": 0.0,
+            "mean": 0.0,
+            "minimum_observed": 0.0,
+            "number_observed": 5,
+            "number_of_scenes": 5
+          },
+          "physics_loop_deadline_miss_fraction": {
+            "bootstrap_95_lower": 0.0,
+            "bootstrap_95_upper": 0.0,
+            "interval_status": "complete_scene_block_descriptive_interval",
+            "maximum_observed": 0.0,
+            "mean": 0.0,
+            "minimum_observed": 0.0,
+            "number_observed": 5,
+            "number_of_scenes": 5
+          },
+          "physics_loop_maximum_cycle_time_s": {
+            "bootstrap_95_lower": 0.019135879999998905,
+            "bootstrap_95_upper": 0.02642309999999881,
+            "interval_status": "complete_scene_block_descriptive_interval",
+            "maximum_observed": 0.030264100000000127,
+            "mean": 0.022239719999998898,
+            "minimum_observed": 0.01837979999999817,
+            "number_observed": 5,
+            "number_of_scenes": 5
+          },
+          "physics_loop_mean_cycle_time_s": {
+            "bootstrap_95_lower": 0.01241201950000008,
+            "bootstrap_95_upper": 0.012809075666666595,
+            "interval_status": "complete_scene_block_descriptive_interval",
+            "maximum_observed": 0.01290582416666665,
+            "mean": 0.012622088000000054,
+            "minimum_observed": 0.012288568333333435,
+            "number_observed": 5,
+            "number_of_scenes": 5
+          },
+          "physics_loop_p95_cycle_time_s": {
+            "bootstrap_95_lower": 0.016524300000001765,
+            "bootstrap_95_upper": 0.016897284,
+            "interval_status": "complete_scene_block_descriptive_interval",
+            "maximum_observed": 0.017024199999999646,
+            "mean": 0.01670265400000051,
+            "minimum_observed": 0.016511310000000275,
+            "number_observed": 5,
+            "number_of_scenes": 5
+          },
+          "planner_dropped_request_fraction": {
+            "bootstrap_95_lower": 0.8067796610169491,
+            "bootstrap_95_upper": 0.854858757062147,
+            "interval_status": "complete_scene_block_descriptive_interval",
+            "maximum_observed": 0.8813559322033898,
+            "mean": 0.8277401129943502,
+            "minimum_observed": 0.7966101694915254,
+            "number_observed": 5,
+            "number_of_scenes": 5
+          },
+          "planner_effective_completed_update_rate_hz": {
+            "bootstrap_95_lower": 1.4333333333333333,
+            "bootstrap_95_upper": 1.9,
+            "interval_status": "complete_scene_block_descriptive_interval",
+            "maximum_observed": 2.0,
+            "mean": 1.7,
+            "minimum_observed": 1.1666666666666667,
+            "number_observed": 5,
+            "number_of_scenes": 5
+          },
+          "planner_maximum_total_s": {
+            "bootstrap_95_lower": 1.3619384399999999,
+            "bootstrap_95_upper": 1.8612448000000001,
+            "interval_status": "complete_scene_block_descriptive_interval",
+            "maximum_observed": 1.972882,
+            "mean": 1.6440409800000002,
+            "minimum_observed": 1.0998493,
+            "number_observed": 5,
+            "number_of_scenes": 5
+          },
+          "planner_mean_total_s": {
+            "bootstrap_95_lower": 0.538448082,
+            "bootstrap_95_upper": 0.6651557236363638,
+            "interval_status": "complete_scene_block_descriptive_interval",
+            "maximum_observed": 0.7295039000000001,
+            "mean": 0.5958349989696969,
+            "minimum_observed": 0.5067999166666667,
+            "number_observed": 5,
+            "number_of_scenes": 5
+          },
+          "planner_p95_total_s": {
+            "bootstrap_95_lower": 1.0570396159999995,
+            "bootstrap_95_upper": 1.5280773819999998,
+            "interval_status": "complete_scene_block_descriptive_interval",
+            "maximum_observed": 1.7141285199999994,
+            "mean": 1.2899974899999997,
+            "minimum_observed": 0.9029946749999997,
+            "number_observed": 5,
+            "number_of_scenes": 5
+          },
+          "planner_reveal_to_hidden_aware_plan_applied_s": {
+            "bootstrap_95_lower": 0.7200000000000002,
+            "bootstrap_95_upper": 2.1300000000000003,
+            "interval_status": "complete_scene_block_descriptive_interval",
+            "maximum_observed": 3.0500000000000003,
+            "mean": 1.2100000000000004,
+            "minimum_observed": 0.7000000000000002,
+            "number_observed": 5,
+            "number_of_scenes": 5
+          },
+          "traffic_hard_braking_actor_count": {
+            "bootstrap_95_lower": 0.0,
+            "bootstrap_95_upper": 0.6,
+            "interval_status": "complete_scene_block_descriptive_interval",
+            "maximum_observed": 1.0,
+            "mean": 0.2,
+            "minimum_observed": 0.0,
+            "number_observed": 5,
+            "number_of_scenes": 5
+          },
+          "traffic_total_integrated_speed_deficit_vehicle_m": {
+            "bootstrap_95_lower": 55.09257950302041,
+            "bootstrap_95_upper": 70.07932964445013,
+            "interval_status": "complete_scene_block_descriptive_interval",
+            "maximum_observed": 75.51844246602602,
+            "mean": 62.585954573735265,
+            "minimum_observed": 52.82884334411134,
+            "number_observed": 5,
+            "number_of_scenes": 5
+          }
+        }
+      },
+      "DREAM": {
+        "collision_count": 0,
+        "collision_or_near_count": 2,
+        "display_label": "DREAM",
+        "mean_episode_mean_ego_speed_mps": {
+          "bootstrap_95_lower": 29.698571987194203,
+          "bootstrap_95_upper": 30.16036467308883,
+          "mean": 29.91926496034561
+        },
+        "mean_episode_minimum_clearance_first_3s_after_reference_m": {
+          "bootstrap_95_lower": 1.1136685788498926,
+          "bootstrap_95_upper": 1.2394255845834166,
+          "mean": 1.1806689629857285
+        },
+        "mean_episode_minimum_oriented_clearance_m": {
+          "bootstrap_95_lower": 0.9384374237348523,
+          "bootstrap_95_upper": 1.1871118885519143,
+          "mean": 1.072532327930635
+        },
+        "near_collision_count": 2,
+        "number_of_independent_scenes": 5,
+        "section_4_4_metrics": {
+          "ego_maximum_speed_loss_mps": {
+            "bootstrap_95_lower": 5.588397738529712,
+            "bootstrap_95_upper": 6.647490550194175,
+            "interval_status": "complete_scene_block_descriptive_interval",
+            "maximum_observed": 6.980093601373525,
+            "mean": 6.089489757807389,
+            "minimum_observed": 5.5191812372016535,
+            "number_observed": 5,
+            "number_of_scenes": 5
+          },
+          "ego_peak_deceleration_mps2": {
+            "bootstrap_95_lower": -6.4063279388869745,
+            "bootstrap_95_upper": -2.5174625536580635,
+            "interval_status": "complete_scene_block_descriptive_interval",
+            "maximum_observed": -2.4540511666067033,
+            "mean": -4.461895246272519,
+            "minimum_observed": -7.3927931627646615,
+            "number_observed": 5,
+            "number_of_scenes": 5
+          },
+          "low_level_deadline_miss_count": {
+            "bootstrap_95_lower": 0.0,
+            "bootstrap_95_upper": 0.0,
+            "interval_status": "complete_scene_block_descriptive_interval",
+            "maximum_observed": 0.0,
+            "mean": 0.0,
+            "minimum_observed": 0.0,
+            "number_observed": 5,
+            "number_of_scenes": 5
+          },
+          "low_level_deadline_miss_fraction": {
+            "bootstrap_95_lower": 0.0,
+            "bootstrap_95_upper": 0.0,
+            "interval_status": "complete_scene_block_descriptive_interval",
+            "maximum_observed": 0.0,
+            "mean": 0.0,
+            "minimum_observed": 0.0,
+            "number_observed": 5,
+            "number_of_scenes": 5
+          },
+          "low_level_maximum_time_s": {
+            "bootstrap_95_lower": 0.0027021599999976333,
+            "bootstrap_95_upper": 0.003211440000000465,
+            "interval_status": "complete_scene_block_descriptive_interval",
+            "maximum_observed": 0.0034200000000055297,
+            "mean": 0.00295685999999975,
+            "minimum_observed": 0.002567999999996573,
+            "number_observed": 5,
+            "number_of_scenes": 5
+          },
+          "low_level_mean_time_s": {
+            "bootstrap_95_lower": 0.0014694820000000538,
+            "bootstrap_95_upper": 0.0015361150000001325,
+            "interval_status": "complete_scene_block_descriptive_interval",
+            "maximum_observed": 0.0015781550000000995,
+            "mean": 0.001493366333333365,
+            "minimum_observed": 0.0014670250000003548,
+            "number_observed": 5,
+            "number_of_scenes": 5
+          },
+          "low_level_p95_time_s": {
+            "bootstrap_95_lower": 0.0018837629999993051,
+            "bootstrap_95_upper": 0.0022445579999990166,
+            "interval_status": "complete_scene_block_descriptive_interval",
+            "maximum_observed": 0.002440874999999387,
+            "mean": 0.002029413999999327,
+            "minimum_observed": 0.0018395499999998674,
+            "number_observed": 5,
+            "number_of_scenes": 5
+          },
+          "maximum_follower_speed_loss_mps": {
+            "bootstrap_95_lower": 1.6261342303431312,
+            "bootstrap_95_upper": 2.3811062994450047,
+            "interval_status": "complete_scene_block_descriptive_interval",
+            "maximum_observed": 2.545599074515845,
+            "mean": 2.013352194266937,
+            "minimum_observed": 1.4081816406325594,
+            "number_observed": 5,
+            "number_of_scenes": 5
+          },
+          "minimum_clearance_first_3s_after_reference_m": {
+            "bootstrap_95_lower": 1.1136685788498926,
+            "bootstrap_95_upper": 1.2394255845834166,
+            "interval_status": "complete_scene_block_descriptive_interval",
+            "maximum_observed": 1.2593838911040518,
+            "mean": 1.1806689629857285,
+            "minimum_observed": 1.0549191372194988,
+            "number_observed": 5,
+            "number_of_scenes": 5
+          },
+          "minimum_hidden_oriented_clearance_m": {
+            "bootstrap_95_lower": 1.0359215974536493,
+            "bootstrap_95_upper": 1.7003936207807702,
+            "interval_status": "complete_scene_block_descriptive_interval",
+            "maximum_observed": 1.7842434343653077,
+            "mean": 1.3752939213900301,
+            "minimum_observed": 0.8481351614111486,
+            "number_observed": 5,
+            "number_of_scenes": 5
+          },
+          "minimum_hidden_ttc_2d_s": {
+            "bootstrap_95_lower": 0.9691395304675551,
+            "bootstrap_95_upper": 1.3882908045961528,
+            "interval_status": "complete_scene_block_descriptive_interval",
+            "maximum_observed": 1.5582985848126998,
+            "mean": 1.1645885606545299,
+            "minimum_observed": 0.9291475940166471,
+            "number_observed": 5,
+            "number_of_scenes": 5
+          },
+          "physics_loop_deadline_miss_count": {
+            "bootstrap_95_lower": 0.0,
+            "bootstrap_95_upper": 0.0,
+            "interval_status": "complete_scene_block_descriptive_interval",
+            "maximum_observed": 0.0,
+            "mean": 0.0,
+            "minimum_observed": 0.0,
+            "number_observed": 5,
+            "number_of_scenes": 5
+          },
+          "physics_loop_deadline_miss_fraction": {
+            "bootstrap_95_lower": 0.0,
+            "bootstrap_95_upper": 0.0,
+            "interval_status": "complete_scene_block_descriptive_interval",
+            "maximum_observed": 0.0,
+            "mean": 0.0,
+            "minimum_observed": 0.0,
+            "number_observed": 5,
+            "number_of_scenes": 5
+          },
+          "physics_loop_maximum_cycle_time_s": {
+            "bootstrap_95_lower": 0.018884419999997702,
+            "bootstrap_95_upper": 0.02023202000000026,
+            "interval_status": "complete_scene_block_descriptive_interval",
+            "maximum_observed": 0.020677100000000337,
+            "mean": 0.01955821999999898,
+            "minimum_observed": 0.018590699999997184,
+            "number_observed": 5,
+            "number_of_scenes": 5
+          },
+          "physics_loop_mean_cycle_time_s": {
+            "bootstrap_95_lower": 0.012178164833333404,
+            "bootstrap_95_upper": 0.012934835500000071,
+            "interval_status": "complete_scene_block_descriptive_interval",
+            "maximum_observed": 0.013121210833333367,
+            "mean": 0.01255650016666674,
+            "minimum_observed": 0.012099180000000143,
+            "number_observed": 5,
+            "number_of_scenes": 5
+          },
+          "physics_loop_p95_cycle_time_s": {
+            "bootstrap_95_lower": 0.01623990199999973,
+            "bootstrap_95_upper": 0.016912912999999318,
+            "interval_status": "complete_scene_block_descriptive_interval",
+            "maximum_observed": 0.017169874999999734,
+            "mean": 0.016573633999999483,
+            "minimum_observed": 0.016048190000000417,
+            "number_observed": 5,
+            "number_of_scenes": 5
+          },
+          "planner_dropped_request_fraction": {
+            "bootstrap_95_lower": 0.7627118644067796,
+            "bootstrap_95_upper": 0.7627118644067796,
+            "interval_status": "complete_scene_block_descriptive_interval",
+            "maximum_observed": 0.7627118644067796,
+            "mean": 0.7627118644067796,
+            "minimum_observed": 0.7627118644067796,
+            "number_observed": 5,
+            "number_of_scenes": 5
+          },
+          "planner_effective_completed_update_rate_hz": {
+            "bootstrap_95_lower": 2.3333333333333335,
+            "bootstrap_95_upper": 2.3333333333333335,
+            "interval_status": "complete_scene_block_descriptive_interval",
+            "maximum_observed": 2.3333333333333335,
+            "mean": 2.3333333333333335,
+            "minimum_observed": 2.3333333333333335,
+            "number_observed": 5,
+            "number_of_scenes": 5
+          },
+          "planner_maximum_total_s": {
+            "bootstrap_95_lower": 0.5149068600000001,
+            "bootstrap_95_upper": 0.5326373999999999,
+            "interval_status": "complete_scene_block_descriptive_interval",
+            "maximum_observed": 0.5360961,
+            "mean": 0.5237244999999999,
+            "minimum_observed": 0.5065452,
+            "number_observed": 5,
+            "number_of_scenes": 5
+          },
+          "planner_mean_total_s": {
+            "bootstrap_95_lower": 0.43961393714285724,
+            "bootstrap_95_upper": 0.4448044628571428,
+            "interval_status": "complete_scene_block_descriptive_interval",
+            "maximum_observed": 0.4469331785714285,
+            "mean": 0.4421343471428572,
+            "minimum_observed": 0.4385824071428571,
+            "number_observed": 5,
+            "number_of_scenes": 5
+          },
+          "planner_p95_total_s": {
+            "bootstrap_95_lower": 0.512428688,
+            "bootstrap_95_upper": 0.52868221,
+            "interval_status": "complete_scene_block_descriptive_interval",
+            "maximum_observed": 0.531303105,
+            "mean": 0.521011023,
+            "minimum_observed": 0.504512845,
+            "number_observed": 5,
+            "number_of_scenes": 5
+          },
+          "planner_reveal_to_hidden_aware_plan_applied_s": {
+            "bootstrap_95_lower": 0.8,
+            "bootstrap_95_upper": 0.9500000000000002,
+            "interval_status": "complete_scene_block_descriptive_interval",
+            "maximum_observed": 1.0500000000000003,
+            "mean": 0.8500000000000002,
+            "minimum_observed": 0.8,
+            "number_observed": 5,
+            "number_of_scenes": 5
+          },
+          "traffic_hard_braking_actor_count": {
+            "bootstrap_95_lower": 0.0,
+            "bootstrap_95_upper": 0.6,
+            "interval_status": "complete_scene_block_descriptive_interval",
+            "maximum_observed": 1.0,
+            "mean": 0.2,
+            "minimum_observed": 0.0,
+            "number_observed": 5,
+            "number_of_scenes": 5
+          },
+          "traffic_total_integrated_speed_deficit_vehicle_m": {
+            "bootstrap_95_lower": 55.18672343083007,
+            "bootstrap_95_upper": 70.20431874024027,
+            "interval_status": "complete_scene_block_descriptive_interval",
+            "maximum_observed": 75.61921096315244,
+            "mean": 62.69552108553516,
+            "minimum_observed": 52.88756724356124,
+            "number_observed": 5,
+            "number_of_scenes": 5
+          }
+        }
+      },
+      "IDEAM": {
+        "collision_count": 4,
+        "collision_or_near_count": 5,
+        "display_label": "IDEAM",
+        "mean_episode_mean_ego_speed_mps": {
+          "bootstrap_95_lower": 28.73938306132584,
+          "bootstrap_95_upper": 29.652739004241642,
+          "mean": 29.136825927215607
+        },
+        "mean_episode_minimum_clearance_first_3s_after_reference_m": {
+          "bootstrap_95_lower": 1.1267357228401225,
+          "bootstrap_95_upper": 1.2357712013362494,
+          "mean": 1.184041418650142
+        },
+        "mean_episode_minimum_oriented_clearance_m": {
+          "bootstrap_95_lower": -0.49417586754134957,
+          "bootstrap_95_upper": 0.22461727514773872,
+          "mean": -0.11579360525436382
+        },
+        "near_collision_count": 5,
+        "number_of_independent_scenes": 5,
+        "section_4_4_metrics": {
+          "ego_maximum_speed_loss_mps": {
+            "bootstrap_95_lower": 9.72490444340254,
+            "bootstrap_95_upper": 16.60216625521477,
+            "interval_status": "complete_scene_block_descriptive_interval",
+            "maximum_observed": 18.617824594005977,
+            "mean": 13.45708539618995,
+            "minimum_observed": 6.8368774814867805,
+            "number_observed": 5,
+            "number_of_scenes": 5
+          },
+          "ego_peak_deceleration_mps2": {
+            "bootstrap_95_lower": -44.80061226496052,
+            "bootstrap_95_upper": -8.112659464355588,
+            "interval_status": "complete_scene_block_descriptive_interval",
+            "maximum_observed": -7.381957999087518,
+            "mean": -20.697477781281478,
+            "minimum_observed": -68.65608324363798,
+            "number_observed": 5,
+            "number_of_scenes": 5
+          },
+          "low_level_deadline_miss_count": {
+            "bootstrap_95_lower": 0.0,
+            "bootstrap_95_upper": 0.0,
+            "interval_status": "complete_scene_block_descriptive_interval",
+            "maximum_observed": 0.0,
+            "mean": 0.0,
+            "minimum_observed": 0.0,
+            "number_observed": 5,
+            "number_of_scenes": 5
+          },
+          "low_level_deadline_miss_fraction": {
+            "bootstrap_95_lower": 0.0,
+            "bootstrap_95_upper": 0.0,
+            "interval_status": "complete_scene_block_descriptive_interval",
+            "maximum_observed": 0.0,
+            "mean": 0.0,
+            "minimum_observed": 0.0,
+            "number_observed": 5,
+            "number_of_scenes": 5
+          },
+          "low_level_maximum_time_s": {
+            "bootstrap_95_lower": 0.002818879999999524,
+            "bootstrap_95_upper": 0.003601459999998724,
+            "interval_status": "complete_scene_block_descriptive_interval",
+            "maximum_observed": 0.003914000000001749,
+            "mean": 0.003163139999999487,
+            "minimum_observed": 0.0027034999999990816,
+            "number_observed": 5,
+            "number_of_scenes": 5
+          },
+          "low_level_mean_time_s": {
+            "bootstrap_95_lower": 0.0014480233333330852,
+            "bootstrap_95_upper": 0.0014633056666663198,
+            "interval_status": "complete_scene_block_descriptive_interval",
+            "maximum_observed": 0.001470208333332875,
+            "mean": 0.0014556629999997266,
+            "minimum_observed": 0.0014445499999997816,
+            "number_observed": 5,
+            "number_of_scenes": 5
+          },
+          "low_level_p95_time_s": {
+            "bootstrap_95_lower": 0.0019043689999996612,
+            "bootstrap_95_upper": 0.0021756729999984612,
+            "interval_status": "complete_scene_block_descriptive_interval",
+            "maximum_observed": 0.002302134999999161,
+            "mean": 0.0020331529999986124,
+            "minimum_observed": 0.001845464999999357,
+            "number_observed": 5,
+            "number_of_scenes": 5
+          },
+          "maximum_follower_speed_loss_mps": {
+            "bootstrap_95_lower": 1.6265976992116016,
+            "bootstrap_95_upper": 2.381105536504136,
+            "interval_status": "complete_scene_block_descriptive_interval",
+            "maximum_observed": 2.545599074515845,
+            "mean": 2.0138156631682884,
+            "minimum_observed": 1.4081816405503567,
+            "number_observed": 5,
+            "number_of_scenes": 5
+          },
+          "minimum_clearance_first_3s_after_reference_m": {
+            "bootstrap_95_lower": 1.1267357228401225,
+            "bootstrap_95_upper": 1.2357712013362494,
+            "interval_status": "complete_scene_block_descriptive_interval",
+            "maximum_observed": 1.2557128476237833,
+            "mean": 1.184041418650142,
+            "minimum_observed": 1.0813605552944883,
+            "number_observed": 5,
+            "number_of_scenes": 5
+          },
+          "minimum_hidden_oriented_clearance_m": {
+            "bootstrap_95_lower": -0.49417586754134957,
+            "bootstrap_95_upper": 0.22461727514773872,
+            "interval_status": "complete_scene_block_descriptive_interval",
+            "maximum_observed": 0.4291566206130329,
+            "mean": -0.11579360525436382,
+            "minimum_observed": -0.7724732169360493,
+            "number_observed": 5,
+            "number_of_scenes": 5
+          },
+          "minimum_hidden_ttc_2d_s": {
+            "bootstrap_95_lower": 0.0,
+            "bootstrap_95_upper": 0.28308500318665136,
+            "interval_status": "complete_scene_block_descriptive_interval",
+            "maximum_observed": 0.47180833864441896,
+            "mean": 0.0943616677288838,
+            "minimum_observed": 0.0,
+            "number_observed": 5,
+            "number_of_scenes": 5
+          },
+          "physics_loop_deadline_miss_count": {
+            "bootstrap_95_lower": 0.0,
+            "bootstrap_95_upper": 0.0,
+            "interval_status": "complete_scene_block_descriptive_interval",
+            "maximum_observed": 0.0,
+            "mean": 0.0,
+            "minimum_observed": 0.0,
+            "number_observed": 5,
+            "number_of_scenes": 5
+          },
+          "physics_loop_deadline_miss_fraction": {
+            "bootstrap_95_lower": 0.0,
+            "bootstrap_95_upper": 0.0,
+            "interval_status": "complete_scene_block_descriptive_interval",
+            "maximum_observed": 0.0,
+            "mean": 0.0,
+            "minimum_observed": 0.0,
+            "number_observed": 5,
+            "number_of_scenes": 5
+          },
+          "physics_loop_maximum_cycle_time_s": {
+            "bootstrap_95_lower": 0.02042880000000267,
+            "bootstrap_95_upper": 0.02817573999999894,
+            "interval_status": "complete_scene_block_descriptive_interval",
+            "maximum_observed": 0.03194649999999655,
+            "mean": 0.023882860000001217,
+            "minimum_observed": 0.018191400000002744,
+            "number_observed": 5,
+            "number_of_scenes": 5
+          },
+          "physics_loop_mean_cycle_time_s": {
+            "bootstrap_95_lower": 0.012326219166666619,
+            "bootstrap_95_upper": 0.012575279833333414,
+            "interval_status": "complete_scene_block_descriptive_interval",
+            "maximum_observed": 0.012688175833333244,
+            "mean": 0.012435065500000082,
+            "minimum_observed": 0.012267547499999734,
+            "number_observed": 5,
+            "number_of_scenes": 5
+          },
+          "physics_loop_p95_cycle_time_s": {
+            "bootstrap_95_lower": 0.01596769199999823,
+            "bootstrap_95_upper": 0.016993669999999027,
+            "interval_status": "complete_scene_block_descriptive_interval",
+            "maximum_observed": 0.017376429999999488,
+            "mean": 0.016467291999999172,
+            "minimum_observed": 0.015687144999999347,
+            "number_observed": 5,
+            "number_of_scenes": 5
+          },
+          "planner_dropped_request_fraction": {
+            "bootstrap_95_lower": 0.7898305084745763,
+            "bootstrap_95_upper": 0.8101694915254238,
+            "interval_status": "complete_scene_block_descriptive_interval",
+            "maximum_observed": 0.8135593220338984,
+            "mean": 0.8,
+            "minimum_observed": 0.7796610169491526,
+            "number_observed": 5,
+            "number_of_scenes": 5
+          },
+          "planner_effective_completed_update_rate_hz": {
+            "bootstrap_95_lower": 1.8666666666666665,
+            "bootstrap_95_upper": 2.066666666666667,
+            "interval_status": "complete_scene_block_descriptive_interval",
+            "maximum_observed": 2.1666666666666665,
+            "mean": 1.9666666666666668,
+            "minimum_observed": 1.8333333333333333,
+            "number_observed": 5,
+            "number_of_scenes": 5
+          },
+          "planner_maximum_total_s": {
+            "bootstrap_95_lower": 0.975295684,
+            "bootstrap_95_upper": 1.06559494,
+            "interval_status": "complete_scene_block_descriptive_interval",
+            "maximum_observed": 1.0726968,
+            "mean": 1.03252056,
+            "minimum_observed": 0.919173,
+            "number_observed": 5,
+            "number_of_scenes": 5
+          },
+          "planner_mean_total_s": {
+            "bootstrap_95_lower": 0.4877486694871795,
+            "bootstrap_95_upper": 0.5287591607575757,
+            "interval_status": "complete_scene_block_descriptive_interval",
+            "maximum_observed": 0.5511866999999999,
+            "mean": 0.5049781038344988,
+            "minimum_observed": 0.4843441583333333,
+            "number_observed": 5,
+            "number_of_scenes": 5
+          },
+          "planner_p95_total_s": {
+            "bootstrap_95_lower": 0.8603000689999998,
+            "bootstrap_95_upper": 0.9728792769999999,
+            "interval_status": "complete_scene_block_descriptive_interval",
+            "maximum_observed": 1.0368954000000001,
+            "mean": 0.9040333519999997,
+            "minimum_observed": 0.8563315849999997,
+            "number_observed": 5,
+            "number_of_scenes": 5
+          },
+          "planner_reveal_to_hidden_aware_plan_applied_s": {
+            "bootstrap_95_lower": 0.6400000000000001,
+            "bootstrap_95_upper": 0.8600000000000001,
+            "interval_status": "complete_scene_block_descriptive_interval",
+            "maximum_observed": 0.9000000000000001,
+            "mean": 0.7500000000000002,
+            "minimum_observed": 0.5500000000000002,
+            "number_observed": 5,
+            "number_of_scenes": 5
+          },
+          "traffic_hard_braking_actor_count": {
+            "bootstrap_95_lower": 0.0,
+            "bootstrap_95_upper": 0.6,
+            "interval_status": "complete_scene_block_descriptive_interval",
+            "maximum_observed": 1.0,
+            "mean": 0.2,
+            "minimum_observed": 0.0,
+            "number_observed": 5,
+            "number_of_scenes": 5
+          },
+          "traffic_total_integrated_speed_deficit_vehicle_m": {
+            "bootstrap_95_lower": 55.113385461054214,
+            "bootstrap_95_upper": 70.08724311107453,
+            "interval_status": "complete_scene_block_descriptive_interval",
+            "maximum_observed": 75.51249460249508,
+            "mean": 62.600314286064375,
+            "minimum_observed": 52.83529400507202,
+            "number_observed": 5,
+            "number_of_scenes": 5
+          }
+        }
+      }
+    }
+  },
+  "clearance_definition": "signed minimum separation between ego and neighboring oriented boxes; zero denotes contact and negative values denote overlap",
+  "conditions": [
+    "empty_shadow",
+    "true_threat"
+  ],
+  "controller_display_labels": {
+    "ADA": "ADA-sourced",
+    "APF": "APF-sourced",
+    "DREAM": "DREAM",
+    "IDEAM": "IDEAM"
+  },
+  "controllers": [
+    "DREAM",
+    "IDEAM",
+    "ADA",
+    "APF"
+  ],
+  "created_utc": "2026-07-17T11:38:54.002040+00:00",
+  "empty_shadow_conservatism_tax_vs_ideam": {
+    "ADA": {
+      "conservatism_tax_mps": {
+        "bootstrap_95_lower": 0.1879512871452164,
+        "bootstrap_95_upper": 0.40185298327807006,
+        "mean": 0.28735126423848956
+      },
+      "definition": "IDEAM minus candidate episode-mean ego speed",
+      "display_label": "ADA-sourced"
+    },
+    "APF": {
+      "conservatism_tax_mps": {
+        "bootstrap_95_lower": 0.07153450086651247,
+        "bootstrap_95_upper": 0.32695413129102635,
+        "mean": 0.18693626653959897
+      },
+      "definition": "IDEAM minus candidate episode-mean ego speed",
+      "display_label": "APF-sourced"
+    },
+    "DREAM": {
+      "conservatism_tax_mps": {
+        "bootstrap_95_lower": 1.1310025749498194,
+        "bootstrap_95_upper": 1.317100610138948,
+        "mean": 1.2240515925443838
+      },
+      "definition": "IDEAM minus candidate episode-mean ego speed",
+      "display_label": "DREAM"
+    },
+    "IDEAM": {
+      "conservatism_tax_mps": {
+        "bootstrap_95_lower": 0.0,
+        "bootstrap_95_upper": 0.0,
+        "mean": 0.0
+      },
+      "definition": "IDEAM minus candidate episode-mean ego speed",
+      "display_label": "IDEAM"
+    }
+  },
+  "number_of_independent_scenes": 5,
+  "number_of_valid_runs": 40,
+  "paired_dream_minus_comparator": {
+    "empty_shadow": {
+      "ADA": {
+        "comparison": "DREAM minus ADA-sourced",
+        "paired_difference_collision_incidence": {
+          "bootstrap_95_lower": 0.0,
+          "bootstrap_95_upper": 0.0,
+          "mean": 0.0
+        },
+        "paired_difference_episode_mean_ego_speed_mps": {
+          "bootstrap_95_lower": -0.9850342499675208,
+          "bootstrap_95_upper": -0.890699640847339,
+          "mean": -0.9367003283058942
+        },
+        "paired_difference_episode_minimum_oriented_clearance_m": {
+          "bootstrap_95_lower": -0.00026595895566101647,
+          "bootstrap_95_upper": 4.848930167757083e-05,
+          "mean": -6.767567606309477e-05
+        },
+        "paired_difference_near_collision_incidence": {
+          "bootstrap_95_lower": 0.0,
+          "bootstrap_95_upper": 0.0,
+          "mean": 0.0
+        },
+        "section_4_4_paired_metric_differences": {
+          "ego_maximum_speed_loss_mps": {
+            "bootstrap_95_lower": 1.5288256121665007,
+            "bootstrap_95_upper": 1.6700484935010855,
+            "interval_status": "complete_scene_block_descriptive_interval",
+            "maximum_observed": 1.694983657462469,
+            "mean": 1.6121456585655125,
+            "minimum_observed": 1.4478402401984773,
+            "number_observed": 5,
+            "number_of_scenes": 5
+          },
+          "ego_peak_deceleration_mps2": {
+            "bootstrap_95_lower": -0.0783897158619169,
+            "bootstrap_95_upper": -0.0007973850702995833,
+            "interval_status": "complete_scene_block_descriptive_interval",
+            "maximum_observed": -1.5483542483707424e-05,
+            "mean": -0.032825507762581196,
+            "minimum_observed": -0.11556652515949395,
+            "number_observed": 5,
+            "number_of_scenes": 5
+          },
+          "low_level_deadline_miss_count": {
+            "bootstrap_95_lower": 0.0,
+            "bootstrap_95_upper": 0.0,
+            "interval_status": "complete_scene_block_descriptive_interval",
+            "maximum_observed": 0.0,
+            "mean": 0.0,
+            "minimum_observed": 0.0,
+            "number_observed": 5,
+            "number_of_scenes": 5
+          },
+          "low_level_deadline_miss_fraction": {
+            "bootstrap_95_lower": 0.0,
+            "bootstrap_95_upper": 0.0,
+            "interval_status": "complete_scene_block_descriptive_interval",
+            "maximum_observed": 0.0,
+            "mean": 0.0,
+            "minimum_observed": 0.0,
+            "number_observed": 5,
+            "number_of_scenes": 5
+          },
+          "low_level_maximum_time_s": {
+            "bootstrap_95_lower": -0.0005937200000040832,
+            "bootstrap_95_upper": -6.804000000144583e-05,
+            "interval_status": "complete_scene_block_descriptive_interval",
+            "maximum_observed": 4.8100000000772525e-05,
+            "mean": -0.00032416000000310417,
+            "minimum_observed": -0.0008066000000077622,
+            "number_observed": 5,
+            "number_of_scenes": 5
+          },
+          "low_level_mean_time_s": {
+            "bootstrap_95_lower": -2.1485666666952364e-05,
+            "bootstrap_95_upper": 5.241866666705641e-05,
+            "interval_status": "complete_scene_block_descriptive_interval",
+            "maximum_observed": 5.826000000025053e-05,
+            "mean": 2.1574000000062694e-05,
+            "minimum_observed": -5.9828333333733497e-05,
+            "number_observed": 5,
+            "number_of_scenes": 5
+          },
+          "low_level_p95_time_s": {
+            "bootstrap_95_lower": -4.4159999997538764e-05,
+            "bootstrap_95_upper": 0.0005810729999967986,
+            "interval_status": "complete_scene_block_descriptive_interval",
+            "maximum_observed": 0.0008238749999938113,
+            "mean": 0.00023340599999979633,
+            "minimum_observed": -0.00022126999999549815,
+            "number_observed": 5,
+            "number_of_scenes": 5
+          },
+          "maximum_follower_speed_loss_mps": {
+            "bootstrap_95_lower": -0.0012725329117607488,
+            "bootstrap_95_upper": 1.5621992588421562e-11,
+            "interval_status": "complete_scene_block_descriptive_interval",
+            "maximum_observed": 3.772271384150372e-11,
+            "mean": -0.00045011769569214266,
+            "minimum_observed": -0.0020560380395053812,
+            "number_observed": 5,
+            "number_of_scenes": 5
+          },
+          "minimum_clearance_first_3s_after_reference_m": {
+            "bootstrap_95_lower": -0.00024454558012085845,
+            "bootstrap_95_upper": 0.0001584027764295774,
+            "interval_status": "complete_scene_block_descriptive_interval",
+            "maximum_observed": 0.00023519288686846274,
+            "mean": -2.1080455314592685e-05,
+            "minimum_observed": -0.00046300250910902285,
+            "number_observed": 5,
+            "number_of_scenes": 5
+          },
+          "minimum_hidden_oriented_clearance_m": {
+            "bootstrap_95_lower": null,
+            "bootstrap_95_upper": null,
+            "interval_status": "not_available_no_observations",
+            "maximum_observed": null,
+            "mean": null,
+            "minimum_observed": null,
+            "number_observed": 0,
+            "number_of_scenes": 5
+          },
+          "minimum_hidden_ttc_2d_s": {
+            "bootstrap_95_lower": null,
+            "bootstrap_95_upper": null,
+            "interval_status": "not_available_no_observations",
+            "maximum_observed": null,
+            "mean": null,
+            "minimum_observed": null,
+            "number_observed": 0,
+            "number_of_scenes": 5
+          },
+          "physics_loop_deadline_miss_count": {
+            "bootstrap_95_lower": 0.0,
+            "bootstrap_95_upper": 0.0,
+            "interval_status": "complete_scene_block_descriptive_interval",
+            "maximum_observed": 0.0,
+            "mean": 0.0,
+            "minimum_observed": 0.0,
+            "number_observed": 5,
+            "number_of_scenes": 5
+          },
+          "physics_loop_deadline_miss_fraction": {
+            "bootstrap_95_lower": 0.0,
+            "bootstrap_95_upper": 0.0,
+            "interval_status": "complete_scene_block_descriptive_interval",
+            "maximum_observed": 0.0,
+            "mean": 0.0,
+            "minimum_observed": 0.0,
+            "number_observed": 5,
+            "number_of_scenes": 5
+          },
+          "physics_loop_maximum_cycle_time_s": {
+            "bootstrap_95_lower": -0.0053934600000012265,
+            "bootstrap_95_upper": 0.0008699599999985707,
+            "interval_status": "complete_scene_block_descriptive_interval",
+            "maximum_observed": 0.0012092999999993026,
+            "mean": -0.0016074800000012602,
+            "minimum_observed": -0.008946000000001675,
+            "number_observed": 5,
+            "number_of_scenes": 5
+          },
+          "physics_loop_mean_cycle_time_s": {
+            "bootstrap_95_lower": 4.1682999999721056e-05,
+            "bootstrap_95_upper": 0.00037280499999989557,
+            "interval_status": "complete_scene_block_descriptive_interval",
+            "maximum_observed": 0.0005126299999997329,
+            "mean": 0.000196097333333203,
+            "minimum_observed": -4.1318333334079346e-05,
+            "number_observed": 5,
+            "number_of_scenes": 5
+          },
+          "physics_loop_p95_cycle_time_s": {
+            "bootstrap_95_lower": -0.0008801279999950399,
+            "bootstrap_95_upper": 0.0004283120000015111,
+            "interval_status": "complete_scene_block_descriptive_interval",
+            "maximum_observed": 0.00062977499999981,
+            "mean": -0.0002259079999967644,
+            "minimum_observed": -0.0012156099999913305,
+            "number_observed": 5,
+            "number_of_scenes": 5
+          },
+          "planner_dropped_request_fraction": {
+            "bootstrap_95_lower": -0.10169491525423731,
+            "bootstrap_95_upper": -0.0745762711864407,
+            "interval_status": "complete_scene_block_descriptive_interval",
+            "maximum_observed": -0.06779661016949157,
+            "mean": -0.0864406779661017,
+            "minimum_observed": -0.11440677966101698,
+            "number_observed": 5,
+            "number_of_scenes": 5
+          },
+          "planner_effective_completed_update_rate_hz": {
+            "bootstrap_95_lower": 0.7333333333333334,
+            "bootstrap_95_upper": 1.0333333333333334,
+            "interval_status": "complete_scene_block_descriptive_interval",
+            "maximum_observed": 1.1666666666666667,
+            "mean": 0.8666666666666666,
+            "minimum_observed": 0.6666666666666667,
+            "number_observed": 5,
+            "number_of_scenes": 5
+          },
+          "planner_maximum_total_s": {
+            "bootstrap_95_lower": -1.22322546,
+            "bootstrap_95_upper": -0.5563637599999999,
+            "interval_status": "complete_scene_block_descriptive_interval",
+            "maximum_observed": -0.5246678999999999,
+            "mean": -0.79446628,
+            "minimum_observed": -1.6404277,
+            "number_observed": 5,
+            "number_of_scenes": 5
+          },
+          "planner_mean_total_s": {
+            "bootstrap_95_lower": -0.2776568753333332,
+            "bootstrap_95_upper": -0.1702309704761904,
+            "interval_status": "complete_scene_block_descriptive_interval",
+            "maximum_observed": -0.16897745666666658,
+            "mean": -0.2084225265714285,
+            "minimum_observed": -0.34498556999999985,
+            "number_observed": 5,
+            "number_of_scenes": 5
+          },
+          "planner_p95_total_s": {
+            "bootstrap_95_lower": -0.9518137699999996,
+            "bootstrap_95_upper": -0.45825047399999963,
+            "interval_status": "complete_scene_block_descriptive_interval",
+            "maximum_observed": -0.44352800999999964,
+            "mean": -0.6292389509999997,
+            "minimum_observed": -1.2687812499999995,
+            "number_observed": 5,
+            "number_of_scenes": 5
+          },
+          "planner_reveal_to_hidden_aware_plan_applied_s": {
+            "bootstrap_95_lower": null,
+            "bootstrap_95_upper": null,
+            "interval_status": "not_available_no_observations",
+            "maximum_observed": null,
+            "mean": null,
+            "minimum_observed": null,
+            "number_observed": 0,
+            "number_of_scenes": 5
+          },
+          "traffic_hard_braking_actor_count": {
+            "bootstrap_95_lower": 0.0,
+            "bootstrap_95_upper": 0.0,
+            "interval_status": "complete_scene_block_descriptive_interval",
+            "maximum_observed": 0.0,
+            "mean": 0.0,
+            "minimum_observed": 0.0,
+            "number_observed": 5,
+            "number_of_scenes": 5
+          },
+          "traffic_total_integrated_speed_deficit_vehicle_m": {
+            "bootstrap_95_lower": 0.0710253668176847,
+            "bootstrap_95_upper": 0.13549726850511662,
+            "interval_status": "complete_scene_block_descriptive_interval",
+            "maximum_observed": 0.16478989177471703,
+            "mean": 0.10085211302078108,
+            "minimum_observed": 0.056542526559994144,
+            "number_observed": 5,
+            "number_of_scenes": 5
+          }
+        }
+      },
+      "APF": {
+        "comparison": "DREAM minus APF-sourced",
+        "paired_difference_collision_incidence": {
+          "bootstrap_95_lower": 0.0,
+          "bootstrap_95_upper": 0.0,
+          "mean": 0.0
+        },
+        "paired_difference_episode_mean_ego_speed_mps": {
+          "bootstrap_95_lower": -1.132661429027977,
+          "bootstrap_95_upper": -0.9390022727928325,
+          "mean": -1.0371153260047847
+        },
+        "paired_difference_episode_minimum_oriented_clearance_m": {
+          "bootstrap_95_lower": -0.015717478726438028,
+          "bootstrap_95_upper": 0.00012048488190532502,
+          "mean": -0.005186182834814579
+        },
+        "paired_difference_near_collision_incidence": {
+          "bootstrap_95_lower": 0.0,
+          "bootstrap_95_upper": 0.0,
+          "mean": 0.0
+        },
+        "section_4_4_paired_metric_differences": {
+          "ego_maximum_speed_loss_mps": {
+            "bootstrap_95_lower": 1.7328420116224457,
+            "bootstrap_95_upper": 1.9236657022775652,
+            "interval_status": "complete_scene_block_descriptive_interval",
+            "maximum_observed": 2.0167275572129455,
+            "mean": 1.8240443397007902,
+            "minimum_observed": 1.6788088399592809,
+            "number_observed": 5,
+            "number_of_scenes": 5
+          },
+          "ego_peak_deceleration_mps2": {
+            "bootstrap_95_lower": -0.12872745209017467,
+            "bootstrap_95_upper": -0.00674430344363941,
+            "interval_status": "complete_scene_block_descriptive_interval",
+            "maximum_observed": 0.047613638013359605,
+            "mean": -0.07007894363468381,
+            "minimum_observed": -0.1680037430872261,
+            "number_observed": 5,
+            "number_of_scenes": 5
+          },
+          "low_level_deadline_miss_count": {
+            "bootstrap_95_lower": 0.0,
+            "bootstrap_95_upper": 0.0,
+            "interval_status": "complete_scene_block_descriptive_interval",
+            "maximum_observed": 0.0,
+            "mean": 0.0,
+            "minimum_observed": 0.0,
+            "number_observed": 5,
+            "number_of_scenes": 5
+          },
+          "low_level_deadline_miss_fraction": {
+            "bootstrap_95_lower": 0.0,
+            "bootstrap_95_upper": 0.0,
+            "interval_status": "complete_scene_block_descriptive_interval",
+            "maximum_observed": 0.0,
+            "mean": 0.0,
+            "minimum_observed": 0.0,
+            "number_observed": 5,
+            "number_of_scenes": 5
+          },
+          "low_level_maximum_time_s": {
+            "bootstrap_95_lower": -0.0005340200000048867,
+            "bootstrap_95_upper": 0.0006684799999973734,
+            "interval_status": "complete_scene_block_descriptive_interval",
+            "maximum_observed": 0.0008446999999947025,
+            "mean": 0.00011149999999631177,
+            "minimum_observed": -0.0011568000000039547,
+            "number_observed": 5,
+            "number_of_scenes": 5
+          },
+          "low_level_mean_time_s": {
+            "bootstrap_95_lower": 1.4759808333543325e-05,
+            "bootstrap_95_upper": 0.00015695366666693171,
+            "interval_status": "complete_scene_block_descriptive_interval",
+            "maximum_observed": 0.00020651166666697893,
+            "mean": 8.791500000011609e-05,
+            "minimum_observed": -3.305999999980713e-05,
+            "number_observed": 5,
+            "number_of_scenes": 5
+          },
+          "low_level_p95_time_s": {
+            "bootstrap_95_lower": -0.00024103474999629217,
+            "bootstrap_95_upper": 0.0007861849999979857,
+            "interval_status": "complete_scene_block_descriptive_interval",
+            "maximum_observed": 0.001128824999996603,
+            "mean": 0.0002671959999999985,
+            "minimum_observed": -0.0006526049999939334,
+            "number_observed": 5,
+            "number_of_scenes": 5
+          },
+          "maximum_follower_speed_loss_mps": {
+            "bootstrap_95_lower": -0.0014678444699896432,
+            "bootstrap_95_upper": 1.4136958270682953e-11,
+            "interval_status": "complete_scene_block_descriptive_interval",
+            "maximum_observed": 3.5342395676707383e-11,
+            "mean": -0.0006454292541874906,
+            "minimum_observed": -0.0020560380395053812,
+            "number_observed": 5,
+            "number_of_scenes": 5
+          },
+          "minimum_clearance_first_3s_after_reference_m": {
+            "bootstrap_95_lower": -0.015659194819370816,
+            "bootstrap_95_upper": 0.00033938561523854104,
+            "interval_status": "complete_scene_block_descriptive_interval",
+            "maximum_observed": 0.000445127037824955,
+            "mean": -0.005054322828744828,
+            "minimum_observed": -0.026245997596175297,
+            "number_observed": 5,
+            "number_of_scenes": 5
+          },
+          "minimum_hidden_oriented_clearance_m": {
+            "bootstrap_95_lower": null,
+            "bootstrap_95_upper": null,
+            "interval_status": "not_available_no_observations",
+            "maximum_observed": null,
+            "mean": null,
+            "minimum_observed": null,
+            "number_observed": 0,
+            "number_of_scenes": 5
+          },
+          "minimum_hidden_ttc_2d_s": {
+            "bootstrap_95_lower": null,
+            "bootstrap_95_upper": null,
+            "interval_status": "not_available_no_observations",
+            "maximum_observed": null,
+            "mean": null,
+            "minimum_observed": null,
+            "number_observed": 0,
+            "number_of_scenes": 5
+          },
+          "physics_loop_deadline_miss_count": {
+            "bootstrap_95_lower": 0.0,
+            "bootstrap_95_upper": 0.0,
+            "interval_status": "complete_scene_block_descriptive_interval",
+            "maximum_observed": 0.0,
+            "mean": 0.0,
+            "minimum_observed": 0.0,
+            "number_observed": 5,
+            "number_of_scenes": 5
+          },
+          "physics_loop_deadline_miss_fraction": {
+            "bootstrap_95_lower": 0.0,
+            "bootstrap_95_upper": 0.0,
+            "interval_status": "complete_scene_block_descriptive_interval",
+            "maximum_observed": 0.0,
+            "mean": 0.0,
+            "minimum_observed": 0.0,
+            "number_observed": 5,
+            "number_of_scenes": 5
+          },
+          "physics_loop_maximum_cycle_time_s": {
+            "bootstrap_95_lower": -0.0028505200000019217,
+            "bootstrap_95_upper": 0.002423599999998771,
+            "interval_status": "complete_scene_block_descriptive_interval",
+            "maximum_observed": 0.00382940000000076,
+            "mean": 0.00011093999999900461,
+            "minimum_observed": -0.005401800000001344,
+            "number_observed": 5,
+            "number_of_scenes": 5
+          },
+          "physics_loop_mean_cycle_time_s": {
+            "bootstrap_95_lower": -6.715966666655318e-05,
+            "bootstrap_95_upper": 0.0002446703333330837,
+            "interval_status": "complete_scene_block_descriptive_interval",
+            "maximum_observed": 0.0002636500000000371,
+            "mean": 9.355333333320517e-05,
+            "minimum_observed": -0.00018237333333314537,
+            "number_observed": 5,
+            "number_of_scenes": 5
+          },
+          "physics_loop_p95_cycle_time_s": {
+            "bootstrap_95_lower": -5.256599999590543e-05,
+            "bootstrap_95_upper": 0.0006384589999989022,
+            "interval_status": "complete_scene_block_descriptive_interval",
+            "maximum_observed": 0.0009117500000025182,
+            "mean": 0.00029002100000184337,
+            "minimum_observed": -0.00021664499999225414,
+            "number_observed": 5,
+            "number_of_scenes": 5
+          },
+          "planner_dropped_request_fraction": {
+            "bootstrap_95_lower": -0.1228813559322034,
+            "bootstrap_95_upper": -0.09322033898305085,
+            "interval_status": "complete_scene_block_descriptive_interval",
+            "maximum_observed": -0.0847457627118644,
+            "mean": -0.10677966101694916,
+            "minimum_observed": -0.13559322033898302,
+            "number_observed": 5,
+            "number_of_scenes": 5
+          },
+          "planner_effective_completed_update_rate_hz": {
+            "bootstrap_95_lower": 0.9333333333333332,
+            "bootstrap_95_upper": 1.2333333333333332,
+            "interval_status": "complete_scene_block_descriptive_interval",
+            "maximum_observed": 1.3333333333333333,
+            "mean": 1.0666666666666669,
+            "minimum_observed": 0.8333333333333333,
+            "number_observed": 5,
+            "number_of_scenes": 5
+          },
+          "planner_maximum_total_s": {
+            "bootstrap_95_lower": -1.3674146199999997,
+            "bootstrap_95_upper": -0.8256781400000002,
+            "interval_status": "complete_scene_block_descriptive_interval",
+            "maximum_observed": -0.5738624999999999,
+            "mean": -1.1296732999999999,
+            "minimum_observed": -1.5038466999999998,
+            "number_observed": 5,
+            "number_of_scenes": 5
+          },
+          "planner_mean_total_s": {
+            "bootstrap_95_lower": -0.3119978644047618,
+            "bootstrap_95_upper": -0.20785399873809518,
+            "interval_status": "complete_scene_block_descriptive_interval",
+            "maximum_observed": -0.15470801666666661,
+            "mean": -0.2666504039523809,
+            "minimum_observed": -0.3211462303571428,
+            "number_observed": 5,
+            "number_of_scenes": 5
+          },
+          "planner_p95_total_s": {
+            "bootstrap_95_lower": -1.1056748999999997,
+            "bootstrap_95_upper": -0.6516531759999997,
+            "interval_status": "complete_scene_block_descriptive_interval",
+            "maximum_observed": -0.42624364999999964,
+            "mean": -0.8972351059999996,
+            "minimum_observed": -1.230245979999999,
+            "number_observed": 5,
+            "number_of_scenes": 5
+          },
+          "planner_reveal_to_hidden_aware_plan_applied_s": {
+            "bootstrap_95_lower": null,
+            "bootstrap_95_upper": null,
+            "interval_status": "not_available_no_observations",
+            "maximum_observed": null,
+            "mean": null,
+            "minimum_observed": null,
+            "number_observed": 0,
+            "number_of_scenes": 5
+          },
+          "traffic_hard_braking_actor_count": {
+            "bootstrap_95_lower": 0.0,
+            "bootstrap_95_upper": 0.0,
+            "interval_status": "complete_scene_block_descriptive_interval",
+            "maximum_observed": 0.0,
+            "mean": 0.0,
+            "minimum_observed": 0.0,
+            "number_observed": 5,
+            "number_of_scenes": 5
+          },
+          "traffic_total_integrated_speed_deficit_vehicle_m": {
+            "bootstrap_95_lower": 0.09581139112813446,
+            "bootstrap_95_upper": 0.19507246186186364,
+            "interval_status": "complete_scene_block_descriptive_interval",
+            "maximum_observed": 0.21056024733690037,
+            "mean": 0.14544192649499904,
+            "minimum_observed": 0.08370986473784114,
+            "number_observed": 5,
+            "number_of_scenes": 5
+          }
+        }
+      },
+      "IDEAM": {
+        "comparison": "DREAM minus IDEAM",
+        "paired_difference_collision_incidence": {
+          "bootstrap_95_lower": 0.0,
+          "bootstrap_95_upper": 0.0,
+          "mean": 0.0
+        },
+        "paired_difference_episode_mean_ego_speed_mps": {
+          "bootstrap_95_lower": -1.317100610138948,
+          "bootstrap_95_upper": -1.1310025749498194,
+          "mean": -1.2240515925443838
+        },
+        "paired_difference_episode_minimum_oriented_clearance_m": {
+          "bootstrap_95_lower": -0.07077753285058623,
+          "bootstrap_95_upper": 0.0017357262210071056,
+          "mean": -0.02272029447884334
+        },
+        "paired_difference_near_collision_incidence": {
+          "bootstrap_95_lower": 0.0,
+          "bootstrap_95_upper": 0.0,
+          "mean": 0.0
+        },
+        "section_4_4_paired_metric_differences": {
+          "ego_maximum_speed_loss_mps": {
+            "bootstrap_95_lower": 1.887432847379793,
+            "bootstrap_95_upper": 2.1482787879502103,
+            "interval_status": "complete_scene_block_descriptive_interval",
+            "maximum_observed": 2.26649011867028,
+            "mean": 2.0167502664699817,
+            "minimum_observed": 1.8430550780645127,
+            "number_observed": 5,
+            "number_of_scenes": 5
+          },
+          "ego_peak_deceleration_mps2": {
+            "bootstrap_95_lower": -0.30945913733890507,
+            "bootstrap_95_upper": -0.1378684665055232,
+            "interval_status": "complete_scene_block_descriptive_interval",
+            "maximum_observed": -0.0614958838149704,
+            "mean": -0.22547749253718052,
+            "minimum_observed": -0.36656414802166637,
+            "number_observed": 5,
+            "number_of_scenes": 5
+          },
+          "low_level_deadline_miss_count": {
+            "bootstrap_95_lower": 0.0,
+            "bootstrap_95_upper": 0.0,
+            "interval_status": "complete_scene_block_descriptive_interval",
+            "maximum_observed": 0.0,
+            "mean": 0.0,
+            "minimum_observed": 0.0,
+            "number_observed": 5,
+            "number_of_scenes": 5
+          },
+          "low_level_deadline_miss_fraction": {
+            "bootstrap_95_lower": 0.0,
+            "bootstrap_95_upper": 0.0,
+            "interval_status": "complete_scene_block_descriptive_interval",
+            "maximum_observed": 0.0,
+            "mean": 0.0,
+            "minimum_observed": 0.0,
+            "number_observed": 5,
+            "number_of_scenes": 5
+          },
+          "low_level_maximum_time_s": {
+            "bootstrap_95_lower": -0.0005686000000032721,
+            "bootstrap_95_upper": 0.00025343999999449807,
+            "interval_status": "complete_scene_block_descriptive_interval",
+            "maximum_observed": 0.000657399999994368,
+            "mean": -0.00021894000000415302,
+            "minimum_observed": -0.0006142000000046721,
+            "number_observed": 5,
+            "number_of_scenes": 5
+          },
+          "low_level_mean_time_s": {
+            "bootstrap_95_lower": 4.0683333333125374e-05,
+            "bootstrap_95_upper": 0.00011885266666681101,
+            "interval_status": "complete_scene_block_descriptive_interval",
+            "maximum_observed": 0.00014701333333372681,
+            "mean": 7.976799999996819e-05,
+            "minimum_observed": 2.6003333333513056e-05,
+            "number_observed": 5,
+            "number_of_scenes": 5
+          },
+          "low_level_p95_time_s": {
+            "bootstrap_95_lower": -2.168999999661251e-06,
+            "bootstrap_95_upper": 0.0006694959999999024,
+            "interval_status": "complete_scene_block_descriptive_interval",
+            "maximum_observed": 0.0009172700000004137,
+            "mean": 0.00031969800000041426,
+            "minimum_observed": -7.891499999992425e-05,
+            "number_observed": 5,
+            "number_of_scenes": 5
+          },
+          "maximum_follower_speed_loss_mps": {
+            "bootstrap_95_lower": -0.001233241327695822,
+            "bootstrap_95_upper": 0.0012496916246874435,
+            "interval_status": "complete_scene_block_descriptive_interval",
+            "maximum_observed": 0.0020828192892352604,
+            "mean": 5.7377459533825e-06,
+            "minimum_observed": -0.0020560380395053812,
+            "number_observed": 5,
+            "number_of_scenes": 5
+          },
+          "minimum_clearance_first_3s_after_reference_m": {
+            "bootstrap_95_lower": -0.08132216029280906,
+            "bootstrap_95_upper": 0.003598208847963557,
+            "interval_status": "complete_scene_block_descriptive_interval",
+            "maximum_observed": 0.005206442664847932,
+            "mean": -0.025491658105801472,
+            "minimum_observed": -0.1368806793039934,
+            "number_observed": 5,
+            "number_of_scenes": 5
+          },
+          "minimum_hidden_oriented_clearance_m": {
+            "bootstrap_95_lower": null,
+            "bootstrap_95_upper": null,
+            "interval_status": "not_available_no_observations",
+            "maximum_observed": null,
+            "mean": null,
+            "minimum_observed": null,
+            "number_observed": 0,
+            "number_of_scenes": 5
+          },
+          "minimum_hidden_ttc_2d_s": {
+            "bootstrap_95_lower": null,
+            "bootstrap_95_upper": null,
+            "interval_status": "not_available_no_observations",
+            "maximum_observed": null,
+            "mean": null,
+            "minimum_observed": null,
+            "number_observed": 0,
+            "number_of_scenes": 5
+          },
+          "physics_loop_deadline_miss_count": {
+            "bootstrap_95_lower": 0.0,
+            "bootstrap_95_upper": 0.0,
+            "interval_status": "complete_scene_block_descriptive_interval",
+            "maximum_observed": 0.0,
+            "mean": 0.0,
+            "minimum_observed": 0.0,
+            "number_observed": 5,
+            "number_of_scenes": 5
+          },
+          "physics_loop_deadline_miss_fraction": {
+            "bootstrap_95_lower": 0.0,
+            "bootstrap_95_upper": 0.0,
+            "interval_status": "complete_scene_block_descriptive_interval",
+            "maximum_observed": 0.0,
+            "mean": 0.0,
+            "minimum_observed": 0.0,
+            "number_observed": 5,
+            "number_of_scenes": 5
+          },
+          "physics_loop_maximum_cycle_time_s": {
+            "bootstrap_95_lower": -0.0021144199999987732,
+            "bootstrap_95_upper": 0.000884600000000546,
+            "interval_status": "complete_scene_block_descriptive_interval",
+            "maximum_observed": 0.0019774000000012393,
+            "mean": -0.0005576800000000048,
+            "minimum_observed": -0.003294799999999043,
+            "number_observed": 5,
+            "number_of_scenes": 5
+          },
+          "physics_loop_mean_cycle_time_s": {
+            "bootstrap_95_lower": -9.110016666661266e-05,
+            "bootstrap_95_upper": 0.0006201984999999091,
+            "interval_status": "complete_scene_block_descriptive_interval",
+            "maximum_observed": 0.0007810274999997674,
+            "mean": 0.00026454916666664825,
+            "minimum_observed": -0.0002307891666664709,
+            "number_observed": 5,
+            "number_of_scenes": 5
+          },
+          "physics_loop_p95_cycle_time_s": {
+            "bootstrap_95_lower": -0.00027514999999936964,
+            "bootstrap_95_upper": 0.0003117740000043768,
+            "interval_status": "complete_scene_block_descriptive_interval",
+            "maximum_observed": 0.0004576200000043322,
+            "mean": 3.7868000003378825e-05,
+            "minimum_observed": -0.0005395800000007594,
+            "number_observed": 5,
+            "number_of_scenes": 5
+          },
+          "planner_dropped_request_fraction": {
+            "bootstrap_95_lower": -0.07774011299435028,
+            "bootstrap_95_upper": -0.05542372881355932,
+            "interval_status": "complete_scene_block_descriptive_interval",
+            "maximum_observed": -0.04661016949152541,
+            "mean": -0.06728813559322036,
+            "minimum_observed": -0.0847457627118644,
+            "number_observed": 5,
+            "number_of_scenes": 5
+          },
+          "planner_effective_completed_update_rate_hz": {
+            "bootstrap_95_lower": 0.5666666666666668,
+            "bootstrap_95_upper": 0.7666666666666666,
+            "interval_status": "complete_scene_block_descriptive_interval",
+            "maximum_observed": 0.8333333333333333,
+            "mean": 0.6666666666666667,
+            "minimum_observed": 0.5,
+            "number_observed": 5,
+            "number_of_scenes": 5
+          },
+          "planner_maximum_total_s": {
+            "bootstrap_95_lower": -0.92813134,
+            "bootstrap_95_upper": -0.4443469799999999,
+            "interval_status": "complete_scene_block_descriptive_interval",
+            "maximum_observed": -0.3672460999999999,
+            "mean": -0.64051784,
+            "minimum_observed": -1.1816126,
+            "number_observed": 5,
+            "number_of_scenes": 5
+          },
+          "planner_mean_total_s": {
+            "bootstrap_95_lower": -0.18304244129004318,
+            "bootstrap_95_upper": -0.12726602078787885,
+            "interval_status": "complete_scene_block_descriptive_interval",
+            "maximum_observed": -0.11128956333333345,
+            "mean": -0.15306612069264064,
+            "minimum_observed": -0.21070867285714273,
+            "number_observed": 5,
+            "number_of_scenes": 5
+          },
+          "planner_p95_total_s": {
+            "bootstrap_95_lower": -0.6158997619999992,
+            "bootstrap_95_upper": -0.3271762799999999,
+            "interval_status": "complete_scene_block_descriptive_interval",
+            "maximum_observed": -0.28574751,
+            "mean": -0.4430488559999997,
+            "minimum_observed": -0.7688176249999988,
+            "number_observed": 5,
+            "number_of_scenes": 5
+          },
+          "planner_reveal_to_hidden_aware_plan_applied_s": {
+            "bootstrap_95_lower": null,
+            "bootstrap_95_upper": null,
+            "interval_status": "not_available_no_observations",
+            "maximum_observed": null,
+            "mean": null,
+            "minimum_observed": null,
+            "number_observed": 0,
+            "number_of_scenes": 5
+          },
+          "traffic_hard_braking_actor_count": {
+            "bootstrap_95_lower": 0.0,
+            "bootstrap_95_upper": 0.0,
+            "interval_status": "complete_scene_block_descriptive_interval",
+            "maximum_observed": 0.0,
+            "mean": 0.0,
+            "minimum_observed": 0.0,
+            "number_observed": 5,
+            "number_of_scenes": 5
+          },
+          "traffic_total_integrated_speed_deficit_vehicle_m": {
+            "bootstrap_95_lower": 0.1385955503765018,
+            "bootstrap_95_upper": 0.26699872830921834,
+            "interval_status": "complete_scene_block_descriptive_interval",
+            "maximum_observed": 0.292136229250886,
+            "mean": 0.2027971393428601,
+            "minimum_observed": 0.12446322823299738,
+            "number_observed": 5,
+            "number_of_scenes": 5
+          }
+        }
+      }
+    },
+    "true_threat": {
+      "ADA": {
+        "comparison": "DREAM minus ADA-sourced",
+        "paired_difference_collision_incidence": {
+          "bootstrap_95_lower": 0.0,
+          "bootstrap_95_upper": 0.0,
+          "mean": 0.0
+        },
+        "paired_difference_episode_mean_ego_speed_mps": {
+          "bootstrap_95_lower": 0.1891593809431896,
+          "bootstrap_95_upper": 0.8210267709336811,
+          "mean": 0.5423993279648286
+        },
+        "paired_difference_episode_minimum_oriented_clearance_m": {
+          "bootstrap_95_lower": 0.5207841421827795,
+          "bootstrap_95_upper": 0.8161102443346616,
+          "mean": 0.6668782510216069
+        },
+        "paired_difference_near_collision_incidence": {
+          "bootstrap_95_lower": -1.0,
+          "bootstrap_95_upper": -0.2,
+          "mean": -0.6
+        },
+        "section_4_4_paired_metric_differences": {
+          "ego_maximum_speed_loss_mps": {
+            "bootstrap_95_lower": -7.29648567583452,
+            "bootstrap_95_upper": -1.62457617136117,
+            "interval_status": "complete_scene_block_descriptive_interval",
+            "maximum_observed": 0.49065393091077425,
+            "mean": -4.777994436263619,
+            "minimum_observed": -8.007742622514904,
+            "number_observed": 5,
+            "number_of_scenes": 5
+          },
+          "ego_peak_deceleration_mps2": {
+            "bootstrap_95_lower": 2.0541473340655187,
+            "bootstrap_95_upper": 5.7129489863352205,
+            "interval_status": "complete_scene_block_descriptive_interval",
+            "maximum_observed": 7.2552068479998155,
+            "mean": 3.6971655647936785,
+            "minimum_observed": 1.7379692069604857,
+            "number_observed": 5,
+            "number_of_scenes": 5
+          },
+          "low_level_deadline_miss_count": {
+            "bootstrap_95_lower": 0.0,
+            "bootstrap_95_upper": 0.0,
+            "interval_status": "complete_scene_block_descriptive_interval",
+            "maximum_observed": 0.0,
+            "mean": 0.0,
+            "minimum_observed": 0.0,
+            "number_observed": 5,
+            "number_of_scenes": 5
+          },
+          "low_level_deadline_miss_fraction": {
+            "bootstrap_95_lower": 0.0,
+            "bootstrap_95_upper": 0.0,
+            "interval_status": "complete_scene_block_descriptive_interval",
+            "maximum_observed": 0.0,
+            "mean": 0.0,
+            "minimum_observed": 0.0,
+            "number_observed": 5,
+            "number_of_scenes": 5
+          },
+          "low_level_maximum_time_s": {
+            "bootstrap_95_lower": 0.00010269450000009785,
+            "bootstrap_95_upper": 0.0009536800000041979,
+            "interval_status": "complete_scene_block_descriptive_interval",
+            "maximum_observed": 0.0013756000000064716,
+            "mean": 0.0004834999999999923,
+            "minimum_observed": -0.00014640000000198938,
+            "number_observed": 5,
+            "number_of_scenes": 5
+          },
+          "low_level_mean_time_s": {
+            "bootstrap_95_lower": 2.7984999999889747e-05,
+            "bootstrap_95_upper": 8.074900000002812e-05,
+            "interval_status": "complete_scene_block_descriptive_interval",
+            "maximum_observed": 9.937166666672921e-05,
+            "mean": 5.5266666666694196e-05,
+            "minimum_observed": 6.258333333223742e-06,
+            "number_observed": 5,
+            "number_of_scenes": 5
+          },
+          "low_level_p95_time_s": {
+            "bootstrap_95_lower": 0.00010473699999923982,
+            "bootstrap_95_upper": 0.00047403099999975516,
+            "interval_status": "complete_scene_block_descriptive_interval",
+            "maximum_observed": 0.0006512250000000113,
+            "mean": 0.0002649339999994994,
+            "minimum_observed": 7.49999999996474e-05,
+            "number_observed": 5,
+            "number_of_scenes": 5
+          },
+          "maximum_follower_speed_loss_mps": {
+            "bootstrap_95_lower": -0.0013915511697334183,
+            "bootstrap_95_upper": 5.329070518200751e-13,
+            "interval_status": "complete_scene_block_descriptive_interval",
+            "maximum_observed": 1.3322676295501878e-12,
+            "mean": -0.00046385039328100675,
+            "minimum_observed": -0.0023192519411310286,
+            "number_observed": 5,
+            "number_of_scenes": 5
+          },
+          "minimum_clearance_first_3s_after_reference_m": {
+            "bootstrap_95_lower": -0.0006112625794185255,
+            "bootstrap_95_upper": 8.992556634108695e-05,
+            "interval_status": "complete_scene_block_descriptive_interval",
+            "maximum_observed": 0.00023519288686846274,
+            "mean": -0.00022568278392314233,
+            "minimum_observed": -0.0008682891858318165,
+            "number_observed": 5,
+            "number_of_scenes": 5
+          },
+          "minimum_hidden_oriented_clearance_m": {
+            "bootstrap_95_lower": 0.76666339231297,
+            "bootstrap_95_upper": 1.1895540173147505,
+            "interval_status": "complete_scene_block_descriptive_interval",
+            "maximum_observed": 1.3673076544039908,
+            "mean": 0.9696398444810022,
+            "minimum_observed": 0.6723499063409086,
+            "number_observed": 5,
+            "number_of_scenes": 5
+          },
+          "minimum_hidden_ttc_2d_s": {
+            "bootstrap_95_lower": 0.3132824358585689,
+            "bootstrap_95_upper": 0.5647787630123051,
+            "interval_status": "complete_scene_block_descriptive_interval",
+            "maximum_observed": 0.6878366065134414,
+            "mean": 0.42179364742785425,
+            "minimum_observed": 0.2764664730611519,
+            "number_observed": 5,
+            "number_of_scenes": 5
+          },
+          "physics_loop_deadline_miss_count": {
+            "bootstrap_95_lower": 0.0,
+            "bootstrap_95_upper": 0.0,
+            "interval_status": "complete_scene_block_descriptive_interval",
+            "maximum_observed": 0.0,
+            "mean": 0.0,
+            "minimum_observed": 0.0,
+            "number_observed": 5,
+            "number_of_scenes": 5
+          },
+          "physics_loop_deadline_miss_fraction": {
+            "bootstrap_95_lower": 0.0,
+            "bootstrap_95_upper": 0.0,
+            "interval_status": "complete_scene_block_descriptive_interval",
+            "maximum_observed": 0.0,
+            "mean": 0.0,
+            "minimum_observed": 0.0,
+            "number_observed": 5,
+            "number_of_scenes": 5
+          },
+          "physics_loop_maximum_cycle_time_s": {
+            "bootstrap_95_lower": -0.000847680000003237,
+            "bootstrap_95_upper": 0.0009477999999994325,
+            "interval_status": "complete_scene_block_descriptive_interval",
+            "maximum_observed": 0.0012157999999971025,
+            "mean": 5.005999999809774e-05,
+            "minimum_observed": -0.0012980000000020198,
+            "number_observed": 5,
+            "number_of_scenes": 5
+          },
+          "physics_loop_mean_cycle_time_s": {
+            "bootstrap_95_lower": -0.0006157966666664842,
+            "bootstrap_95_upper": 0.0006909283333332537,
+            "interval_status": "complete_scene_block_descriptive_interval",
+            "maximum_observed": 0.0011018699999997793,
+            "mean": 9.911666666688815e-06,
+            "minimum_observed": -0.0007582799999998283,
+            "number_observed": 5,
+            "number_of_scenes": 5
+          },
+          "physics_loop_p95_cycle_time_s": {
+            "bootstrap_95_lower": 0.00013938100000004255,
+            "bootstrap_95_upper": 0.0009705280000002501,
+            "interval_status": "complete_scene_block_descriptive_interval",
+            "maximum_observed": 0.001444040000001045,
+            "mean": 0.00046739699999946563,
+            "minimum_observed": 2.1185000001366916e-05,
+            "number_observed": 5,
+            "number_of_scenes": 5
+          },
+          "planner_dropped_request_fraction": {
+            "bootstrap_95_lower": -0.04745762711864414,
+            "bootstrap_95_upper": -0.03389830508474578,
+            "interval_status": "complete_scene_block_descriptive_interval",
+            "maximum_observed": -0.03389830508474578,
+            "mean": -0.04067796610169496,
+            "minimum_observed": -0.05084745762711873,
+            "number_observed": 5,
+            "number_of_scenes": 5
+          },
+          "planner_effective_completed_update_rate_hz": {
+            "bootstrap_95_lower": 0.3333333333333335,
+            "bootstrap_95_upper": 0.4666666666666669,
+            "interval_status": "complete_scene_block_descriptive_interval",
+            "maximum_observed": 0.5000000000000002,
+            "mean": 0.4000000000000002,
+            "minimum_observed": 0.3333333333333335,
+            "number_observed": 5,
+            "number_of_scenes": 5
+          },
+          "planner_maximum_total_s": {
+            "bootstrap_95_lower": -0.6156901799999999,
+            "bootstrap_95_upper": -0.5894656199999999,
+            "interval_status": "complete_scene_block_descriptive_interval",
+            "maximum_observed": -0.5846421999999999,
+            "mean": -0.6025779,
+            "minimum_observed": -0.6253896999999999,
+            "number_observed": 5,
+            "number_of_scenes": 5
+          },
+          "planner_mean_total_s": {
+            "bootstrap_95_lower": -0.10389226632034632,
+            "bootstrap_95_upper": -0.07487594333333335,
+            "interval_status": "complete_scene_block_descriptive_interval",
+            "maximum_observed": -0.07149542857142849,
+            "mean": -0.08938410482683982,
+            "minimum_observed": -0.11096555649350648,
+            "number_observed": 5,
+            "number_of_scenes": 5
+          },
+          "planner_p95_total_s": {
+            "bootstrap_95_lower": -0.4587155909999999,
+            "bootstrap_95_upper": -0.40267384299999975,
+            "interval_status": "complete_scene_block_descriptive_interval",
+            "maximum_observed": -0.3949181399999997,
+            "mean": -0.42556366499999976,
+            "minimum_observed": -0.490677555,
+            "number_observed": 5,
+            "number_of_scenes": 5
+          },
+          "planner_reveal_to_hidden_aware_plan_applied_s": {
+            "bootstrap_95_lower": -0.040000000000000036,
+            "bootstrap_95_upper": 0.10000000000000013,
+            "interval_status": "complete_scene_block_descriptive_interval",
+            "maximum_observed": 0.1000000000000002,
+            "mean": 0.040000000000000056,
+            "minimum_observed": -0.10000000000000009,
+            "number_observed": 5,
+            "number_of_scenes": 5
+          },
+          "traffic_hard_braking_actor_count": {
+            "bootstrap_95_lower": 0.0,
+            "bootstrap_95_upper": 0.0,
+            "interval_status": "complete_scene_block_descriptive_interval",
+            "maximum_observed": 0.0,
+            "mean": 0.0,
+            "minimum_observed": 0.0,
+            "number_observed": 5,
+            "number_of_scenes": 5
+          },
+          "traffic_total_integrated_speed_deficit_vehicle_m": {
+            "bootstrap_95_lower": 0.0013784420841886913,
+            "bootstrap_95_upper": 0.026986337563604933,
+            "interval_status": "complete_scene_block_descriptive_interval",
+            "maximum_observed": 0.03206724869494337,
+            "mean": 0.01590213090242685,
+            "minimum_observed": -0.010715488692753183,
+            "number_observed": 5,
+            "number_of_scenes": 5
+          }
+        }
+      },
+      "APF": {
+        "comparison": "DREAM minus APF-sourced",
+        "paired_difference_collision_incidence": {
+          "bootstrap_95_lower": 0.0,
+          "bootstrap_95_upper": 0.0,
+          "mean": 0.0
+        },
+        "paired_difference_episode_mean_ego_speed_mps": {
+          "bootstrap_95_lower": -0.8229286683920705,
+          "bootstrap_95_upper": -0.061217381814553565,
+          "mean": -0.3920555340901693
+        },
+        "paired_difference_episode_minimum_oriented_clearance_m": {
+          "bootstrap_95_lower": 0.020118062279130332,
+          "bootstrap_95_upper": 0.385902382826795,
+          "mean": 0.18644915892866679
+        },
+        "paired_difference_near_collision_incidence": {
+          "bootstrap_95_lower": -0.8,
+          "bootstrap_95_upper": 0.0,
+          "mean": -0.4
+        },
+        "section_4_4_paired_metric_differences": {
+          "ego_maximum_speed_loss_mps": {
+            "bootstrap_95_lower": -1.190496004667859,
+            "bootstrap_95_upper": 1.3077818096186973,
+            "interval_status": "complete_scene_block_descriptive_interval",
+            "maximum_observed": 2.3293228537608925,
+            "mean": 0.0940993729723509,
+            "minimum_observed": -1.9281609834362285,
+            "number_observed": 5,
+            "number_of_scenes": 5
+          },
+          "ego_peak_deceleration_mps2": {
+            "bootstrap_95_lower": -0.12108493335222192,
+            "bootstrap_95_upper": 3.5104206080223435,
+            "interval_status": "complete_scene_block_descriptive_interval",
+            "maximum_observed": 4.771617102841006,
+            "mean": 1.567104773334023,
+            "minimum_observed": -0.2269931828172389,
+            "number_observed": 5,
+            "number_of_scenes": 5
+          },
+          "low_level_deadline_miss_count": {
+            "bootstrap_95_lower": 0.0,
+            "bootstrap_95_upper": 0.0,
+            "interval_status": "complete_scene_block_descriptive_interval",
+            "maximum_observed": 0.0,
+            "mean": 0.0,
+            "minimum_observed": 0.0,
+            "number_observed": 5,
+            "number_of_scenes": 5
+          },
+          "low_level_deadline_miss_fraction": {
+            "bootstrap_95_lower": 0.0,
+            "bootstrap_95_upper": 0.0,
+            "interval_status": "complete_scene_block_descriptive_interval",
+            "maximum_observed": 0.0,
+            "mean": 0.0,
+            "minimum_observed": 0.0,
+            "number_observed": 5,
+            "number_of_scenes": 5
+          },
+          "low_level_maximum_time_s": {
+            "bootstrap_95_lower": -0.0008648400000026868,
+            "bootstrap_95_upper": 0.0004506399999982591,
+            "interval_status": "complete_scene_block_descriptive_interval",
+            "maximum_observed": 0.0010552999999973167,
+            "mean": -0.0002583200000010777,
+            "minimum_observed": -0.0009820000000040352,
+            "number_observed": 5,
+            "number_of_scenes": 5
+          },
+          "low_level_mean_time_s": {
+            "bootstrap_95_lower": -0.00015711299999997182,
+            "bootstrap_95_upper": 8.103266666635357e-05,
+            "interval_status": "complete_scene_block_descriptive_interval",
+            "maximum_observed": 0.00017752666666635722,
+            "mean": -3.86826666669057e-05,
+            "minimum_observed": -0.0002381916666662914,
+            "number_observed": 5,
+            "number_of_scenes": 5
+          },
+          "low_level_p95_time_s": {
+            "bootstrap_95_lower": -0.0007136400000009497,
+            "bootstrap_95_upper": 0.00040151799999637975,
+            "interval_status": "complete_scene_block_descriptive_interval",
+            "maximum_observed": 0.0008614299999981868,
+            "mean": -0.0001671990000017584,
+            "minimum_observed": -0.0009797699999996466,
+            "number_observed": 5,
+            "number_of_scenes": 5
+          },
+          "maximum_follower_speed_loss_mps": {
+            "bootstrap_95_lower": -0.0013915511651546807,
+            "bootstrap_95_upper": 0.0,
+            "interval_status": "complete_scene_block_descriptive_interval",
+            "maximum_observed": 0.0,
+            "mean": -0.00046385038870226935,
+            "minimum_observed": -0.0023192519411310286,
+            "number_observed": 5,
+            "number_of_scenes": 5
+          },
+          "minimum_clearance_first_3s_after_reference_m": {
+            "bootstrap_95_lower": -0.015787764833539074,
+            "bootstrap_95_upper": 0.00038772141010956496,
+            "interval_status": "complete_scene_block_descriptive_interval",
+            "maximum_observed": 0.000445127037824955,
+            "mean": -0.005067064177052982,
+            "minimum_observed": -0.026466455315652393,
+            "number_observed": 5,
+            "number_of_scenes": 5
+          },
+          "minimum_hidden_oriented_clearance_m": {
+            "bootstrap_95_lower": 0.18501190709946144,
+            "bootstrap_95_upper": 0.8409923314817129,
+            "interval_status": "complete_scene_block_descriptive_interval",
+            "maximum_observed": 1.1254263215988551,
+            "mean": 0.48559817643112224,
+            "minimum_observed": -0.02270420039220533,
+            "number_observed": 5,
+            "number_of_scenes": 5
+          },
+          "minimum_hidden_ttc_2d_s": {
+            "bootstrap_95_lower": 0.05518508979448433,
+            "bootstrap_95_upper": 0.4584606762121002,
+            "interval_status": "complete_scene_block_descriptive_interval",
+            "maximum_observed": 0.6344522803338069,
+            "mean": 0.23303029626174646,
+            "minimum_observed": 0.02009665320183529,
+            "number_observed": 5,
+            "number_of_scenes": 5
+          },
+          "physics_loop_deadline_miss_count": {
+            "bootstrap_95_lower": 0.0,
+            "bootstrap_95_upper": 0.0,
+            "interval_status": "complete_scene_block_descriptive_interval",
+            "maximum_observed": 0.0,
+            "mean": 0.0,
+            "minimum_observed": 0.0,
+            "number_observed": 5,
+            "number_of_scenes": 5
+          },
+          "physics_loop_deadline_miss_fraction": {
+            "bootstrap_95_lower": 0.0,
+            "bootstrap_95_upper": 0.0,
+            "interval_status": "complete_scene_block_descriptive_interval",
+            "maximum_observed": 0.0,
+            "mean": 0.0,
+            "minimum_observed": 0.0,
+            "number_observed": 5,
+            "number_of_scenes": 5
+          },
+          "physics_loop_maximum_cycle_time_s": {
+            "bootstrap_95_lower": -0.006243879999999535,
+            "bootstrap_95_upper": 0.0003501400000004651,
+            "interval_status": "complete_scene_block_descriptive_interval",
+            "maximum_observed": 0.0017149000000031833,
+            "mean": -0.0026814999999999144,
+            "minimum_observed": -0.00958699999999979,
+            "number_observed": 5,
+            "number_of_scenes": 5
+          },
+          "physics_loop_mean_cycle_time_s": {
+            "bootstrap_95_lower": -0.000599871499999794,
+            "bootstrap_95_upper": 0.0005064623333332696,
+            "interval_status": "complete_scene_block_descriptive_interval",
+            "maximum_observed": 0.0008326424999999318,
+            "mean": -6.558783333331306e-05,
+            "minimum_observed": -0.0006294783333330809,
+            "number_observed": 5,
+            "number_of_scenes": 5
+          },
+          "physics_loop_p95_cycle_time_s": {
+            "bootstrap_95_lower": -0.00047543200000184637,
+            "bootstrap_95_upper": 0.00018783699999968124,
+            "interval_status": "complete_scene_block_descriptive_interval",
+            "maximum_observed": 0.0002735250000020159,
+            "mean": -0.00012902000000103442,
+            "minimum_observed": -0.0006873400000012367,
+            "number_observed": 5,
+            "number_of_scenes": 5
+          },
+          "planner_dropped_request_fraction": {
+            "bootstrap_95_lower": -0.09214689265536727,
+            "bootstrap_95_upper": -0.04406779661016953,
+            "interval_status": "complete_scene_block_descriptive_interval",
+            "maximum_observed": -0.03389830508474578,
+            "mean": -0.06502824858757066,
+            "minimum_observed": -0.11864406779661019,
+            "number_observed": 5,
+            "number_of_scenes": 5
+          },
+          "planner_effective_completed_update_rate_hz": {
+            "bootstrap_95_lower": 0.43333333333333346,
+            "bootstrap_95_upper": 0.9000000000000001,
+            "interval_status": "complete_scene_block_descriptive_interval",
+            "maximum_observed": 1.1666666666666667,
+            "mean": 0.6333333333333334,
+            "minimum_observed": 0.3333333333333335,
+            "number_observed": 5,
+            "number_of_scenes": 5
+          },
+          "planner_maximum_total_s": {
+            "bootstrap_95_lower": -1.34612074,
+            "bootstrap_95_upper": -0.8329707,
+            "interval_status": "complete_scene_block_descriptive_interval",
+            "maximum_observed": -0.5657835,
+            "mean": -1.12031648,
+            "minimum_observed": -1.4520491,
+            "number_observed": 5,
+            "number_of_scenes": 5
+          },
+          "planner_mean_total_s": {
+            "bootstrap_95_lower": -0.22333023220779227,
+            "bootstrap_95_upper": -0.09618494199999998,
+            "interval_status": "complete_scene_block_descriptive_interval",
+            "maximum_observed": -0.06486654523809515,
+            "mean": -0.15370065182683987,
+            "minimum_observed": -0.29001815000000003,
+            "number_observed": 5,
+            "number_of_scenes": 5
+          },
+          "planner_p95_total_s": {
+            "bootstrap_95_lower": -1.0068217029999995,
+            "bootstrap_95_upper": -0.5313381259999997,
+            "interval_status": "complete_scene_block_descriptive_interval",
+            "maximum_observed": -0.37169156999999975,
+            "mean": -0.7689864669999997,
+            "minimum_observed": -1.1956089049999994,
+            "number_observed": 5,
+            "number_of_scenes": 5
+          },
+          "planner_reveal_to_hidden_aware_plan_applied_s": {
+            "bootstrap_95_lower": -1.1800000000000002,
+            "bootstrap_95_upper": 0.07999999999999989,
+            "interval_status": "complete_scene_block_descriptive_interval",
+            "maximum_observed": 0.09999999999999987,
+            "mean": -0.36000000000000004,
+            "minimum_observed": -2.0,
+            "number_observed": 5,
+            "number_of_scenes": 5
+          },
+          "traffic_hard_braking_actor_count": {
+            "bootstrap_95_lower": 0.0,
+            "bootstrap_95_upper": 0.0,
+            "interval_status": "complete_scene_block_descriptive_interval",
+            "maximum_observed": 0.0,
+            "mean": 0.0,
+            "minimum_observed": 0.0,
+            "number_observed": 5,
+            "number_of_scenes": 5
+          },
+          "traffic_total_integrated_speed_deficit_vehicle_m": {
+            "bootstrap_95_lower": 0.0839506580558151,
+            "bootstrap_95_upper": 0.13342917238720134,
+            "interval_status": "complete_scene_block_descriptive_interval",
+            "maximum_observed": 0.14460278518507153,
+            "mean": 0.10956651179990332,
+            "minimum_observed": 0.05872389944990175,
+            "number_observed": 5,
+            "number_of_scenes": 5
+          }
+        }
+      },
+      "IDEAM": {
+        "comparison": "DREAM minus IDEAM",
+        "paired_difference_collision_incidence": {
+          "bootstrap_95_lower": -1.0,
+          "bootstrap_95_upper": -0.4,
+          "mean": -0.8
+        },
+        "paired_difference_episode_mean_ego_speed_mps": {
+          "bootstrap_95_lower": 0.3906755344801695,
+          "bootstrap_95_upper": 1.1742025317798366,
+          "mean": 0.7824390331300031
+        },
+        "paired_difference_episode_minimum_oriented_clearance_m": {
+          "bootstrap_95_lower": 0.8938981768371288,
+          "bootstrap_95_upper": 1.5614875162696307,
+          "mean": 1.188325933184999
+        },
+        "paired_difference_near_collision_incidence": {
+          "bootstrap_95_lower": -1.0,
+          "bootstrap_95_upper": -0.2,
+          "mean": -0.6
+        },
+        "section_4_4_paired_metric_differences": {
+          "ego_maximum_speed_loss_mps": {
+            "bootstrap_95_lower": -10.502772500660598,
+            "bootstrap_95_upper": -3.889710827871297,
+            "interval_status": "complete_scene_block_descriptive_interval",
+            "maximum_observed": -1.1858754778753138,
+            "mean": -7.3675956383825625,
+            "minimum_observed": -12.991512486689086,
+            "number_observed": 5,
+            "number_of_scenes": 5
+          },
+          "ego_peak_deceleration_mps2": {
+            "bootstrap_95_lower": 2.468250988960932,
+            "bootstrap_95_upper": 41.25851957595546,
+            "interval_status": "complete_scene_block_descriptive_interval",
+            "maximum_observed": 66.03100255045732,
+            "mean": 16.23558253500896,
+            "minimum_observed": 1.6391311764018468,
+            "number_observed": 5,
+            "number_of_scenes": 5
+          },
+          "low_level_deadline_miss_count": {
+            "bootstrap_95_lower": 0.0,
+            "bootstrap_95_upper": 0.0,
+            "interval_status": "complete_scene_block_descriptive_interval",
+            "maximum_observed": 0.0,
+            "mean": 0.0,
+            "minimum_observed": 0.0,
+            "number_observed": 5,
+            "number_of_scenes": 5
+          },
+          "low_level_deadline_miss_fraction": {
+            "bootstrap_95_lower": 0.0,
+            "bootstrap_95_upper": 0.0,
+            "interval_status": "complete_scene_block_descriptive_interval",
+            "maximum_observed": 0.0,
+            "mean": 0.0,
+            "minimum_observed": 0.0,
+            "number_observed": 5,
+            "number_of_scenes": 5
+          },
+          "low_level_maximum_time_s": {
+            "bootstrap_95_lower": -0.0004218999999984874,
+            "bootstrap_95_upper": 1.5219999998805633e-05,
+            "interval_status": "complete_scene_block_descriptive_interval",
+            "maximum_observed": 0.00014959999999675233,
+            "mean": -0.00020627999999973668,
+            "minimum_observed": -0.0004939999999962197,
+            "number_observed": 5,
+            "number_of_scenes": 5
+          },
+          "low_level_mean_time_s": {
+            "bootstrap_95_lower": 1.766200000023581e-05,
+            "bootstrap_95_upper": 7.284228333372168e-05,
+            "interval_status": "complete_scene_block_descriptive_interval",
+            "maximum_observed": 0.0001079466666672245,
+            "mean": 3.770333333363847e-05,
+            "minimum_observed": 1.4120000000161824e-05,
+            "number_observed": 5,
+            "number_of_scenes": 5
+          },
+          "low_level_p95_time_s": {
+            "bootstrap_95_lower": -0.00018772800000007813,
+            "bootstrap_95_upper": 0.00021985900000245792,
+            "interval_status": "complete_scene_block_descriptive_interval",
+            "maximum_observed": 0.00040816000000507566,
+            "mean": -3.73899999928551e-06,
+            "minimum_observed": -0.00029575499999907624,
+            "number_observed": 5,
+            "number_of_scenes": 5
+          },
+          "maximum_follower_speed_loss_mps": {
+            "bootstrap_95_lower": -0.0013915511482380793,
+            "bootstrap_95_upper": 1.1444113027891945e-06,
+            "interval_status": "complete_scene_block_descriptive_interval",
+            "maximum_observed": 1.907352171315324e-06,
+            "mean": -0.00046346890135140484,
+            "minimum_observed": -0.0023192519411310286,
+            "number_observed": 5,
+            "number_of_scenes": 5
+          },
+          "minimum_clearance_first_3s_after_reference_m": {
+            "bootstrap_95_lower": -0.015027253359819425,
+            "bootstrap_95_upper": 0.0036766427989467607,
+            "interval_status": "complete_scene_block_descriptive_interval",
+            "maximum_observed": 0.005206442664847932,
+            "mean": -0.003372455664413421,
+            "minimum_observed": -0.026441418074989453,
+            "number_observed": 5,
+            "number_of_scenes": 5
+          },
+          "minimum_hidden_oriented_clearance_m": {
+            "bootstrap_95_lower": 1.0608177578814066,
+            "bootstrap_95_upper": 1.9889144951666928,
+            "interval_status": "complete_scene_block_descriptive_interval",
+            "maximum_observed": 2.43476958045322,
+            "mean": 1.491087526644394,
+            "minimum_observed": 0.9151759193603494,
+            "number_observed": 5,
+            "number_of_scenes": 5
+          },
+          "minimum_hidden_ttc_2d_s": {
+            "bootstrap_95_lower": 0.9666330164840288,
+            "bootstrap_95_upper": 1.1935401886784862,
+            "interval_status": "complete_scene_block_descriptive_interval",
+            "maximum_observed": 1.3073262143407431,
+            "mean": 1.0702268929256462,
+            "minimum_observed": 0.9291475940166471,
+            "number_observed": 5,
+            "number_of_scenes": 5
+          },
+          "physics_loop_deadline_miss_count": {
+            "bootstrap_95_lower": 0.0,
+            "bootstrap_95_upper": 0.0,
+            "interval_status": "complete_scene_block_descriptive_interval",
+            "maximum_observed": 0.0,
+            "mean": 0.0,
+            "minimum_observed": 0.0,
+            "number_observed": 5,
+            "number_of_scenes": 5
+          },
+          "physics_loop_deadline_miss_fraction": {
+            "bootstrap_95_lower": 0.0,
+            "bootstrap_95_upper": 0.0,
+            "interval_status": "complete_scene_block_descriptive_interval",
+            "maximum_observed": 0.0,
+            "mean": 0.0,
+            "minimum_observed": 0.0,
+            "number_observed": 5,
+            "number_of_scenes": 5
+          },
+          "physics_loop_maximum_cycle_time_s": {
+            "bootstrap_95_lower": -0.00886696000000029,
+            "bootstrap_95_upper": -0.0008035400000018456,
+            "interval_status": "complete_scene_block_descriptive_interval",
+            "maximum_observed": 0.0006206999999953666,
+            "mean": -0.004324640000002234,
+            "minimum_observed": -0.013355799999999363,
+            "number_observed": 5,
+            "number_of_scenes": 5
+          },
+          "physics_loop_mean_cycle_time_s": {
+            "bootstrap_95_lower": -0.00028235466666649383,
+            "bootstrap_95_upper": 0.0005252239999998066,
+            "interval_status": "complete_scene_block_descriptive_interval",
+            "maximum_observed": 0.0007134783333332759,
+            "mean": 0.00012143466666665638,
+            "minimum_observed": -0.0005011274999999898,
+            "number_observed": 5,
+            "number_of_scenes": 5
+          },
+          "physics_loop_p95_cycle_time_s": {
+            "bootstrap_95_lower": -0.0005588579999998456,
+            "bootstrap_95_upper": 0.0007092800000005901,
+            "interval_status": "complete_scene_block_descriptive_interval",
+            "maximum_observed": 0.0009080200000004986,
+            "mean": 0.00010634200000030347,
+            "minimum_observed": -0.001039570000001079,
+            "number_observed": 5,
+            "number_of_scenes": 5
+          },
+          "planner_dropped_request_fraction": {
+            "bootstrap_95_lower": -0.04745762711864414,
+            "bootstrap_95_upper": -0.027118644067796648,
+            "interval_status": "complete_scene_block_descriptive_interval",
+            "maximum_observed": -0.016949152542372947,
+            "mean": -0.037288135593220396,
+            "minimum_observed": -0.05084745762711873,
+            "number_observed": 5,
+            "number_of_scenes": 5
+          },
+          "planner_effective_completed_update_rate_hz": {
+            "bootstrap_95_lower": 0.2666666666666669,
+            "bootstrap_95_upper": 0.4666666666666669,
+            "interval_status": "complete_scene_block_descriptive_interval",
+            "maximum_observed": 0.5000000000000002,
+            "mean": 0.36666666666666686,
+            "minimum_observed": 0.16666666666666696,
+            "number_observed": 5,
+            "number_of_scenes": 5
+          },
+          "planner_maximum_total_s": {
+            "bootstrap_95_lower": -0.55204052,
+            "bootstrap_95_upper": -0.44343383999999997,
+            "interval_status": "complete_scene_block_descriptive_interval",
+            "maximum_observed": -0.3851072,
+            "mean": -0.5087960599999999,
+            "minimum_observed": -0.5661515999999999,
+            "number_observed": 5,
+            "number_of_scenes": 5
+          },
+          "planner_mean_total_s": {
+            "bootstrap_95_lower": -0.08363210450549449,
+            "bootstrap_95_upper": -0.046919571929195845,
+            "interval_status": "complete_scene_block_descriptive_interval",
+            "maximum_observed": -0.040607129761904726,
+            "mean": -0.06284375669164163,
+            "minimum_observed": -0.10425352142857142,
+            "number_observed": 5,
+            "number_of_scenes": 5
+          },
+          "planner_p95_total_s": {
+            "bootstrap_95_lower": -0.44825379600000004,
+            "bootstrap_95_upper": -0.3358211999999998,
+            "interval_status": "complete_scene_block_descriptive_interval",
+            "maximum_observed": -0.32797289499999993,
+            "mean": -0.38302232899999983,
+            "minimum_observed": -0.5068101100000002,
+            "number_observed": 5,
+            "number_of_scenes": 5
+          },
+          "planner_reveal_to_hidden_aware_plan_applied_s": {
+            "bootstrap_95_lower": -0.06000000000000005,
+            "bootstrap_95_upper": 0.3000000000000001,
+            "interval_status": "complete_scene_block_descriptive_interval",
+            "maximum_observed": 0.5000000000000001,
+            "mean": 0.10000000000000002,
+            "minimum_observed": -0.10000000000000009,
+            "number_observed": 5,
+            "number_of_scenes": 5
+          },
+          "traffic_hard_braking_actor_count": {
+            "bootstrap_95_lower": 0.0,
+            "bootstrap_95_upper": 0.0,
+            "interval_status": "complete_scene_block_descriptive_interval",
+            "maximum_observed": 0.0,
+            "mean": 0.0,
+            "minimum_observed": 0.0,
+            "number_observed": 5,
+            "number_of_scenes": 5
+          },
+          "traffic_total_integrated_speed_deficit_vehicle_m": {
+            "bootstrap_95_lower": 0.062213820649685656,
+            "bootstrap_95_upper": 0.12829135911959497,
+            "interval_status": "complete_scene_block_descriptive_interval",
+            "maximum_observed": 0.16082239881713178,
+            "mean": 0.095206799470796,
+            "minimum_observed": 0.050300626879717925,
+            "number_observed": 5,
+            "number_of_scenes": 5
+          }
+        }
+      }
+    }
+  },
+  "paired_true_threat_minus_empty_shadow": {
+    "ADA": {
+      "comparison": "true threat minus empty shadow",
+      "display_label": "ADA-sourced",
+      "paired_difference_episode_mean_ego_speed_mps": {
+        "bootstrap_95_lower": -2.0276583899337113,
+        "bootstrap_95_upper": -1.2301701056704437,
+        "mean": -1.680678167937581
+      },
+      "paired_difference_episode_minimum_oriented_clearance_m": {
+        "bootstrap_95_lower": -0.9484639826731392,
+        "bootstrap_95_upper": -0.5590318343357302,
+        "mean": -0.7553369177099007
+      }
+    },
+    "APF": {
+      "comparison": "true threat minus empty shadow",
+      "display_label": "APF-sourced",
+      "paired_difference_episode_mean_ego_speed_mps": {
+        "bootstrap_95_lower": -1.3164338805625655,
+        "bootstrap_95_upper": -0.36397824447852967,
+        "mean": -0.8466383035814736
+      },
+      "paired_difference_episode_minimum_oriented_clearance_m": {
+        "bootstrap_95_lower": -0.4616100370701558,
+        "bootstrap_95_upper": -0.10083627306381218,
+        "mean": -0.2800263327757121
+      }
+    },
+    "DREAM": {
+      "comparison": "true threat minus empty shadow",
+      "display_label": "DREAM",
+      "paired_difference_episode_mean_ego_speed_mps": {
+        "bootstrap_95_lower": -0.34844237522179355,
+        "bootstrap_95_upper": -0.06342808345457485,
+        "mean": -0.20157851166685817
+      },
+      "paired_difference_episode_minimum_oriented_clearance_m": {
+        "bootstrap_95_lower": -0.18245938271335213,
+        "bootstrap_95_upper": 0.0,
+        "mean": -0.08839099101223073
+      }
+    },
+    "IDEAM": {
+      "comparison": "true threat minus empty shadow",
+      "display_label": "IDEAM",
+      "paired_difference_episode_mean_ego_speed_mps": {
+        "bootstrap_95_lower": -2.568381831981734,
+        "bootstrap_95_upper": -1.75182494558562,
+        "mean": -2.208069137341245
+      },
+      "paired_difference_episode_minimum_oriented_clearance_m": {
+        "bootstrap_95_lower": -1.6541423286257781,
+        "bootstrap_95_upper": -0.979500793191882,
+        "mean": -1.2994372186760728
+      }
+    }
+  },
+  "results_root": "<DREAM_ROOT>\\outputs\\carla_field_baselines_n5_v20",
+  "scene_blocks": [
+    {
+      "construction_hash": "76d7e32b2ca849634caa69400150615164a35868619c2640bd7215787abb8571",
+      "scenario_family": "town06_converging_dual_overtake_firetruck_v1",
+      "scenario_id": "town06_converging_dual_overtake_firetruck_v1_seed001001_76d7e32b2ca8",
+      "scene_seed": "1001"
+    },
+    {
+      "construction_hash": "57bd7ad37b5dffbb0f0b6c6eca3282401e47bf4c8b260567b19916ccaeeb1149",
+      "scenario_family": "town06_converging_dual_overtake_firetruck_v1",
+      "scenario_id": "town06_converging_dual_overtake_firetruck_v1_seed001002_57bd7ad37b5d",
+      "scene_seed": "1002"
+    },
+    {
+      "construction_hash": "64d4027dc9bedc3faa34eb04aedb0151a2117a61cf68b0435eac585d4e3541b4",
+      "scenario_family": "town06_converging_dual_overtake_firetruck_v1",
+      "scenario_id": "town06_converging_dual_overtake_firetruck_v1_seed001003_64d4027dc9be",
+      "scene_seed": "1003"
+    },
+    {
+      "construction_hash": "6d07bc9a0c61e4816a417e64f24997dc7ceaa6217cfcc01e13fcfdd1ddf80c18",
+      "scenario_family": "town06_converging_dual_overtake_firetruck_v1",
+      "scenario_id": "town06_converging_dual_overtake_firetruck_v1_seed001004_6d07bc9a0c61",
+      "scene_seed": "1004"
+    },
+    {
+      "construction_hash": "c1df7bf640026aadbf78a8bbede5333689d9e59654c058fdf44aac5d3ab63fd6",
+      "scenario_family": "town06_converging_dual_overtake_firetruck_v1",
+      "scenario_id": "town06_converging_dual_overtake_firetruck_v1_seed001005_c1df7bf64002",
+      "scene_seed": "1005"
+    }
+  ],
+  "schema": "carla_figure6_reveal_aligned_profiles_v1",
+  "section_4_4_metric_definitions": {
+    "ego_maximum_speed_loss_mps": "Maximum ego speed loss within the episode (m/s).",
+    "ego_peak_deceleration_mps2": "Most negative ego longitudinal acceleration (m/s^2).",
+    "low_level_deadline_miss_count": "Observed low-level deadline-miss count.",
+    "low_level_deadline_miss_fraction": "Observed low-level deadline-miss fraction.",
+    "low_level_maximum_time_s": "Maximum low-level control execution time (s).",
+    "low_level_mean_time_s": "Mean low-level control execution time (s).",
+    "low_level_p95_time_s": "95th-percentile low-level control execution time (s).",
+    "maximum_follower_speed_loss_mps": "Largest speed loss among the designated following vehicles in the episode (m/s).",
+    "minimum_clearance_first_3s_after_reference_m": "Minimum signed oriented-box clearance to any neighbor in the first 3 s after the matched semantic-LiDAR reveal reference (m).",
+    "minimum_hidden_oriented_clearance_m": "Episode minimum signed oriented-box clearance to the hidden vehicle (m).",
+    "minimum_hidden_ttc_2d_s": "Episode minimum constant-velocity, oriented-box two-dimensional TTC to the hidden vehicle (s).",
+    "physics_loop_deadline_miss_count": "Observed physics-loop deadline-miss count.",
+    "physics_loop_deadline_miss_fraction": "Observed physics-loop deadline-miss fraction.",
+    "physics_loop_maximum_cycle_time_s": "Maximum physics/control-loop cycle time (s).",
+    "physics_loop_mean_cycle_time_s": "Mean physics/control-loop cycle time (s).",
+    "physics_loop_p95_cycle_time_s": "95th-percentile physics/control-loop cycle time (s).",
+    "planner_dropped_request_fraction": "Fraction of high-level requests dropped.",
+    "planner_effective_completed_update_rate_hz": "Effective completed high-level update rate (Hz).",
+    "planner_maximum_total_s": "Maximum completed high-level planning time (s).",
+    "planner_mean_total_s": "Mean completed high-level planning time (s).",
+    "planner_p95_total_s": "95th-percentile completed high-level planning time (s).",
+    "planner_reveal_to_hidden_aware_plan_applied_s": "Delay from semantic-LiDAR reveal to the first applied hidden-aware plan (s).",
+    "traffic_hard_braking_actor_count": "Number of surrounding traffic actors meeting the hard-braking criterion.",
+    "traffic_total_integrated_speed_deficit_vehicle_m": "Sum of surrounding-traffic integrated desired-speed deficits (vehicle-m)."
+  }
+}

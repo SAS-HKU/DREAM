@@ -1,0 +1,20 @@
+\begin{table*}[t]
+\centering
+\caption{CARLA evaluation in matched empty-shadow and true-threat scenes. Speed entries are means of episode-mean speeds, and clearance entries are means of episode minima across scenes; brackets give descriptive 95\% scene-block bootstrap intervals, not inferential significance tests. Clearance is the episode minimum signed oriented-box separation; zero denotes contact and negative values denote overlap. Event columns report the observed number of episodes out of $n=5$ independent scene constructions.}
+\label{tab:carla-shadow-profiles}
+\begin{tabular}{llcccc}
+\toprule
+Condition & Controller & Mean ego speed (m s$^{-1}$) & Episode-minimum clearance (m) & Collision & Near collision \\
+\midrule
+Empty shadow & DREAM & 30.12 [29.90, 30.34] & 1.16 [1.11, 1.21] & 0/5 & 0/5 \\
+Empty shadow & IDEAM & 31.34 [31.20, 31.49] & 1.18 [1.16, 1.21] & 0/5 & 0/5 \\
+Empty shadow & ADA-sourced & 31.06 [30.83, 31.29] & 1.16 [1.11, 1.21] & 0/5 & 0/5 \\
+Empty shadow & APF-sourced & 31.16 [30.94, 31.37] & 1.17 [1.12, 1.21] & 0/5 & 0/5 \\
+\midrule
+True threat & DREAM & 29.92 [29.70, 30.16] & 1.07 [0.94, 1.19] & 0/5 & 2/5 \\
+True threat & IDEAM & 29.14 [28.74, 29.65] & -0.12 [-0.49, 0.22] & 4/5 & 5/5 \\
+True threat & ADA-sourced & 29.38 [28.89, 29.91] & 0.41 [0.20, 0.61] & 0/5 & 5/5 \\
+True threat & APF-sourced & 30.31 [29.96, 30.67] & 0.89 [0.70, 1.07] & 0/5 & 4/5 \\
+\bottomrule
+\end{tabular}
+\end{table*}

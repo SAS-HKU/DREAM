@@ -4,6 +4,8 @@ from pathlib import Path
 
 from run_carla_converging_bank import (
     ARMS,
+    DEFAULT_CONTROLLERS,
+    SUPPORTED_CONTROLLERS,
     execute_bank,
     freeze_bank,
     randomized_arm_order,
@@ -52,6 +54,50 @@ def test_randomized_order_is_deterministic_and_complete():
         for seed in range(101, 111)
     }
     assert len(orders) > 1
+
+
+def test_extended_bank_materializes_eight_arm_blocks(tmp_path):
+    bank_dir = tmp_path / "extended_bank"
+    index = freeze_bank(
+        TEMPLATE,
+        bank_dir,
+        [201, 202],
+        randomization_seed=88,
+        controllers=SUPPORTED_CONTROLLERS,
+    )
+
+    expected_arms = {
+        (controller, condition)
+        for controller in SUPPORTED_CONTROLLERS
+        for condition in ("true_threat", "empty_shadow")
+    }
+    assert tuple(index["matched_block_factors"]["controller"]) == SUPPORTED_CONTROLLERS
+    assert index["planned_run_count"] == 16
+    assert index["manifest_policy"] == (
+        "one_byte_identical_frozen_manifest_per_8_arm_scene"
+    )
+    for scene in index["scenes"]:
+        assert scene["arm_count"] == 8
+        assert {
+            (item["controller"], item["condition"])
+            for item in scene["arm_order"]
+        } == expected_arms
+
+
+def test_default_bank_retains_original_identity_fields(tmp_path):
+    index = freeze_bank(
+        TEMPLATE,
+        tmp_path / "default_bank",
+        [1001, 1002, 1003, 1004, 1005],
+        randomization_seed=20260716,
+        controllers=DEFAULT_CONTROLLERS,
+    )
+
+    assert index["bank_id"] == "converging_bank_e378a392a5a45a10"
+    assert index["arm_order_version"] == "matched_four_arm_randomization_v1"
+    assert index["manifest_policy"] == (
+        "one_byte_identical_frozen_manifest_per_four_arm_scene"
+    )
 
 
 def test_execute_bank_logs_each_failure_and_preserves_manifest_digest(tmp_path):

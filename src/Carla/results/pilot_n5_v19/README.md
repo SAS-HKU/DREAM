@@ -1,4 +1,9 @@
-# Frozen pilot result record
+# Archived v19 pilot result record
+
+> **Archive notice.** This 20-arm DREAM--IDEAM pilot is retained only for
+> provenance of the earlier CARLA development round. It is superseded by
+> `../field_baselines_n5_v20`, must not be used for the revised Section 4.4,
+> and must not be mixed with the v20 estimates.
 
 - Bank ID: `converging_bank_e378a392a5a45a10`
 - Generator: `carla_converging_scene_resolver_v19`

@@ -1,11 +1,12 @@
 #!/usr/bin/env python3
 """Freeze and optionally execute matched CARLA converging-overtake scenes.
 
-The safe default only freezes the bank.  Pass ``--execute`` to run the four
-matched arms for each scene.  The same resolved manifest path and file digest
-are supplied to DREAM/IDEAM and true-threat/empty-shadow arms; only the two
-explicit command-line factors vary.  Every attempted arm receives a durable
-JSONL ledger entry, including launch errors and non-zero exits.
+The safe default only freezes the bank.  Pass ``--execute`` to run every
+requested controller/condition arm for each scene.  The default remains the
+original four-arm DREAM/IDEAM design.  ``--controllers DREAM,IDEAM,ADA,APF``
+creates the eight-arm field-source benchmark used for the revised Figure 6.
+Every attempted arm receives a durable JSONL ledger entry, including launch
+errors and non-zero exits.
 
 This orchestration layer is Python 3.7 compatible and does not import CARLA.
 """
@@ -43,6 +44,10 @@ except ImportError:  # Direct invocation from evaluation/ under Python 3.7.
 BANK_SCHEMA = "carla_converging_scene_bank_v1"
 LEDGER_SCHEMA = "carla_converging_scene_run_ledger_v1"
 ARM_ORDER_VERSION = "matched_four_arm_randomization_v1"
+EXTENDED_ARM_ORDER_VERSION = "matched_controller_condition_randomization_v2"
+DEFAULT_CONTROLLERS = ("DREAM", "IDEAM")
+SUPPORTED_CONTROLLERS = ("DREAM", "IDEAM", "ADA", "APF")
+CONDITIONS = ("true_threat", "empty_shadow")
 ARMS = (
     ("DREAM", "true_threat"),
     ("DREAM", "empty_shadow"),
@@ -86,17 +91,57 @@ def _utc_now():
     return datetime.now(timezone.utc).isoformat()
 
 
-def randomized_arm_order(scene_seed, randomization_seed=0):
-    """Return a deterministic within-scene permutation of all four arms."""
+def _normalize_controllers(controllers=None):
+    values = DEFAULT_CONTROLLERS if controllers is None else tuple(controllers)
+    normalized = []
+    seen = set()
+    for value in values:
+        name = str(value).strip().upper()
+        if name not in SUPPORTED_CONTROLLERS:
+            raise BankError(
+                "unsupported controller {!r}; choose from {}".format(
+                    value, ", ".join(SUPPORTED_CONTROLLERS)
+                )
+            )
+        if name in seen:
+            raise BankError("duplicate controller: {}".format(name))
+        normalized.append(name)
+        seen.add(name)
+    if not normalized:
+        raise BankError("at least one controller is required")
+    return tuple(normalized)
+
+
+def _arms_for_controllers(controllers):
+    return tuple(
+        (controller, condition)
+        for controller in controllers
+        for condition in CONDITIONS
+    )
+
+
+def _arm_order_version(controllers):
+    return (
+        ARM_ORDER_VERSION
+        if tuple(controllers) == DEFAULT_CONTROLLERS
+        else EXTENDED_ARM_ORDER_VERSION
+    )
+
+
+def randomized_arm_order(scene_seed, randomization_seed=0, controllers=None):
+    """Return a deterministic within-scene permutation of all requested arms."""
+
+    controllers = _normalize_controllers(controllers)
+    order_version = _arm_order_version(controllers)
 
     material = "{}:{}:{}".format(
-        ARM_ORDER_VERSION, int(randomization_seed), int(scene_seed)
+        order_version, int(randomization_seed), int(scene_seed)
     ).encode("ascii")
     local_seed = int(hashlib.sha256(material).hexdigest()[:16], 16)
     rng = random.Random(local_seed)
     arms = [
         {"controller": controller, "condition": condition}
-        for controller, condition in ARMS
+        for controller, condition in _arms_for_controllers(controllers)
     ]
     rng.shuffle(arms)
     return arms
@@ -133,12 +178,21 @@ def _normalize_seeds(seeds):
     return normalized
 
 
-def freeze_bank(template_path, bank_dir, seeds, randomization_seed=0):
+def freeze_bank(
+    template_path,
+    bank_dir,
+    seeds,
+    randomization_seed=0,
+    controllers=None,
+):
     """Resolve and freeze a deterministic bank, returning its index payload."""
 
     template_path = Path(template_path).expanduser().resolve()
     bank_dir = Path(bank_dir).expanduser().resolve()
     seeds = _normalize_seeds(seeds)
+    controllers = _normalize_controllers(controllers)
+    arms = _arms_for_controllers(controllers)
+    order_version = _arm_order_version(controllers)
     template_bytes = template_path.read_bytes()
     template_digest = _sha256_bytes(template_bytes)
     template = load_template(template_path)
@@ -146,11 +200,15 @@ def freeze_bank(template_path, bank_dir, seeds, randomization_seed=0):
     bank_identity = {
         "schema_version": BANK_SCHEMA,
         "generator_version": GENERATOR_VERSION,
-        "arm_order_version": ARM_ORDER_VERSION,
+        "arm_order_version": order_version,
         "template_sha256": template_digest,
         "scene_seeds": seeds,
         "randomization_seed": int(randomization_seed),
     }
+    # Preserve the identity of the previously frozen DREAM/IDEAM bank while
+    # making extended controller sets explicit in new bank identifiers.
+    if controllers != DEFAULT_CONTROLLERS:
+        bank_identity["controllers"] = list(controllers)
     bank_id = "converging_bank_{}".format(
         _sha256_bytes(_canonical_bytes(bank_identity))[:16]
     )
@@ -168,7 +226,11 @@ def freeze_bank(template_path, bank_dir, seeds, randomization_seed=0):
         manifest_path = bank_dir / manifest_relpath
         manifest_bytes = _pretty_bytes(manifest)
         _write_frozen(manifest_path, manifest_bytes)
-        order = randomized_arm_order(seed, randomization_seed)
+        order = randomized_arm_order(
+            seed,
+            randomization_seed,
+            controllers=controllers,
+        )
         scenes.append(
             {
                 "ordinal": ordinal + 1,
@@ -186,17 +248,26 @@ def freeze_bank(template_path, bank_dir, seeds, randomization_seed=0):
         "schema_version": BANK_SCHEMA,
         "bank_id": bank_id,
         "generator_version": GENERATOR_VERSION,
-        "arm_order_version": ARM_ORDER_VERSION,
+        "arm_order_version": order_version,
         "template_source": str(template_path),
         "template_sha256": template_digest,
         "randomization_seed": int(randomization_seed),
         "scene_count": len(scenes),
-        "planned_run_count": 4 * len(scenes),
+        "planned_run_count": len(arms) * len(scenes),
         "matched_block_factors": {
-            "controller": ["DREAM", "IDEAM"],
-            "condition": ["true_threat", "empty_shadow"],
+            "controller": list(controllers),
+            "condition": list(CONDITIONS),
         },
-        "manifest_policy": "one_byte_identical_frozen_manifest_per_four_arm_scene",
+        # Keep the original literal for byte-level compatibility with the
+        # already frozen DREAM/IDEAM v19 bank.  Extended banks state the
+        # numeric arm count explicitly.
+        "manifest_policy": (
+            "one_byte_identical_frozen_manifest_per_four_arm_scene"
+            if controllers == DEFAULT_CONTROLLERS
+            else "one_byte_identical_frozen_manifest_per_{}_arm_scene".format(
+                len(arms)
+            )
+        ),
         "scenes": scenes,
     }
     _write_frozen(bank_dir / "bank_index.json", _pretty_bytes(index))
@@ -209,8 +280,16 @@ def load_bank_index(path):
         index = json.load(handle)
     if index.get("schema_version") != BANK_SCHEMA:
         raise BankError("unsupported bank index schema")
-    if int(index.get("planned_run_count", -1)) != 4 * int(index.get("scene_count", -1)):
-        raise BankError("bank index does not describe complete four-arm blocks")
+    factors = index.get("matched_block_factors", {})
+    controllers = _normalize_controllers(factors.get("controller"))
+    conditions = tuple(str(item) for item in factors.get("condition", ()))
+    if conditions != CONDITIONS:
+        raise BankError("bank index has unsupported condition factors")
+    expected_per_scene = len(_arms_for_controllers(controllers))
+    if int(index.get("planned_run_count", -1)) != expected_per_scene * int(
+        index.get("scene_count", -1)
+    ):
+        raise BankError("bank index does not describe complete matched blocks")
     return index
 
 
@@ -274,6 +353,10 @@ def execute_bank(
     index_path = Path(index_path).expanduser().resolve()
     bank_dir = index_path.parent
     index = load_bank_index(index_path)
+    controllers = _normalize_controllers(
+        index["matched_block_factors"]["controller"]
+    )
+    expected_arms = set(_arms_for_controllers(controllers))
     trial_script = Path(trial_script).expanduser().resolve()
     output_root = Path(output_root).expanduser().resolve()
     output_root.mkdir(parents=True, exist_ok=True)
@@ -306,8 +389,14 @@ def execute_bank(
         normalized_arms = {
             (arm["controller"], arm["condition"]) for arm in scene["arm_order"]
         }
-        if normalized_arms != set(ARMS) or len(scene["arm_order"]) != 4:
-            raise BankError("scene {} is not a complete four-arm block".format(scene["scene_id"]))
+        if normalized_arms != expected_arms or len(scene["arm_order"]) != len(
+            expected_arms
+        ):
+            raise BankError(
+                "scene {} is not a complete {}-arm block".format(
+                    scene["scene_id"], len(expected_arms)
+                )
+            )
 
         for order_index, arm in enumerate(scene["arm_order"], start=1):
             controller = arm["controller"]
@@ -447,6 +536,14 @@ def _parse_seed_list(raw_values, start_seed, scene_count):
     return [int(start_seed) + offset for offset in range(int(scene_count))]
 
 
+def _parse_controller_list(raw_value):
+    if raw_value is None:
+        return DEFAULT_CONTROLLERS
+    return _normalize_controllers(
+        token.strip() for token in str(raw_value).split(",") if token.strip()
+    )
+
+
 def _parse_args(argv=None):
     repo_root = Path(__file__).resolve().parents[1]
     parser = argparse.ArgumentParser(description=__doc__)
@@ -466,6 +563,13 @@ def _parse_args(argv=None):
     parser.add_argument("--start-seed", type=int, default=1001)
     parser.add_argument("--scene-count", type=int, default=12)
     parser.add_argument("--randomization-seed", type=int, default=20260716)
+    parser.add_argument(
+        "--controllers",
+        default=",".join(DEFAULT_CONTROLLERS),
+        help=(
+            "comma-separated controllers; supported values: {}"
+        ).format(", ".join(SUPPORTED_CONTROLLERS)),
+    )
     parser.add_argument(
         "--execute",
         action="store_true",
@@ -498,11 +602,13 @@ def _parse_args(argv=None):
 def main(argv=None):
     args = _parse_args(argv)
     seeds = _parse_seed_list(args.seeds, args.start_seed, args.scene_count)
+    controllers = _parse_controller_list(args.controllers)
     index = freeze_bank(
         args.template,
         args.bank_dir,
         seeds,
         randomization_seed=args.randomization_seed,
+        controllers=controllers,
     )
     result = {
         "bank_index": str(Path(args.bank_dir).expanduser().resolve() / "bank_index.json"),
@@ -543,6 +649,10 @@ if __name__ == "__main__":
 __all__ = [
     "ARMS",
     "ARM_ORDER_VERSION",
+    "CONDITIONS",
+    "DEFAULT_CONTROLLERS",
+    "EXTENDED_ARM_ORDER_VERSION",
+    "SUPPORTED_CONTROLLERS",
     "BANK_SCHEMA",
     "BankError",
     "execute_bank",

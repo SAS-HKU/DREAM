@@ -165,6 +165,24 @@ def test_dream_factory_receives_carla_mpc_geometry(monkeypatch):
     assert service.ego_geometry_m == pytest.approx((4.892, 1.837))
 
 
+@pytest.mark.parametrize(
+    ("controller", "expected_source"),
+    [
+        ("DREAM", None),
+        ("ADA", planner_module.compute_Q_ADA),
+        ("APF", planner_module.compute_Q_APF),
+    ],
+)
+def test_field_controller_selects_declared_source(controller, expected_source):
+    service = planner_module.ExternalPhysicsPlanner(controller, {})
+    assert service._source_function() is expected_source
+
+
+def test_oa_cmpc_is_not_an_accepted_carla_controller():
+    with pytest.raises(ValueError, match="controller must be one of"):
+        planner_module.ExternalPhysicsPlanner("OA-CMPC", {})
+
+
 def test_zero_previous_field_timestamp_advances_full_elapsed_interval():
     class _Drift:
         def __init__(self):
