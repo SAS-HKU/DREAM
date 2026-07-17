@@ -61,9 +61,12 @@ from Integration.episode_control import (  # noqa: E402
 )
 from Path.path import Path as DreamPath  # noqa: E402
 from pde_solver import create_vehicle as create_drift_vehicle  # noqa: E402
+from Aggressiveness_Modeling.ADA_drift_source import compute_Q_ADA  # noqa: E402
+from APF_Modeling.APF_drift_source import compute_Q_APF  # noqa: E402
 
 
 PLANNER_DT_S = 0.1
+SUPPORTED_CONTROLLERS = ("DREAM", "IDEAM", "ADA", "APF")
 LANE_CENTRES_Y = (-201.75, -205.25, -208.75)
 PATH_TRANSLATION_X = -200.0
 RISK_WEIGHTS = {
@@ -333,12 +336,23 @@ def _safe_float(value: Any) -> Any:
 
 
 class ExternalPhysicsPlanner:
-    """Stateful, single-worker DREAM/IDEAM planner."""
+    """Stateful planner for the four fidelity-defensible CARLA arms.
+
+    DREAM, ADA, and APF share the submitted decision/MPC/CBF coupling stack.
+    They differ only in the risk-source model used to update the field.  IDEAM
+    is the no-field reference arm.  OA-CMPC is intentionally absent because
+    the repository adapter does not reproduce its published dual-branch
+    contingency optimizer.
+    """
 
     def __init__(self, controller_name: str, route_request: Mapping[str, Any]) -> None:
         self.controller_name = str(controller_name).upper()
-        if self.controller_name not in {"DREAM", "IDEAM"}:
-            raise ValueError("controller must be DREAM or IDEAM")
+        if self.controller_name not in SUPPORTED_CONTROLLERS:
+            raise ValueError(
+                "controller must be one of {}".format(
+                    ", ".join(SUPPORTED_CONTROLLERS)
+                )
+            )
         self.road = _straight_road()
         self.route_request = ManeuverRequest(
             target_lane=int(route_request.get("target_lane", 1)),
@@ -362,7 +376,7 @@ class ExternalPhysicsPlanner:
                 raise ValueError("ego geometry changed after planner initialisation")
             return
         initial = _planner_state(observation, None)
-        if self.controller_name == "DREAM":
+        if self.controller_name != "IDEAM":
             self.arm = create_prideam_episode_arm(
                 self.road,
                 initial,
@@ -373,7 +387,7 @@ class ExternalPhysicsPlanner:
                     "vehicle_width": width_m,
                 },
                 maneuver_request=self.route_request,
-                name="carla_dream",
+                name="carla_{}".format(self.controller_name.lower()),
             )
             self.arm.controller.drift.reset()
         else:
@@ -386,17 +400,32 @@ class ExternalPhysicsPlanner:
         _configure_arm_ego_geometry(self.arm, length_m=length_m, width_m=width_m)
         self.ego_geometry_m = (length_m, width_m)
 
+    def _source_function(self) -> Any:
+        if self.controller_name == "ADA":
+            return compute_Q_ADA
+        if self.controller_name == "APF":
+            return compute_Q_APF
+        return None
+
     def _update_field(self, observation: Mapping[str, Any]) -> float:
-        if self.controller_name != "DREAM":
+        if self.controller_name == "IDEAM":
             return 0.0
         assert self.arm is not None
         started = time.perf_counter()
         source_time = float(observation["simulation_time_s"])
         vehicles = [_drift_vehicle(actor) for actor in observation["visible_actors"]]
         ego = _ego_drift_vehicle(observation)
+        source_function = self._source_function()
+
+        def advance(dt: float) -> None:
+            kwargs = {"dt": dt, "substeps": 3}
+            if source_function is not None:
+                kwargs["source_fn"] = source_function
+            self.arm.controller.drift.step(vehicles, ego, **kwargs)
+
         if not self.field_warmed:
             for _ in range(5):
-                self.arm.controller.drift.step(vehicles, ego, dt=PLANNER_DT_S, substeps=3)
+                advance(PLANNER_DT_S)
             self.field_warmed = True
             self.last_field_time_s = source_time
         else:
@@ -407,7 +436,7 @@ class ExternalPhysicsPlanner:
             n_steps = max(1, int(math.ceil(elapsed / PLANNER_DT_S)))
             dt_step = min(PLANNER_DT_S, elapsed / n_steps)
             for _ in range(n_steps):
-                self.arm.controller.drift.step(vehicles, ego, dt=dt_step, substeps=3)
+                advance(dt_step)
             self.last_field_time_s = source_time
         return time.perf_counter() - started
 
@@ -460,7 +489,7 @@ class ExternalPhysicsPlanner:
         return states, controls
 
     def _field_payload(self) -> Mapping[str, Any] | None:
-        if self.controller_name != "DREAM" or self.arm is None:
+        if self.controller_name == "IDEAM" or self.arm is None:
             return None
         field = np.asarray(self.arm.controller.drift.risk_field, dtype=float)
         stride_x = 3

@@ -1,0 +1,774 @@
+{
+  "actor_geometry": {
+    "ego": {
+      "height_m": 1.490277647972107,
+      "length_m": 4.89238166809082,
+      "type_id": "vehicle.lincoln.mkz_2020",
+      "width_m": 1.8367133140563965
+    },
+    "follower_1": {
+      "height_m": 1.441947340965271,
+      "length_m": 4.673638820648193,
+      "type_id": "vehicle.mercedes.coupe_2020",
+      "width_m": 1.8118125200271606
+    },
+    "follower_2": {
+      "height_m": 1.4876600503921509,
+      "length_m": 4.791779518127441,
+      "type_id": "vehicle.tesla.model3",
+      "width_m": 2.163450002670288
+    },
+    "follower_3": {
+      "height_m": 1.549050211906433,
+      "length_m": 3.705369472503662,
+      "type_id": "vehicle.audi.a2",
+      "width_m": 1.788678526878357
+    },
+    "follower_4": {
+      "height_m": 2.045147180557251,
+      "length_m": 5.565828800201416,
+      "type_id": "vehicle.nissan.patrol_2021",
+      "width_m": 2.1499669551849365
+    },
+    "latent_vehicle": {
+      "height_m": 1.5347249507904053,
+      "length_m": 5.0078253746032715,
+      "type_id": "vehicle.dodge.charger_2020",
+      "width_m": 1.8816219568252563
+    },
+    "lead_centre": {
+      "height_m": 1.441947340965271,
+      "length_m": 4.673638820648193,
+      "type_id": "vehicle.mercedes.coupe_2020",
+      "width_m": 1.8118125200271606
+    },
+    "lead_left": {
+      "height_m": 1.549050211906433,
+      "length_m": 3.705369472503662,
+      "type_id": "vehicle.audi.a2",
+      "width_m": 1.788678526878357
+    },
+    "lead_right": {
+      "height_m": 1.441947340965271,
+      "length_m": 4.673638820648193,
+      "type_id": "vehicle.mercedes.coupe_2020",
+      "width_m": 1.8118125200271606
+    },
+    "occluder": {
+      "height_m": 3.8274123668670654,
+      "length_m": 8.46804141998291,
+      "type_id": "vehicle.carlamotors.firetruck",
+      "width_m": 2.8910882472991943
+    },
+    "rear_centre": {
+      "height_m": 1.4876600503921509,
+      "length_m": 4.791779518127441,
+      "type_id": "vehicle.tesla.model3",
+      "width_m": 2.163450002670288
+    }
+  },
+  "collision_count": 18,
+  "collision_incidence": 1,
+  "collision_or_near_incidence": 1,
+  "collisions": [
+    {
+      "frame": 1004,
+      "impulse": [
+        -1.2630722522735596,
+        268.0812683105469,
+        9.669578552246094
+      ],
+      "other_actor_id": 122,
+      "other_actor_type": "vehicle.dodge.charger_2020"
+    },
+    {
+      "frame": 1004,
+      "impulse": [
+        -0.6146366596221924,
+        146.27359008789062,
+        5.148207664489746
+      ],
+      "other_actor_id": 122,
+      "other_actor_type": "vehicle.dodge.charger_2020"
+    },
+    {
+      "frame": 1004,
+      "impulse": [
+        -0.14365164935588837,
+        43.27821350097656,
+        1.4777480363845825
+      ],
+      "other_actor_id": 122,
+      "other_actor_type": "vehicle.dodge.charger_2020"
+    },
+    {
+      "frame": 1005,
+      "impulse": [
+        -0.04976535215973854,
+        20.89052963256836,
+        0.6956741213798523
+      ],
+      "other_actor_id": 122,
+      "other_actor_type": "vehicle.dodge.charger_2020"
+    },
+    {
+      "frame": 1005,
+      "impulse": [
+        -0.022706158459186554,
+        15.694697380065918,
+        0.5124651193618774
+      ],
+      "other_actor_id": 122,
+      "other_actor_type": "vehicle.dodge.charger_2020"
+    },
+    {
+      "frame": 1005,
+      "impulse": [
+        -0.006838343571871519,
+        12.996042251586914,
+        0.4178452491760254
+      ],
+      "other_actor_id": 122,
+      "other_actor_type": "vehicle.dodge.charger_2020"
+    },
+    {
+      "frame": 1005,
+      "impulse": [
+        0.0032596741802990437,
+        8.729095458984375,
+        0.27725961804389954
+      ],
+      "other_actor_id": 122,
+      "other_actor_type": "vehicle.dodge.charger_2020"
+    },
+    {
+      "frame": 1005,
+      "impulse": [
+        0.013006612658500671,
+        10.488320350646973,
+        0.3300175070762634
+      ],
+      "other_actor_id": 122,
+      "other_actor_type": "vehicle.dodge.charger_2020"
+    },
+    {
+      "frame": 1006,
+      "impulse": [
+        0.015747202560305595,
+        7.556822776794434,
+        0.23597902059555054
+      ],
+      "other_actor_id": 122,
+      "other_actor_type": "vehicle.dodge.charger_2020"
+    },
+    {
+      "frame": 1006,
+      "impulse": [
+        0.015932926908135414,
+        5.50233793258667,
+        0.1708044707775116
+      ],
+      "other_actor_id": 122,
+      "other_actor_type": "vehicle.dodge.charger_2020"
+    },
+    {
+      "frame": 1006,
+      "impulse": [
+        0.021783525124192238,
+        5.934261798858643,
+        0.18337823450565338
+      ],
+      "other_actor_id": 122,
+      "other_actor_type": "vehicle.dodge.charger_2020"
+    },
+    {
+      "frame": 1006,
+      "impulse": [
+        0.016854139044880867,
+        3.818121910095215,
+        0.11756815016269684
+      ],
+      "other_actor_id": 122,
+      "other_actor_type": "vehicle.dodge.charger_2020"
+    },
+    {
+      "frame": 1006,
+      "impulse": [
+        0.01750250905752182,
+        3.4186482429504395,
+        0.10499178618192673
+      ],
+      "other_actor_id": 122,
+      "other_actor_type": "vehicle.dodge.charger_2020"
+    },
+    {
+      "frame": 1007,
+      "impulse": [
+        0.019824672490358353,
+        3.42476749420166,
+        0.1049984022974968
+      ],
+      "other_actor_id": 122,
+      "other_actor_type": "vehicle.dodge.charger_2020"
+    },
+    {
+      "frame": 1007,
+      "impulse": [
+        0.07267922908067703,
+        11.317366600036621,
+        0.34655120968818665
+      ],
+      "other_actor_id": 122,
+      "other_actor_type": "vehicle.dodge.charger_2020"
+    },
+    {
+      "frame": 1007,
+      "impulse": [
+        0.0647575855255127,
+        9.156095504760742,
+        0.27996334433555603
+      ],
+      "other_actor_id": 122,
+      "other_actor_type": "vehicle.dodge.charger_2020"
+    },
+    {
+      "frame": 1007,
+      "impulse": [
+        0.09378989785909653,
+        10.75042724609375,
+        0.3120220899581909
+      ],
+      "other_actor_id": 122,
+      "other_actor_type": "vehicle.dodge.charger_2020"
+    },
+    {
+      "frame": 1007,
+      "impulse": [
+        0.017803365364670753,
+        1.8944894075393677,
+        0.05489276349544525
+      ],
+      "other_actor_id": 122,
+      "other_actor_type": "vehicle.dodge.charger_2020"
+    }
+  ],
+  "condition": "true_threat",
+  "construction_hash": "76d7e32b2ca849634caa69400150615164a35868619c2640bd7215787abb8571",
+  "controller": "IDEAM",
+  "duration_s": 6.0,
+  "ego": {
+    "centre_lane_completion_time_s": null,
+    "centre_lane_overlap_time_s": 5.15,
+    "final_target_lane_error_m": 2.5452744563615113,
+    "maximum_speed_loss_mps": 13.716835132904638,
+    "mean_speed_mps": 29.26792420468412,
+    "minimum_axis_aligned_clearance_m": 0.0,
+    "minimum_hidden_oriented_box_clearance_m": -0.06704075794920072,
+    "minimum_hidden_ttc_2d_s": 0.0,
+    "minimum_longitudinal_ttc_s": 10.220609741093119,
+    "minimum_oriented_box_clearance_actor_role": "latent_vehicle",
+    "minimum_oriented_box_clearance_first_3s_after_reveal_m": 1.0813605552944883,
+    "minimum_oriented_box_clearance_m": -0.06704075794920072,
+    "minimum_oriented_box_clearance_time_s": 5.45,
+    "minimum_speed_mps": 19.31639135492689,
+    "minimum_ttc_2d_actor_role": "latent_vehicle",
+    "minimum_ttc_2d_s": 0.0,
+    "minimum_ttc_2d_time_s": 5.3500000000000005,
+    "overtake_completion_time_s": 1.55,
+    "peak_deceleration_mps2": -9.031924339166508,
+    "route_completed": 0,
+    "shield_active_time_s": 2.1000000000000005
+  },
+  "followers": {
+    "follower_1": {
+      "desired_speed_mps": 32.0,
+      "hard_brake_time_s": 0,
+      "integrated_speed_deficit_m": 4.965167318524753,
+      "lane_name": "left",
+      "maximum_desired_speed_deficit_mps": 1.3386850915799542,
+      "maximum_speed_loss_mps": 1.3016332860375783,
+      "mean_speed_mps": 31.1821758657024,
+      "minimum_speed_mps": 30.661314908420046,
+      "peak_deceleration_mps2": -1.2254832043532244,
+      "recovered_within_episode": 0,
+      "recovery_time_s": null,
+      "traffic_role": "follower"
+    },
+    "follower_2": {
+      "desired_speed_mps": 32.0,
+      "hard_brake_time_s": 0,
+      "integrated_speed_deficit_m": 6.688455702338427,
+      "lane_name": "left",
+      "maximum_desired_speed_deficit_mps": 1.240308677674495,
+      "maximum_speed_loss_mps": 0.6225146398799843,
+      "mean_speed_mps": 30.885257382943596,
+      "minimum_speed_mps": 30.759691322325505,
+      "peak_deceleration_mps2": -0.7241823998949786,
+      "recovered_within_episode": 0,
+      "recovery_time_s": null,
+      "traffic_role": "follower"
+    },
+    "follower_3": {
+      "desired_speed_mps": 31.244948,
+      "hard_brake_time_s": 0,
+      "integrated_speed_deficit_m": 14.215174519587038,
+      "lane_name": "left",
+      "maximum_desired_speed_deficit_mps": 2.7678438112354264,
+      "maximum_speed_loss_mps": 0.39684464892589233,
+      "mean_speed_mps": 28.87575224673549,
+      "minimum_speed_mps": 28.477104188764574,
+      "peak_deceleration_mps2": -1.326179504877764,
+      "recovered_within_episode": 0,
+      "recovery_time_s": null,
+      "traffic_role": "follower"
+    },
+    "follower_4": {
+      "desired_speed_mps": 32.0,
+      "hard_brake_time_s": 0,
+      "integrated_speed_deficit_m": 9.574689191269112,
+      "lane_name": "left",
+      "maximum_desired_speed_deficit_mps": 2.371978742432862,
+      "maximum_speed_loss_mps": 2.545599074515845,
+      "mean_speed_mps": 30.434020479202882,
+      "minimum_speed_mps": 29.628021257567138,
+      "peak_deceleration_mps2": -2.043343004859552,
+      "recovered_within_episode": 0,
+      "recovery_time_s": null,
+      "traffic_role": "follower"
+    }
+  },
+  "generator_version": "carla_converging_scene_resolver_v19",
+  "latent_vehicle": {
+    "centre_lane_overlap_time_s": 3.05,
+    "final_target_lane_error_m": 0.737928001246928,
+    "overtake_completion_time_s": 0.4,
+    "present": 1
+  },
+  "low_level": {
+    "control_executions": 60,
+    "deadline_miss_fraction": 0.0,
+    "lateral_acceleration_limit_mps2": 2.5,
+    "maximum_plan_age_s": 1.25,
+    "maximum_time_s": 0.00288229999999956,
+    "mean_time_s": 0.0014576533333330013,
+    "observed_control_rate_hz": 10.0,
+    "p95_time_s": 0.001845464999999357,
+    "planner_fallback_time_s": 0,
+    "stale_plan_exposure_fraction": 0.15,
+    "stale_plan_fallback_time_s": 0.9000000000000002,
+    "steering_envelope_active_time_s": 0.7000000000000001,
+    "wall_clock_effective_control_rate_hz": 9.998735493251282
+  },
+  "measurement_initial_state": {
+    "ego": {
+      "expected_speed_mps": 32.48005,
+      "expected_station_m": 178.278309,
+      "lateral_error_m": -0.00035655469403650386,
+      "speed_error_mps": 0.49012484921387767,
+      "speed_mps": 32.970174849213876,
+      "station_error_m": -0.6432227156589079,
+      "station_m": 177.6350862843411
+    },
+    "follower_1": {
+      "expected_speed_mps": 32.0,
+      "expected_station_m": 140.078636,
+      "lateral_error_m": -0.04128830614928347,
+      "speed_error_mps": -0.09943141191991245,
+      "speed_mps": 31.900568588080088,
+      "station_error_m": -0.9327958043130309,
+      "station_m": 139.14584019568696
+    },
+    "follower_2": {
+      "expected_speed_mps": 31.457233,
+      "expected_station_m": 106.034796,
+      "lateral_error_m": -0.00022158856907594782,
+      "speed_error_mps": -0.0814318985018403,
+      "speed_mps": 31.37580110149816,
+      "station_error_m": -0.46468587887329704,
+      "station_m": 105.5701101211267
+    },
+    "follower_3": {
+      "expected_speed_mps": 31.244948,
+      "expected_station_m": 73.560321,
+      "lateral_error_m": -0.0003270517956650565,
+      "speed_error_mps": -2.6531380105609195,
+      "speed_mps": 28.59180998943908,
+      "station_error_m": -2.6510557552616234,
+      "station_m": 70.90926524473838
+    },
+    "follower_4": {
+      "expected_speed_mps": 30.922548,
+      "expected_station_m": 33.367499,
+      "lateral_error_m": -3.366605491805785e-05,
+      "speed_error_mps": 1.151783381733857,
+      "speed_mps": 32.074331381733856,
+      "station_error_m": 0.11395329784370034,
+      "station_m": 33.4814522978437
+    },
+    "latent_vehicle": {
+      "expected_speed_mps": 27.440974,
+      "expected_station_m": 195.89173,
+      "lateral_error_m": -0.0004468248156115351,
+      "speed_error_mps": 0.8031622891134482,
+      "speed_mps": 28.24413628911345,
+      "station_error_m": -0.22599537580168771,
+      "station_m": 195.6657346241983
+    },
+    "lead_centre": {
+      "expected_speed_mps": 18.90006,
+      "expected_station_m": 316.163292,
+      "lateral_error_m": -0.00038697362353445897,
+      "speed_error_mps": 1.7890394426617036,
+      "speed_mps": 20.689099442661703,
+      "station_error_m": 0.5344282625848678,
+      "station_m": 316.6977202625849
+    },
+    "lead_left": {
+      "expected_speed_mps": 23.981529,
+      "expected_station_m": 313.158029,
+      "lateral_error_m": -0.000755573761210826,
+      "speed_error_mps": -1.9676176066354678,
+      "speed_mps": 22.01391139336453,
+      "station_error_m": -2.3273781884788036,
+      "station_m": 310.8306508115212
+    },
+    "lead_right": {
+      "expected_speed_mps": 24.509081,
+      "expected_station_m": 310.549132,
+      "lateral_error_m": 0.004467133448116556,
+      "speed_error_mps": 0.31274480015746775,
+      "speed_mps": 24.821825800157466,
+      "station_error_m": -0.7337342068427688,
+      "station_m": 309.8153977931572
+    },
+    "occluder": {
+      "expected_speed_mps": 18.207641,
+      "expected_station_m": 192.764099,
+      "lateral_error_m": -0.004900411332471322,
+      "speed_error_mps": 0.22421817784726272,
+      "speed_mps": 18.43185917784726,
+      "station_error_m": -0.13471327445603265,
+      "station_m": 192.62938572554395
+    },
+    "rear_centre": {
+      "expected_speed_mps": 18.070676,
+      "expected_station_m": 165.614257,
+      "lateral_error_m": 8.649300644947289e-05,
+      "speed_error_mps": -0.8965187545152027,
+      "speed_mps": 17.174157245484796,
+      "station_error_m": -0.5904959199074824,
+      "station_m": 165.02376108009253
+    }
+  },
+  "metric_definitions": {
+    "geometric_reveal_is_evaluator_only": true,
+    "integrated_speed_deficit_m": "Per-actor integral of desired-speed deficit over time; units are metres.",
+    "near_collision_clearance_m": 0.5,
+    "near_collision_ttc_2d_s": 1.0,
+    "total_integrated_speed_deficit_vehicle_m": "Sum of per-actor integrated speed deficits; units are vehicle-metres.",
+    "ttc_2d_model": "constant velocity, fixed yaw, oriented rectangles, 5 s horizon"
+  },
+  "near_collision_incidence": 1,
+  "physics_control_loop": {
+    "deadline_miss_fraction": 0.0,
+    "maximum_cycle_time_s": 0.02378490000000255,
+    "mean_cycle_time_s": 0.012688175833333244,
+    "p95_cycle_time_s": 0.017376429999999488,
+    "target_rate_hz": 20.0
+  },
+  "planner": {
+    "completed_requests": 11,
+    "dropped_request_fraction": 0.8135593220338984,
+    "dropped_requests": 48,
+    "effective_completed_update_rate_hz": 1.8333333333333333,
+    "fallback_responses": 0,
+    "first_hidden_aware_plan_applied_time_s": 1.6500000000000001,
+    "first_hidden_observation_submitted_time_s": 1.05,
+    "maximum_applied_plan_age_s": 1.7000000000000002,
+    "maximum_total_s": 0.919173,
+    "mean_applied_plan_age_s": 0.9166666666666666,
+    "mean_decision_s": 0.061494918177645144,
+    "mean_field_s": 0.0,
+    "mean_mpc_s": 0.4438877636328636,
+    "mean_total_s": 0.5058915454545454,
+    "p95_applied_plan_age_s": 1.5025,
+    "p95_total_s": 0.8592759999999999,
+    "reveal_to_hidden_aware_plan_applied_s": 0.7000000000000001,
+    "reveal_to_hidden_observation_submitted_s": 0.09999999999999998
+  },
+  "qualification": {
+    "actor_population_pass": true,
+    "bootstrap_nominal_plan_pass": true,
+    "bootstrap_plan_available": true,
+    "bootstrap_plan_status": "ok",
+    "condition_blind_planner_interface": true,
+    "construction_hash_pass": true,
+    "converging_route_definition_pass": true,
+    "cut_in_complete_pass": true,
+    "cut_in_completion_is_outcome_not_eligibility_gate": true,
+    "cut_in_reference_tracking_pass": true,
+    "final_cut_in_lane_containment_margin_m": 0.07126102034044379,
+    "final_cut_in_lateral_error_m": 0.737928001246928,
+    "frozen_manifest_input_pass": true,
+    "geometric_reveal_confirmed_time_s": 0.9500000000000001,
+    "geometric_reveal_first_clear_time_s": 0.05,
+    "geometric_reveal_observed": true,
+    "hidden_actor_never_in_planner_before_reveal": true,
+    "initial_hidden_center_geometric_occlusion_pass": true,
+    "initial_hidden_footprint_geometric_occlusion_pass": true,
+    "initial_hidden_footprint_minimum_blocked_sample_fraction": 1.0,
+    "initial_occlusion_evaluation_start_s": 0.25,
+    "initial_occlusion_pass": true,
+    "initial_speed_pass": true,
+    "initial_station_pass": true,
+    "low_level_10hz_pass": true,
+    "maximum_background_initial_speed_error_mps": 2.6531380105609195,
+    "maximum_background_initial_station_error_m": 2.6510557552616234,
+    "maximum_initial_hidden_lidar_hits": 0,
+    "maximum_primary_initial_speed_error_mps": 0.8031622891134482,
+    "maximum_primary_initial_station_error_m": 0.6432227156589079,
+    "measurement_protocol_pass": true,
+    "measurement_run_without_frame_encoding": true,
+    "metric_completeness_pass": true,
+    "npc_hidden_coupling_policy": "withheld_from_global_idm_until_ego_semantic_lidar_reveal",
+    "npc_trace_complete_pass": true,
+    "npc_trace_expected_rows": 1080,
+    "npc_trace_observed_rows": 1080,
+    "occluder_asset_and_geometry_pass": true,
+    "oracle_metadata_absent_from_planner": true,
+    "paired_manifest_condition_only": true,
+    "planner_condition_token_count": 0,
+    "planner_metric_completeness_pass": true,
+    "planner_oracle_metadata_count": 0,
+    "pre_reveal_hidden_leak_count": 0,
+    "real_time_claim_eligible": true,
+    "real_time_factor_pass": true,
+    "real_time_pacing_enabled": true,
+    "recomputed_construction_hash_sha256": "76d7e32b2ca849634caa69400150615164a35868619c2640bd7215787abb8571",
+    "seed_varies_physical_construction": true,
+    "seeded_construction_provenance_pass": true,
+    "semantic_lidar_reveal_arming_delay_s": 0.25,
+    "statistical_bank_ready": true,
+    "strict_no_oracle_pass": true,
+    "valid_for_analysis": true,
+    "valid_reveal_pass": true
+  },
+  "resolved_manifest_path": "resolved_manifest.json",
+  "reveal_time_s": 0.9500000000000001,
+  "runtime": {
+    "carla_client_version": "0.9.14",
+    "carla_command": [
+      "<CARLA_EXECUTABLE>",
+      "CarlaUE4",
+      "-carla-port=3404",
+      "-RenderOffScreen",
+      "-nosound",
+      "-quality-level=Low",
+      "-ResX=1280",
+      "-ResY=720"
+    ],
+    "carla_server_version": "0.9.14",
+    "command": "<DREAM_ROOT>\\evaluation\\carla_overtaking_trial.py --condition true_threat --controller IDEAM --seed 1001 --manifest <DREAM_ROOT>\\outputs\\carla_field_baselines_bank_n5_v20\\manifests\\scene_0001_seed1001.json --output-root <DREAM_ROOT>\\outputs\\carla_field_baselines_n5_v20\\town06_converging_dual_overtake_firetruck_v1_seed001001_76d7e32b2ca8 --carla-port 3404 --planner-port 10404 --quality-level Low --launch-server --pace-realtime --planner-python <PLANNER_PYTHON> --carla-executable <CARLA_EXECUTABLE>",
+    "planner_command": [
+      "<PLANNER_PYTHON>",
+      "<DREAM_ROOT>\\Integration\\carla_external_planner.py",
+      "--host",
+      "127.0.0.1",
+      "--port",
+      "10404",
+      "--timeout-s",
+      "120.0"
+    ],
+    "python_version": "3.7.9 (tags/v3.7.9:13c94747c7, Aug 17 2020, 18:58:18) [MSC v.1900 64 bit (AMD64)]",
+    "real_time_factor": 0.9998735493251281,
+    "recorded_frames": 0,
+    "rendering_and_measurement_separated": true,
+    "rgb_sensor_enabled": false,
+    "simulated_duration_s": 6.0,
+    "unrecorded_measurement_preroll_s": 1.0,
+    "wall_duration_s": 6.000758800000003
+  },
+  "scenario_family": "town06_converging_dual_overtake_firetruck_v1",
+  "scenario_id": "town06_converging_dual_overtake_firetruck_v1_seed001001_76d7e32b2ca8",
+  "scene_realization": {
+    "concurrent_centre_lane_overlap_incidence": 1,
+    "first_concurrent_centre_lane_overlap_time_s": 5.15,
+    "minimum_hidden_longitudinal_separation_during_overlap_m": 0.004020198884632009,
+    "nominal_factors": {
+      "arrival_time_offset_hidden_minus_ego_s": -0.036591,
+      "conflict_clearance_ahead_occluder_m": 32.890732,
+      "conflict_station_m": 285.336081,
+      "ego_clearance_ahead_at_lane_change_start_m": 11.000514,
+      "ego_initial_station_relative_to_occluder_m": -14.48579,
+      "ego_lane_change_duration_s": 3.020808,
+      "ego_lane_change_start_s": 1.785705,
+      "ego_speed_mps": 32.48005,
+      "ego_station_m": 178.278309,
+      "hidden_clearance_ahead_at_lane_change_start_m": 19.031805,
+      "hidden_initial_station_relative_to_occluder_m": 3.127631,
+      "hidden_lane_change_duration_s": 3.074089,
+      "hidden_lane_change_start_s": 1.722474,
+      "hidden_speed_mps": 27.440974,
+      "hidden_station_m": 195.89173,
+      "idm_npc_count": 9,
+      "legacy_left_follower_count": 4,
+      "nominal_conflict_time_s": 3.277813,
+      "occluder_speed_mps": 18.207641,
+      "occluder_station_m": 192.764099,
+      "resolution_attempt": 41
+    }
+  },
+  "scene_seed": 1001,
+  "schema_version": "carla_overtaking_trial_result_v1",
+  "traffic_disturbance": {
+    "episode_horizon_limits_full_wave_recovery_assessment": true,
+    "hard_braking_actor_count": 0,
+    "maximum_follower_disturbance_amplification": 6.41459846165449,
+    "maximum_speed_loss_mps": 2.545599074515845,
+    "peak_deceleration_mps2": -2.043343004859552,
+    "total_integrated_speed_deficit_vehicle_m": 75.51249460249508
+  },
+  "traffic_stream": {
+    "follower_1": {
+      "desired_speed_mps": 32.0,
+      "hard_brake_time_s": 0,
+      "integrated_speed_deficit_m": 4.965167318524753,
+      "lane_name": "left",
+      "maximum_desired_speed_deficit_mps": 1.3386850915799542,
+      "maximum_speed_loss_mps": 1.3016332860375783,
+      "mean_speed_mps": 31.1821758657024,
+      "minimum_speed_mps": 30.661314908420046,
+      "peak_deceleration_mps2": -1.2254832043532244,
+      "recovered_within_episode": 0,
+      "recovery_time_s": null,
+      "traffic_role": "follower"
+    },
+    "follower_2": {
+      "desired_speed_mps": 32.0,
+      "hard_brake_time_s": 0,
+      "integrated_speed_deficit_m": 6.688455702338427,
+      "lane_name": "left",
+      "maximum_desired_speed_deficit_mps": 1.240308677674495,
+      "maximum_speed_loss_mps": 0.6225146398799843,
+      "mean_speed_mps": 30.885257382943596,
+      "minimum_speed_mps": 30.759691322325505,
+      "peak_deceleration_mps2": -0.7241823998949786,
+      "recovered_within_episode": 0,
+      "recovery_time_s": null,
+      "traffic_role": "follower"
+    },
+    "follower_3": {
+      "desired_speed_mps": 31.244948,
+      "hard_brake_time_s": 0,
+      "integrated_speed_deficit_m": 14.215174519587038,
+      "lane_name": "left",
+      "maximum_desired_speed_deficit_mps": 2.7678438112354264,
+      "maximum_speed_loss_mps": 0.39684464892589233,
+      "mean_speed_mps": 28.87575224673549,
+      "minimum_speed_mps": 28.477104188764574,
+      "peak_deceleration_mps2": -1.326179504877764,
+      "recovered_within_episode": 0,
+      "recovery_time_s": null,
+      "traffic_role": "follower"
+    },
+    "follower_4": {
+      "desired_speed_mps": 32.0,
+      "hard_brake_time_s": 0,
+      "integrated_speed_deficit_m": 9.574689191269112,
+      "lane_name": "left",
+      "maximum_desired_speed_deficit_mps": 2.371978742432862,
+      "maximum_speed_loss_mps": 2.545599074515845,
+      "mean_speed_mps": 30.434020479202882,
+      "minimum_speed_mps": 29.628021257567138,
+      "peak_deceleration_mps2": -2.043343004859552,
+      "recovered_within_episode": 0,
+      "recovery_time_s": null,
+      "traffic_role": "follower"
+    },
+    "lead_centre": {
+      "desired_speed_mps": 18.774793,
+      "hard_brake_time_s": 0,
+      "integrated_speed_deficit_m": 0.10431691235300669,
+      "lane_name": "centre",
+      "maximum_desired_speed_deficit_mps": 0.17929237440129597,
+      "maximum_speed_loss_mps": 2.110085854297651,
+      "mean_speed_mps": 19.309208653810643,
+      "minimum_speed_mps": 18.595500625598703,
+      "peak_deceleration_mps2": -1.8070602185223001,
+      "recovered_within_episode": 1,
+      "recovery_time_s": 2.0,
+      "traffic_role": "leader"
+    },
+    "lead_left": {
+      "desired_speed_mps": 24.473662,
+      "hard_brake_time_s": 0,
+      "integrated_speed_deficit_m": 15.906540783957894,
+      "lane_name": "left",
+      "maximum_desired_speed_deficit_mps": 3.068211898502824,
+      "maximum_speed_loss_mps": 0.6961382866489139,
+      "mean_speed_mps": 21.822571869340354,
+      "minimum_speed_mps": 21.405450101497177,
+      "peak_deceleration_mps2": -1.4493181794467473,
+      "recovered_within_episode": 0,
+      "recovery_time_s": null,
+      "traffic_role": "leader"
+    },
+    "lead_right": {
+      "desired_speed_mps": 24.908478,
+      "hard_brake_time_s": 0,
+      "integrated_speed_deficit_m": 7.169120646813389,
+      "lane_name": "right",
+      "maximum_desired_speed_deficit_mps": 1.984185367884045,
+      "maximum_speed_loss_mps": 1.9941433635681882,
+      "mean_speed_mps": 23.725182200847772,
+      "minimum_speed_mps": 22.924292632115954,
+      "peak_deceleration_mps2": -1.710166418657943,
+      "recovered_within_episode": 0,
+      "recovery_time_s": null,
+      "traffic_role": "leader"
+    },
+    "occluder": {
+      "desired_speed_mps": 18.207641,
+      "hard_brake_time_s": 0,
+      "integrated_speed_deficit_m": 0.9300635270567913,
+      "lane_name": "centre",
+      "maximum_desired_speed_deficit_mps": 0.36324324503107164,
+      "maximum_speed_loss_mps": 0.5955543117151016,
+      "mean_speed_mps": 18.12803690710231,
+      "minimum_speed_mps": 17.844397754968927,
+      "peak_deceleration_mps2": -0.3460310038566441,
+      "recovered_within_episode": 1,
+      "recovery_time_s": 3.85,
+      "traffic_role": "occluder"
+    },
+    "rear_centre": {
+      "desired_speed_mps": 20.0,
+      "hard_brake_time_s": 0,
+      "integrated_speed_deficit_m": 15.958966000594675,
+      "lane_name": "centre",
+      "maximum_desired_speed_deficit_mps": 2.8344677816511066,
+      "maximum_speed_loss_mps": 0.0028114303453072864,
+      "mean_speed_mps": 17.340172333234218,
+      "minimum_speed_mps": 17.165532218348893,
+      "peak_deceleration_mps2": -0.1162719357634359,
+      "recovered_within_episode": 0,
+      "recovery_time_s": null,
+      "traffic_role": "follower"
+    }
+  },
+  "visibility": {
+    "geometric_confirmation_frames": 2,
+    "geometric_definition": "semantic-LiDAR origin to nine latent oriented-footprint samples; the latent actor is geometrically hidden only when every ray is blocked by the measured firetruck footprint",
+    "geometric_footprint_margin_m": 0.0,
+    "geometric_footprint_sample_count": 9,
+    "geometric_to_hidden_aware_plan_s": 0.7000000000000001,
+    "geometric_to_planner_observation_s": 0.09999999999999998,
+    "geometric_to_semantic_lidar_reveal_s": 0.0,
+    "hidden_center_confirmed_geometric_reveal_time_s": 0.9500000000000001,
+    "hidden_center_first_geometric_clear_time_s": 0.05,
+    "initial_full_footprint_occlusion_pass": true,
+    "initial_minimum_blocked_sample_fraction": 1.0,
+    "initial_occlusion_evaluation_start_s": 0.25,
+    "semantic_lidar_confirmed_reveal_time_s": 0.9500000000000001
+  }
+}

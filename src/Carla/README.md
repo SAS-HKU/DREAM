@@ -1,99 +1,124 @@
 # CARLA closed-loop occlusion validation
 
-This directory contains the reproducible CARLA 0.9.14 implementation used to
-complement the mechanism-level Python experiments in DREAM.  It implements a
-matched converging-overtake scenario, causal semantic-LiDAR reveal, an
-asynchronous DREAM/IDEAM planner service, 10 Hz low-level control, eligibility
-checks, scene-block analysis, and SciencePlots figures.
+This directory contains the reproducible CARLA 0.9.14 experiment used for the
+ Section 4.4 and Figure 6. It evaluates the converging-overtake scenario
+under two matched conditions:
 
-The frozen pilot is intentionally small: five physical scene seeds and four
-matched arms per seed (`DREAM/IDEAM` by `true_threat/empty_shadow`), for 20
-eligible runs.  Its bank identifier is
-`converging_bank_e378a392a5a45a10`, and its generator version is
-`carla_converging_scene_resolver_v19`.  Treat the intervals as descriptive
-pilot evidence, not as a population-level significance test.
+- `empty_shadow`: the occluded volume contains no hidden vehicle;
+- `true_threat`: a hidden vehicle overtakes on the opposite side of the
+  occluder and requests the same centre-lane merge region as the ego vehicle.
 
-## Scenario and experimental role
+The frozen bank contains five physical scene seeds and eight matched arms per
+seed: four controllers by two conditions, for 40/40 valid runs. The bank ID is
+`converging_bank_2efd0ce2a79a425b`; the within-scene randomization seed is
+`20260717`. All uncertainty intervals are descriptive 95% whole-scene
+bootstrap intervals (10,000 resamples). With only five scene blocks, they are
+not population-level significance tests.
 
-The ego vehicle passes a large CARLA fire-engine asset from the left lane while
-a hidden vehicle passes it from the right.  Both request the centre-lane merge
-region ahead of the occluder.  Nine surrounding vehicles use an IDM controller.
-In the `empty_shadow` arm the hidden vehicle is removed but all other scene
-construction and traffic inputs remain matched.
+The label `v20` identifies this eight-arm evidence run. The deterministic
+scene resolver remains `carla_converging_scene_resolver_v19`; no scene-geometry
+change was introduced between the earlier four-arm pilot and this bank.
+The files `analyze_carla_converging_bank.py`,
+`plot_carla_paper_validation.py`, `frozen_bank/n5_v19`, and
+`results/pilot_n5_v19` are retained only as an explicitly archived development
+record.
 
-This validation does not replace Figs. 6 and 8 of the manuscript.  Those
-figures expose the risk-field mechanism; CARLA tests whether the behavior
-survives causal sensing, closed-loop vehicle dynamics, background traffic, and
-the measured asynchronous execution path.
+## Controller identities and baseline fidelity
 
-The stock fire engine is a large rigid occluder, not an articulated
-tractor-trailer.  The hidden actor is withheld from the global IDM interaction
-until ego semantic-LiDAR reveal so that the two conditions do not leak through
-indirect traffic motion.  A later cue-enabled robustness experiment should be
-used before making a broad claim about naturalistic traffic anticipation.
+| Label | Implementation used here | Permitted interpretation |
+|---|---|---|
+| DREAM | DREAM source, PDE propagation, and all three downstream coupling channels | Proposed method |
+| IDEAM | Native no-field decision/LMPC--CBF reference | Shared-backbone no-field reference |
+| ADA-sourced | ADA-derived asymmetric source substituted into DREAM's propagation and controller stack | Source-shape control, not a complete ADA planner |
+| APF-sourced | Repulsive APF source substituted into DREAM's propagation and controller stack | Source-shape control, not a complete APF planner |
 
-## Contents
+`OA_CMPC/oa_cmpc_source.py` is retained only as a clearly marked archival
+single-branch risk-source surrogate. It does **not** reproduce the published
+OA-CMPC dual-/multi-branch contingency optimizer. See
+`manuscript/baseline_code_map.md` and
+`manuscript/baseline_implementation_fidelity_table.tex` for the complete
+fidelity audit.
 
-- `carla_overtaking_trial.py`: CARLA bridge, sensors, actor control, timing,
-  qualification, logging, and stacked driver/BEV rendering.
-- `carla_external_planner.py`: asynchronous DREAM/IDEAM planner process.
-- `carla_protocol.py`: versioned length-prefixed message protocol.
-- `carla_converging_scene.py`: deterministic v19 scene resolver and geometric
-  full-footprint occlusion gate.
-- `run_carla_converging_bank.py`: bank freezing and randomized four-arm runner.
-- `analyze_carla_converging_bank.py`: complete-block analysis and block
-  bootstrap; it intentionally emits no p-values.
-- `physical_safety_metrics.py`: oriented-box clearance and two-dimensional TTC.
-- `plot_carla_paper_validation.py`: manuscript figures using SciencePlots.
-- `frozen_bank/n5_v19`: exact five scene manifests and bank index.
-- `results/pilot_n5_v19/run_summaries`: the 20 eligible summary/provenance
-  records from which the supplied CSV results can be regenerated.
-- `figures` and `videos`: publication candidates and outcome-blind seed-1001
-  DREAM replays.  The videos are illustrative and are not timing evidence.
-- `manuscript`: manuscript-ready LaTeX and the joint reviewer response.
+## Scenario and sensing protocol
+
+The ego passes a large CARLA fire-engine asset from the left while the latent
+vehicle passes it from the right. Both target a conflict region ahead of the
+occluder; nine surrounding vehicles use IDM control. The stock fire engine is
+a large rigid occluder, not an articulated tractor--trailer. The paired
+empty-shadow arm removes only the latent vehicle.
+
+The hidden vehicle is unavailable to the planner until its first causal
+semantic-LiDAR detection. A true-threat episode is admitted only when the
+entire projected hidden-vehicle footprint passes the pre-reveal occlusion gate
+and the reveal is valid. Timing runs are camera-free, use Low graphics quality,
+launch a fresh CARLA server for each arm, and are paced in real time. Driver
+and BEV recordings are generated separately and are illustrative rather than
+timing evidence.
+
+## Code map
+
+- `carla_converging_scene.py`: deterministic scene resolution and full-footprint
+  occlusion gate.
+- `carla_overtaking_trial.py`: sensors, actor control, asynchronous execution,
+  metrics, logging, and optional separated driver/BEV rendering.
+- `carla_external_planner.py`: authoritative DREAM/IDEAM/ADA/APF dispatch.
+- `run_carla_converging_bank.py`: bank freezing, randomized eight-arm execution,
+  server lifecycle, and ledger generation.
+- `analyze_carla_figure6_profiles.py`: complete-block validation, reveal-aligned
+  profiles, scene bootstrap, tables, and SciencePlots Figure 6.
+- `physical_safety_metrics.py`: signed oriented-box clearance and 2-D TTC.
+- `frozen_bank/n5_v20`: five byte-identical manifests and a path-sanitized
+  bank index that records their byte-level hashes.
+- `results/field_baselines_n5_v20/run_records`: path-sanitized records for all
+  40 runs, including summaries, resolved manifests, 20-Hz tick traces, NPC
+  traces, and evaluator-only actor-state logs used to compute physical and
+  traffic metrics.
+- `results/field_baselines_n5_v20/run_ledger.jsonl` and `logs/`: randomized
+  attempt order, commands, return codes, and captured standard output/error.
+- `results/field_baselines_n5_v20/analysis`: aggregate JSON/CSV, LaTeX table,
+  and the supplied PDF/PNG figure.
+- `manuscript/section_4_4_carla_two_condition.tex`: manuscript-ready subsection.
+- `manuscript/baseline_fidelity_rebuttal.tex`: reviewer response on baseline
+  fidelity and the comparison.
+- `release_manifest.json`: SHA-256 inventory of the active v20 code, evidence,
+  figures, tests, and manuscript files.
+
+The ADA and APF source implementations are in
+`../Aggressiveness_Modeling/ADA_drift_source.py` and
+`../APF_Modeling/APF_drift_source.py`. Shared controller infrastructure is in
+`../Integration/episode_control.py`, `../Integration/prideam_controller.py`,
+`../Control/MPC.py`, and `../DecisionMaking/decision.py`.
 
 ## Tested environments
-
-The experiment uses two Python processes because the Windows CARLA 0.9.14
-extension is tied to Python 3.7, whereas the submitted DREAM optimization stack
-uses the repository's modern scientific environment.
 
 | Process | Tested environment |
 |---|---|
 | CARLA bridge | Python 3.7.9, CARLA 0.9.14, NumPy 1.21.6, Pygame 2.6.1 |
-| Planner/analysis | Python 3.13.5 (Anaconda), NumPy 1.26.4, SciPy 1.15.3, CasADi 3.7.2, CVXPY 1.7.5 |
-| Figures | Matplotlib 3.10.0, SciencePlots 2.2.1 development snapshot |
+| Planner/analysis | Python 3.13.5, NumPy 1.26.4, SciPy 1.15.3, CasADi 3.7.2, CVXPY 1.7.5 |
+| Figure generation | NumPy 1.26.4, Matplotlib 3.10.0, SciencePlots commit `8d281eabcf5f8159730e6df82e69c7ecd5437cb6` (`2.2.0-3-g8d281ea`) |
 
-Install the CARLA wheel shipped under
-`PythonAPI/carla/dist` into the Python 3.7 environment.  Install the main DREAM
-repository dependencies into the planner environment, followed by
-`requirements-analysis.txt`.  The short requirement files here document the
-CARLA-side and plotting additions; they do not replace the root DREAM
-environment.
+Install the CARLA wheel shipped under `PythonAPI/carla/dist` in the Python 3.7
+environment. Install the main repository requirements and
+`requirements-analysis.txt` in the planner/analysis environment.
 
-## Reproduce the supplied analysis without CARLA
+## Reproduce Figure 6 without rerunning CARLA
 
-From `src/Carla`, use the modern environment:
+From `src/Carla`, run:
 
 ```powershell
-python .\analyze_carla_converging_bank.py `
-  .\results\pilot_n5_v19\run_summaries `
-  --output-dir .\reproduced_analysis `
-  --bootstrap-replicates 10000 `
-  --bootstrap-seed 260716
+python .\analyze_carla_figure6_profiles.py `
+  --results-root .\results\field_baselines_n5_v20\run_records `
+  --output-dir .\reproduced_figure6 `
+  --bootstrap-resamples 10000 `
+  --bootstrap-seed 20260717
 ```
 
-This reconstructs the raw-arm and paired-effect tables from the 20 retained
-`summary.json` files.  A run is rejected from evidence if the four-arm block is
-incomplete, manifest/trace hashes disagree, the projected hidden-vehicle
-footprint fails the occlusion gate, or semantic visibility violates the causal
-reveal rule.
+The analysis rejects an incomplete eight-arm block, invalid reveal, duplicate
+arm, construction-hash mismatch, or mismatch between the trace and reported
+minimum clearance. The scene seed, rather than simulation tick, is the
+sampling unit.
 
-## Freeze and execute a new matched bank
-
-The following PowerShell example launches a separate CARLA server per arm and
-paces the simulation in real time.  Change the executable and interpreter paths
-for the local installation.
+## Freeze and run a new bank
 
 ```powershell
 $carlaPy = "C:\Path\to\Python37\python.exe"
@@ -102,7 +127,8 @@ $carlaExe = "C:\CARLA_0.9.14\WindowsNoEditor\CarlaUE4\Binaries\Win64\CarlaUE4-Wi
 
 & $carlaPy .\run_carla_converging_bank.py `
   --seeds 1001,1002,1003,1004,1005 `
-  --randomization-seed 20260716 `
+  --controllers DREAM,IDEAM,ADA,APF `
+  --randomization-seed 20260717 `
   --bank-dir .\new_frozen_bank `
   --output-root .\new_runs `
   --execute --launch-server --pace-realtime `
@@ -112,83 +138,53 @@ $carlaExe = "C:\CARLA_0.9.14\WindowsNoEditor\CarlaUE4\Binaries\Win64\CarlaUE4-Wi
   --stop-on-failure
 ```
 
-The default action of `run_carla_converging_bank.py` is freeze-only; the
-explicit `--execute` flag prevents accidental expensive runs.  Low-quality,
-camera-free runs are the timing protocol.  Do not add `--record-frames` to runs
-used for computational-time claims.
+The runner defaults to freeze-only; `--execute` is required for the expensive
+CARLA phase. Do not enable frame recording in runs used for timing claims.
 
-An individual frozen arm can be reproduced with:
+An individual arm can be replayed with:
 
 ```powershell
 & $carlaPy .\carla_overtaking_trial.py `
   --condition true_threat --controller DREAM --seed 1001 `
-  --manifest .\frozen_bank\n5_v19\manifests\scene_0001_seed1001.json `
+  --manifest .\frozen_bank\n5_v20\manifests\scene_0001_seed1001.json `
   --output-root .\single_run `
   --launch-server --pace-realtime --quality-level Low `
   --planner-python $plannerPy --carla-executable $carlaExe
 ```
 
-## Create a high-fidelity illustrative replay
+For an illustrative stacked driver/BEV replay, use Epic quality and
+`--record-frames --allow-invalid`; the emitted `driver_frames`, `bev_frames`,
+and non-overlapping vertical `frames` remain separate from timing evidence.
 
-Rendering is deliberately separated from measurement.  Use Epic quality and
-stacked output for an illustrative replay, and retain `--allow-invalid` because
-recording makes it ineligible for the timing analysis:
+## Supplied v20 results
 
-```powershell
-& $carlaPy .\carla_overtaking_trial.py `
-  --condition true_threat --controller DREAM --seed 1001 `
-  --manifest .\frozen_bank\n5_v19\manifests\scene_0001_seed1001.json `
-  --output-root .\visual_replays `
-  --launch-server --quality-level Epic `
-  --record-frames --frame-stride 2 --allow-invalid `
-  --planner-python $plannerPy --carla-executable $carlaExe
-```
+In the true-threat scenes, DREAM recorded 0/5 collisions and 2/5 near
+collisions. IDEAM recorded 4/5 and 5/5, ADA-sourced 0/5 and 5/5, and
+APF-sourced 0/5 and 4/5. Relative to IDEAM, DREAM increased minimum global
+signed clearance by 1.188 m [0.894, 1.561] and hidden-vehicle clearance by
+1.491 m [1.061, 1.989]. Relative hidden-vehicle clearance differences were
+0.970 m [0.767, 1.190] versus ADA-sourced and 0.486 m [0.185, 0.841] versus
+APF-sourced. The result supports a selective margin/near-conflict claim, not a
+claim that DREAM alone avoided collision.
 
-The `frames` directory contains the non-overlapping vertical composite, while
-`driver_frames` and `bev_frames` contain the separated views.  The supplied
-seed-1001 scene was selected from manifest parameters before inspecting
-controller outcomes.
+In empty-shadow scenes, DREAM's mean speed was 30.12 m/s versus 31.34 m/s for
+IDEAM, giving a conservatism tax of 1.224 m/s [1.131, 1.317]. All four arms
+had 0/5 collisions and 0/5 near collisions. DREAM's paired additional maximum
+follower speed loss relative to IDEAM was effectively zero
+(`5.74e-6` m/s [`-0.001233`, `0.001250`]), and the hard-braking traffic-actor
+count showed no observed increase. The integrated traffic speed deficit was
+nevertheless 0.203 vehicle-m [0.139, 0.267] larger. The six-second horizon
+does not rule out longer traffic waves.
 
-After regenerating the aggregate analysis and a representative visual run:
+For DREAM true-threat runs, high-level optimization required 442.1 ms on
+average, 521.0 ms at the mean per-run 95th percentile, and 536.1 ms at the
+observed maximum. The effective high-level rate was 2.33 Hz and 76.3% of
+superseded requests were coalesced. The 10 Hz tracker averaged 1.493 ms and
+missed 0/300 deadlines; the 20 Hz physics/control loop averaged 12.557 ms and
+missed 0/600 deadlines. The mean reveal-to-application delay for a hidden-aware
+plan was 0.85 s [0.80, 0.95], and the largest observed delay was 1.05 s
+(approximately 25.4 and 31.4 m of travel at the reported mean speed). All arms
+shared the same immediate visible-actor safety supervisor, lane-hold fallback,
+and 10 Hz tracker. This is an implemented asynchronous proof of concept, not a
+10 Hz high-level real-time or formal sudden-reveal safety guarantee.
 
-```powershell
-python .\plot_carla_paper_validation.py `
-  --analysis-dir .\reproduced_analysis `
-  --visual-run-dir .\visual_replays\<run-directory> `
-  --output-dir .\paper_figures `
-  --representative-seed 1001
-```
-
-## Supplied pilot results
-
-In the five true-threat blocks, DREAM had 0/5 collisions and 0/5 near
-collisions, whereas IDEAM had 2/5 and 5/5.  The paired DREAM-minus-IDEAM effects
-were +1.50 m [0.92, 2.03] for minimum hidden-vehicle oriented-box clearance and
-+0.96 s [0.54, 1.29] for minimum hidden-vehicle two-dimensional TTC.
-
-In the empty-shadow blocks, the ego-speed conservatism tax was 1.30 m/s [1.22,
-1.39].  The paired additional maximum speed loss of the nearest follower was
-1.9e-6 m/s [0.4e-6, 3.4e-6], hard-braking actor count was unchanged, and the
-additional total integrated traffic speed deficit was 0.219 vehicle-m [0.175,
-0.268].  These six-second trials do not rule out longer-range traffic-wave
-effects.
-
-For DREAM true-threat runs, high-level planning required 451.4 ms on average,
-533.1 ms at the mean per-run 95th percentile, and 579.3 ms at the observed
-maximum.  The effective high-level rate was 2.30 Hz and 76.8% of superseded
-requests were coalesced.  The 10 Hz low-level controller required 1.456 ms on
-average (1.826 ms P95, 3.556 ms maximum), and the 20 Hz physics/control loop
-required 12.296 ms on average (15.253 ms P95, 30.977 ms maximum); neither loop
-missed its deadline.  The current high-level optimizer is therefore not a
-10 Hz real-time implementation.  The evidence supports an implemented
-asynchronous proof of concept only.
-
-## Recommended manuscript placement
-
-Use `figures/fig_carla_closed_loop_validation.pdf` as the main CARLA result:
-panel A establishes the causal occlusion/reveal sequence, panel B reports the
-matched safety margins, and panel C reports the empty-shadow ego/follower
-profiles.  Use `figures/fig_carla_async_runtime.pdf` with the revised timing
-table.  Place the distribution and paired-effect figures in supplementary
-material.  Keep the Python Figs. 6 and 8 because they explain the field
-mechanism that the CARLA experiment does not isolate.

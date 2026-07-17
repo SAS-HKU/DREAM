@@ -1,0 +1,39 @@
+{
+  "carla_command": [
+    "<CARLA_EXECUTABLE>",
+    "CarlaUE4",
+    "-carla-port=3438",
+    "-RenderOffScreen",
+    "-nosound",
+    "-quality-level=Low",
+    "-ResX=1280",
+    "-ResY=720"
+  ],
+  "construction_hash": "c1df7bf640026aadbf78a8bbede5333689d9e59654c058fdf44aac5d3ab63fd6",
+  "evaluator_actor_states": "evaluator_actor_states.jsonl",
+  "evaluator_actor_states_are_planner_inaccessible": true,
+  "experiment_command": "<DREAM_ROOT>\\evaluation\\carla_overtaking_trial.py --condition true_threat --controller IDEAM --seed 1005 --manifest <DREAM_ROOT>\\outputs\\carla_field_baselines_bank_n5_v20\\manifests\\scene_0005_seed1005.json --output-root <DREAM_ROOT>\\outputs\\carla_field_baselines_n5_v20\\town06_converging_dual_overtake_firetruck_v1_seed001005_c1df7bf64002 --carla-port 3438 --planner-port 10438 --quality-level Low --launch-server --pace-realtime --planner-python <PLANNER_PYTHON> --carla-executable <CARLA_EXECUTABLE>",
+  "generator_version": "carla_converging_scene_resolver_v19",
+  "manifest_source": "../../../../../frozen_bank/n5_v20/manifests/scene_0005_seed1005.json",
+  "manifest_source_schema": "carla_overtaking_manifest_v1",
+  "manifest_source_sha256": "574721aff607eed74e88fdff2d3817028a0f926f8302e44f82b506985eb710b3",
+  "npc_trace": "npc_trace.csv",
+  "output_dir": ".",
+  "planner_command": [
+    "<PLANNER_PYTHON>",
+    "<DREAM_ROOT>\\Integration\\carla_external_planner.py",
+    "--host",
+    "127.0.0.1",
+    "--port",
+    "10438",
+    "--timeout-s",
+    "120.0"
+  ],
+  "planner_episode_id": "town06_converging_dual_overtake_firetruck_v1_seed001005_c1df7bf64002_seed1005",
+  "pre_reveal_npc_hidden_coupling_policy": "cue_suppressed_until_ego_semantic_lidar_reveal",
+  "resolved_manifest": "resolved_manifest.json",
+  "run_id": "ideam_true_threat_seed1005_20260717_190945",
+  "scenario_family": "town06_converging_dual_overtake_firetruck_v1",
+  "scene_seed": 1005,
+  "tick_trace": "tick_trace.csv"
+}

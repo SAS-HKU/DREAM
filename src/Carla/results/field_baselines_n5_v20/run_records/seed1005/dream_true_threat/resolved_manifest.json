@@ -1,0 +1,351 @@
+{
+  "actors": {
+    "blocker": {
+      "blueprint": "vehicle.audi.a2",
+      "color": "250,210,0",
+      "enabled": false,
+      "lane_id": -4,
+      "s_m": 365.532732,
+      "speed_mps": 32.153957
+    },
+    "ego": {
+      "blueprint": "vehicle.lincoln.mkz_2020",
+      "color": "0,80,255",
+      "label": "ego",
+      "lane_id": -4,
+      "nominal_dimensions_m": {
+        "height": 1.48,
+        "length": 4.97,
+        "width": 1.93
+      },
+      "s_m": 173.09382,
+      "speed_mps": 32.153957
+    },
+    "followers": [
+      {
+        "blueprint": "vehicle.tesla.model3",
+        "color": "85,85,85",
+        "idm": {
+          "comfortable_deceleration_mps2": 2.748345,
+          "desired_speed_mps": 31.539545,
+          "exponent": 4.0,
+          "maximum_acceleration_mps2": 1.382822,
+          "minimum_gap_m": 1.867539,
+          "time_headway_s": 0.850488
+        },
+        "label": "follower_1",
+        "lane_id": -4,
+        "lane_name": "left",
+        "leader_at_initialization": "ego",
+        "longitudinal_model": "IDM",
+        "s_m": 141.762028,
+        "speed_mps": 31.498686,
+        "traffic_role": "follower"
+      },
+      {
+        "blueprint": "vehicle.mercedes.coupe_2020",
+        "color": "105,105,105",
+        "idm": {
+          "comfortable_deceleration_mps2": 2.220154,
+          "desired_speed_mps": 31.206399,
+          "exponent": 4.0,
+          "maximum_acceleration_mps2": 1.317042,
+          "minimum_gap_m": 1.84398,
+          "time_headway_s": 1.031856
+        },
+        "label": "follower_2",
+        "lane_id": -4,
+        "lane_name": "left",
+        "leader_at_initialization": "follower_1",
+        "longitudinal_model": "IDM",
+        "s_m": 102.141891,
+        "speed_mps": 31.206399,
+        "traffic_role": "follower"
+      },
+      {
+        "blueprint": "vehicle.nissan.patrol_2021",
+        "color": "125,125,125",
+        "idm": {
+          "comfortable_deceleration_mps2": 2.168627,
+          "desired_speed_mps": 30.370599,
+          "exponent": 4.0,
+          "maximum_acceleration_mps2": 1.42535,
+          "minimum_gap_m": 1.98553,
+          "time_headway_s": 0.969922
+        },
+        "label": "follower_3",
+        "lane_id": -4,
+        "lane_name": "left",
+        "leader_at_initialization": "follower_2",
+        "longitudinal_model": "IDM",
+        "s_m": 63.87802,
+        "speed_mps": 30.370599,
+        "traffic_role": "follower"
+      },
+      {
+        "blueprint": "vehicle.tesla.model3",
+        "color": "145,145,145",
+        "idm": {
+          "comfortable_deceleration_mps2": 1.954332,
+          "desired_speed_mps": 30.246639,
+          "exponent": 4.0,
+          "maximum_acceleration_mps2": 1.521913,
+          "minimum_gap_m": 1.711567,
+          "time_headway_s": 0.855866
+        },
+        "label": "follower_4",
+        "lane_id": -4,
+        "lane_name": "left",
+        "leader_at_initialization": "follower_3",
+        "longitudinal_model": "IDM",
+        "s_m": 32.498039,
+        "speed_mps": 30.246639,
+        "traffic_role": "follower"
+      }
+    ],
+    "idm_npcs": [
+      {
+        "blueprint": "vehicle.audi.a2",
+        "color": "25,180,95",
+        "idm": {
+          "comfortable_deceleration_mps2": 2.706559,
+          "desired_speed_mps": 25.388964,
+          "exponent": 4.0,
+          "maximum_acceleration_mps2": 1.498982,
+          "minimum_gap_m": 2.397922,
+          "time_headway_s": 1.025168
+        },
+        "label": "lead_left",
+        "lane_id": -4,
+        "lane_name": "left",
+        "longitudinal_model": "IDM",
+        "s_m": 307.666217,
+        "speed_mps": 24.794271,
+        "traffic_role": "leader"
+      },
+      {
+        "blueprint": "vehicle.tesla.model3",
+        "color": "180,180,40",
+        "idm": {
+          "comfortable_deceleration_mps2": 2.736944,
+          "desired_speed_mps": 19.353903,
+          "exponent": 4.0,
+          "maximum_acceleration_mps2": 1.582275,
+          "minimum_gap_m": 2.110539,
+          "time_headway_s": 0.932058
+        },
+        "label": "lead_centre",
+        "lane_id": -5,
+        "lane_name": "centre",
+        "longitudinal_model": "IDM",
+        "s_m": 307.761686,
+        "speed_mps": 18.921405,
+        "traffic_role": "leader"
+      },
+      {
+        "blueprint": "vehicle.audi.a2",
+        "color": "155,95,210",
+        "idm": {
+          "comfortable_deceleration_mps2": 2.140243,
+          "desired_speed_mps": 24.214186,
+          "exponent": 4.0,
+          "maximum_acceleration_mps2": 1.328393,
+          "minimum_gap_m": 1.813683,
+          "time_headway_s": 1.180499
+        },
+        "label": "lead_right",
+        "lane_id": -6,
+        "lane_name": "right",
+        "longitudinal_model": "IDM",
+        "s_m": 314.714887,
+        "speed_mps": 24.214186,
+        "traffic_role": "leader"
+      },
+      {
+        "blueprint": "vehicle.nissan.patrol_2021",
+        "color": "75,115,145",
+        "idm": {
+          "comfortable_deceleration_mps2": 1.893382,
+          "desired_speed_mps": 20.0,
+          "exponent": 4.0,
+          "maximum_acceleration_mps2": 1.396806,
+          "minimum_gap_m": 1.569432,
+          "time_headway_s": 1.144071
+        },
+        "label": "rear_centre",
+        "lane_id": -5,
+        "lane_name": "centre",
+        "leader_at_initialization": "occluder",
+        "longitudinal_model": "IDM",
+        "s_m": 163.038123,
+        "speed_mps": 17.199601,
+        "traffic_role": "follower"
+      }
+    ],
+    "latent_vehicle": {
+      "blueprint": "vehicle.dodge.charger_2020",
+      "color": "220,20,60",
+      "cut_in_duration_s": 3.107798,
+      "cut_in_start_s": 1.886954,
+      "label": "latent_vehicle",
+      "lane_id": -6,
+      "nominal_conflict_station_m": 285.532732,
+      "nominal_dimensions_m": {
+        "height": 1.48,
+        "length": 5.04,
+        "width": 1.95
+      },
+      "s_m": 193.597597,
+      "source_planner_lane": 2,
+      "speed_mps": 26.718705,
+      "target_lane_id": -5,
+      "target_planner_lane": 1
+    },
+    "occluder": {
+      "blueprint": "vehicle.carlamotors.firetruck",
+      "color": "220,45,25",
+      "idm": {
+        "comfortable_deceleration_mps2": 1.899296,
+        "desired_speed_mps": 18.168496,
+        "exponent": 4.0,
+        "maximum_acceleration_mps2": 1.565635,
+        "minimum_gap_m": 1.666107,
+        "time_headway_s": 1.019807
+      },
+      "label": "occluder",
+      "lane_id": -5,
+      "longitudinal_model": "IDM",
+      "nominal_dimensions_m": {
+        "height": 3.4,
+        "length": 8.55,
+        "width": 2.55
+      },
+      "s_m": 189.256621,
+      "speed_mps": 18.168496
+    }
+  },
+  "description": "Matched converging-overtake construction: the ego passes a large rigid firetruck on the left while a sensor-occluded challenge vehicle passes it on the right; both request the centre lane ahead of the firetruck, with IDM traffic ahead of and behind the conflict.",
+  "duration_s": 6.0,
+  "evaluation_metrics": {
+    "log_all_actor_states_long_format": true,
+    "near_collision_clearance_m": 0.5,
+    "near_collision_ttc_2d_s": 1.0,
+    "physical_reveal_alignment": true,
+    "ttc_2d_horizon_s": 5.0
+  },
+  "lane_map": {
+    "centre": -5,
+    "left": -4,
+    "right": -6
+  },
+  "map": "Town06",
+  "measurement_preroll_s": 1.0,
+  "notes": [
+    "The stock CARLA firetruck is a large rigid occluding vehicle, not an articulated truck-trailer; manuscript terminology must reflect this asset limitation.",
+    "The ego and latent challenge vehicle are both faster than the firetruck and enter the centre lane only after passing its front clearance gate.",
+    "Every seed resolves all positions, speeds, lane-change timings, front traffic, follower traffic, and actor-specific IDM parameters before any controller is run.",
+    "The empty-shadow intervention removes only the latent vehicle; the frozen manifest and every IDM draw remain identical across all four arms.",
+    "No right-lane trailing follower is included because its pre-reveal response to the latent vehicle would create an indirect condition cue in the empty-shadow twin.",
+    "The statistical runner must support actors.idm_npcs, dynamic lane-based leader assignment, and long-format actor traces before this template is used for evidence runs."
+  ],
+  "physics_dt_s": 0.05,
+  "planner_lane_map": {
+    "centre": 1,
+    "left": 0,
+    "right": 2
+  },
+  "qualification": {
+    "earliest_reveal_s": 0.8,
+    "latest_reveal_s": 5.3,
+    "maximum_actor_speed_error_mps": 1.0,
+    "maximum_cut_in_lateral_error_m": 0.75,
+    "maximum_initial_station_error_m": 3.0,
+    "minimum_initial_occlusion_s": 0.75,
+    "minimum_occluder_height_m": 3.0,
+    "minimum_occluder_length_m": 7.5,
+    "minimum_pass_clearance_m": 10.0,
+    "nominal_occluder_projection_inset_m": 0.0,
+    "require_identical_construction_hash_across_arms": true
+  },
+  "rgb_camera": {
+    "fov_deg": 90.0,
+    "height_px": 1080,
+    "pitch_deg": -2.0,
+    "recording_start_s": 0.25,
+    "sensor_tick_s": 0.05,
+    "width_px": 1920,
+    "x_m": 1.4,
+    "z_m": 1.55
+  },
+  "road_id": 40,
+  "road_station_limit_m": 460.0,
+  "route_request": {
+    "conflict_station_m": 285.532732,
+    "end_time_s": 5.8,
+    "nominal_conflict_time_s": 3.496892,
+    "nominal_lane_change_duration_s": 2.850741,
+    "start_time_s": 2.071522,
+    "target_lane": 1
+  },
+  "scenario_family": "town06_converging_dual_overtake_firetruck_v1",
+  "scenario_id": "town06_converging_dual_overtake_firetruck_v1_seed001005_c1df7bf64002",
+  "scene_construction": {
+    "construction_hash_sha256": "c1df7bf640026aadbf78a8bbede5333689d9e59654c058fdf44aac5d3ab63fd6",
+    "generator_version": "carla_converging_scene_resolver_v19",
+    "hash_algorithm": "sha256",
+    "realized_factors": {
+      "arrival_time_offset_hidden_minus_ego_s": -0.056039,
+      "conflict_clearance_ahead_occluder_m": 33.251918,
+      "conflict_station_m": 285.532732,
+      "ego_clearance_ahead_at_lane_change_start_m": 12.808384,
+      "ego_initial_station_relative_to_occluder_m": -16.162801,
+      "ego_lane_change_duration_s": 2.850741,
+      "ego_lane_change_start_s": 2.071522,
+      "ego_speed_mps": 32.153957,
+      "ego_station_m": 173.09382,
+      "hidden_clearance_ahead_at_lane_change_start_m": 20.474828,
+      "hidden_initial_station_relative_to_occluder_m": 4.340976,
+      "hidden_lane_change_duration_s": 3.107798,
+      "hidden_lane_change_start_s": 1.886954,
+      "hidden_speed_mps": 26.718705,
+      "hidden_station_m": 193.597597,
+      "idm_npc_count": 9,
+      "legacy_left_follower_count": 4,
+      "nominal_conflict_time_s": 3.468872,
+      "occluder_speed_mps": 18.168496,
+      "occluder_station_m": 189.256621,
+      "resolution_attempt": 71
+    },
+    "seed": 1005
+  },
+  "schema_version": "carla_overtaking_manifest_v1",
+  "semantic_lidar": {
+    "channels": 32,
+    "consecutive_frames": 2,
+    "horizontal_fov_deg": 360.0,
+    "lower_fov_deg": -22.0,
+    "minimum_actor_hits": 5,
+    "points_per_second": 640000,
+    "range_m": 120.0,
+    "reveal_arming_delay_s": 0.25,
+    "rotation_frequency_hz": 20,
+    "sensor_tick_s": 0.05,
+    "upper_fov_deg": 10.0,
+    "x_m": 1.2,
+    "z_m": 1.8
+  },
+  "traffic_control": {
+    "equation": "complete_idm",
+    "front_leaders_use_free_road_term_when_unled": true,
+    "lane_change_actors": [
+      "ego",
+      "latent_vehicle"
+    ],
+    "leader_assignment": "nearest_forward_actor_in_current_lane",
+    "model": "IDM",
+    "per_tick_random_noise": false,
+    "trace_layout": "long_actor_trace",
+    "update_interval_s": 0.05
+  },
+  "weather": "ClearNoon"
+}

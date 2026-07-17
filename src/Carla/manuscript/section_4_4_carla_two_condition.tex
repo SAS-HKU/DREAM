@@ -1,0 +1,317 @@
+% Replacement text for manuscript Section 4.4.
+% Integration notes:
+%   1. Update the existing qualitative Figure 7 label to
+%      `fig:mixed-traffic-qualitative`, or change the references below.
+%   2. Numerical macros below are frozen to the complete v20 bank
+%      (bank ID converging_bank_2efd0ce2a79a425b; 40/40 valid runs).
+%   4. Remove the submitted OA-CMPC panel (old Fig. 8) and the OA-CMPC row in
+%      the submitted runtime table. The audited adapter is not the published
+%      dual-branch method.
+%   5. The old REI/jerk/CT_v aggregate plot may be retained only as a secondary
+%      mechanism/trade-off diagnostic (preferably in the supplement); it is not
+%      a substitute for the physical outcomes reported here.
+
+\providecommand{\CarlaFigureSixFile}{figure6_carla_speed_clearance.pdf}
+
+% Text-level findings from the complete v20 scene bank.
+\providecommand{\CarlaEmptyShadowFinding}{All four controllers completed the
+empty-shadow scenes without a collision or near collision.  DREAM reduced the
+episode-mean ego speed from 31.34 to 30.12~m\,s$^{-1}$ relative to IDEAM,
+corresponding to $CT_v=1.22$~m\,s$^{-1}$ [1.13, 1.32].  Its mean episode-minimum
+clearance was 1.16~m [1.11, 1.21], compared with 1.18~m [1.16, 1.21] for IDEAM;
+the paired difference was $-0.023$~m [$-0.071$, 0.002].  DREAM's mean peak
+deceleration was $-2.51$~m\,s$^{-2}$ [$-2.58$, $-2.45$], and no empty-shadow
+scene crossed the $-3$~m\,s$^{-2}$ hard-braking threshold.}
+\providecommand{\CarlaTrueThreatFinding}{DREAM produced 0/5 collisions and 2/5
+near collisions, compared with 4/5 and 5/5 for IDEAM, 0/5 and 5/5 for the
+ADA-sourced control, and 0/5 and 4/5 for the APF-sourced control.  DREAM's mean
+episode-minimum signed clearance was 1.07~m [0.94, 1.19].  The paired clearance
+increases relative to IDEAM, ADA-sourced, and APF-sourced were 1.19~m
+[0.89, 1.56], 0.67~m [0.52, 0.82], and 0.19~m [0.02, 0.39], respectively.  The
+hidden-vehicle-specific clearance and two-dimensional TTC increased by 1.49~m
+[1.06, 1.99] and 1.07~s [0.97, 1.19] relative to IDEAM.}
+\providecommand{\CarlaFollowerFinding}{Relative to IDEAM, DREAM changed the
+maximum follower speed loss by only $5.7\times10^{-6}$~m\,s$^{-1}$
+[$-1.23\times10^{-3}$, $1.25\times10^{-3}$] and did not change the hard-braking
+actor count.  The total integrated traffic speed deficit increased by
+0.203~vehicle-m [0.139, 0.267], or 0.33\% of the IDEAM total.  Thus, the tested
+empty shadows showed a measurable ego-level efficiency cost, but no increase
+was observed in either the hard-braking count or the maximum-follower-speed-loss
+metric; the 6-s horizon does not exclude longer-range traffic-wave
+amplification.}
+
+% True-threat condition.
+\providecommand{\CarlaTTCollisionDREAM}{0/5}
+\providecommand{\CarlaTTCollisionIDEAM}{4/5}
+\providecommand{\CarlaTTCollisionADA}{0/5}
+\providecommand{\CarlaTTCollisionAPF}{0/5}
+\providecommand{\CarlaTTNearDREAM}{2/5}
+\providecommand{\CarlaTTNearIDEAM}{5/5}
+\providecommand{\CarlaTTNearADA}{5/5}
+\providecommand{\CarlaTTNearAPF}{4/5}
+\providecommand{\CarlaTTClearDREAM}{1.07 [0.94, 1.19]}
+\providecommand{\CarlaTTClearIDEAM}{$-0.12$ [$-0.49$, 0.22]}
+\providecommand{\CarlaTTClearADA}{0.41 [0.20, 0.61]}
+\providecommand{\CarlaTTClearAPF}{0.89 [0.70, 1.07]}
+
+% Empty-shadow condition.
+\providecommand{\CarlaESSpeedDREAM}{30.12 [29.90, 30.34]}
+\providecommand{\CarlaESSpeedIDEAM}{31.34 [31.20, 31.49]}
+\providecommand{\CarlaESSpeedADA}{31.06 [30.83, 31.29]}
+\providecommand{\CarlaESSpeedAPF}{31.16 [30.94, 31.37]}
+\providecommand{\CarlaESCTVdream}{1.22 [1.13, 1.32]}
+\providecommand{\CarlaESCTVada}{0.29 [0.19, 0.40]}
+\providecommand{\CarlaESCTVapf}{0.19 [0.07, 0.33]}
+\providecommand{\CarlaESClearDREAM}{1.16 [1.11, 1.21]}
+\providecommand{\CarlaESClearIDEAM}{1.18 [1.16, 1.21]}
+\providecommand{\CarlaESClearADA}{1.16 [1.11, 1.21]}
+\providecommand{\CarlaESClearAPF}{1.17 [1.12, 1.21]}
+\providecommand{\CarlaESFollowLossDREAM}{2.013 [1.626, 2.381]}
+\providecommand{\CarlaESFollowLossIDEAM}{2.013 [1.627, 2.380]}
+\providecommand{\CarlaESFollowLossADA}{2.014 [1.627, 2.381]}
+\providecommand{\CarlaESFollowLossAPF}{2.014 [1.627, 2.382]}
+\providecommand{\CarlaESHardBrakeDREAM}{0.20 [0.00, 0.60]}
+\providecommand{\CarlaESHardBrakeIDEAM}{0.20 [0.00, 0.60]}
+\providecommand{\CarlaESHardBrakeADA}{0.20 [0.00, 0.60]}
+\providecommand{\CarlaESHardBrakeAPF}{0.20 [0.00, 0.60]}
+
+% Runtime values from the five DREAM true-threat arms in the v20 bank.
+\providecommand{\CarlaHighLevelMeanMs}{442.1}
+\providecommand{\CarlaHighLevelPNinetyFiveMs}{521.0}
+\providecommand{\CarlaHighLevelMaxMs}{536.1}
+\providecommand{\CarlaThreatMeanSpeed}{29.92}
+\providecommand{\CarlaTravelAtMeanLatency}{13.2}
+\providecommand{\CarlaTravelAtPNinetyFiveLatency}{15.6}
+\providecommand{\CarlaTravelAtMaxLatency}{16.0}
+\providecommand{\CarlaHighLevelRateHz}{2.33}
+\providecommand{\CarlaDroppedRequestsPct}{76.3}
+\providecommand{\CarlaLowLevelMeanMs}{1.493}
+\providecommand{\CarlaLowLevelPNinetyFiveMs}{2.029}
+\providecommand{\CarlaLowLevelMaxMs}{3.420}
+\providecommand{\CarlaPhysicsMeanMs}{12.557}
+\providecommand{\CarlaPhysicsPNinetyFiveMs}{16.574}
+\providecommand{\CarlaPhysicsMaxMs}{20.677}
+\providecommand{\CarlaRevealPlanDelayMeanS}{0.85}
+\providecommand{\CarlaRevealPlanDelayLowS}{0.80}
+\providecommand{\CarlaRevealPlanDelayHighS}{0.95}
+\providecommand{\CarlaRevealPlanDelayMaxS}{1.05}
+\providecommand{\CarlaRevealPlanTravelMeanM}{25.4}
+\providecommand{\CarlaRevealPlanTravelMaxM}{31.4}
+
+\subsection{Evaluation results}
+\label{sec:evaluation-results}
+
+\subsubsection{Mechanism-level qualitative evidence}
+\label{sec:mechanism-qualitative}
+
+Figure~\ref{fig:mixed-traffic-qualitative} examines how the alternative field
+sources represent an occluded conflict in mixed traffic.  The snapshots show
+the instantaneous spatial support of each field and its relation to the
+corresponding ego response.  DREAM places caution inside the shadow before a
+hidden actor is observed.  The ADA-sourced and APF-sourced controls produce
+different spatial patterns under the same shared planning backbone.  These
+examples expose the mechanism and support visual comparison of the field
+geometry.  They do not estimate event incidence, establish a safety margin,
+or provide a guarantee for unobserved traffic scenes.
+
+The qualitative visualization and the closed-loop experiment serve distinct
+roles.  Figure~\ref{fig:mixed-traffic-qualitative} makes the field mechanism
+visible in a representative mixed-traffic interaction.  Figure~\ref{fig:carla-two-condition-profiles}
+instead aggregates matched, high-fidelity CARLA runs.  It tests whether the
+mechanism changes physical responses when the same shadow is empty or contains
+a conflicting vehicle.
+
+\subsubsection{Matched empty-shadow and true-threat comparison}
+\label{sec:carla-two-condition}
+
+The CARLA experiment used a converging overtaking scenario in Town06.  The ego
+vehicle passed CARLA's rigid fire-engine asset, which served as a large truck
+surrogate rather than an articulated truck--trailer.  A second vehicle passed
+on the opposite side.  Both vehicles then requested entry into the centre lane
+ahead of the occluder.  Surrounding vehicles followed an
+intelligent-driver-model controller.  The \emph{empty-shadow} condition removed
+the hidden vehicle, whereas the \emph{true-threat} condition retained its
+conflicting maneuver.
+
+Five randomized scene blocks were evaluated with DREAM, IDEAM, an ADA-sourced
+field control, and an APF-sourced field control.  The resulting bank contained
+$5\times2\times4=40$ runs.  Within each block, all eight arms used the same
+frozen nominal manifest, random seed, actor definitions, and background-traffic
+control laws.  Realized
+initial states were admitted only when they satisfied the common tolerances,
+and construction hashes were required to match across arms.  Arm order was
+randomized within each block.  The ADA-sourced and APF-sourced arms changed
+the field source while retaining the common propagation, coupling, and
+MPC--CBF backbone.  They are
+therefore source-level controls rather than complete reimplementations of the
+cited external planners.  OA-CMPC was not included because the available
+adapter does not reproduce its original dual-branch contingency optimization.
+
+The true-threat traces were aligned to the first semantic-LiDAR detection of
+the hidden vehicle.  The matching empty-shadow trace used the reveal time from
+the corresponding true-threat arm.  This construction preserves a common
+event origin without introducing a synthetic reveal into the empty condition.
+The plotted centre line is the mean over complete scene blocks.  Shading shows
+a descriptive 95\% scene-block bootstrap interval from 10,000 resamples.  The
+scene block, rather than the 20-Hz simulation tick, is the resampling unit.
+The intervals summarize this finite scenario bank and are not used for
+population-level hypothesis testing.
+
+For each neighboring vehicle $i$, let $B_{\mathrm{e}}(t)$ and $B_i(t)$ denote
+their ground-plane oriented bounding boxes (OBBs).  Their signed separation is
+\begin{equation}
+\delta_i(t)=
+\begin{cases}
+\displaystyle \min_{x\in B_{\mathrm{e}}(t),\,y\in B_i(t)}\lVert x-y\rVert_2,
+& B_{\mathrm{e}}(t)\cap B_i(t)=\varnothing,\\[2mm]
+-\operatorname{mtd}\!\left(B_{\mathrm{e}}(t),B_i(t)\right),
+& B_{\mathrm{e}}(t)\cap B_i(t)\neq\varnothing,
+\end{cases}
+\qquad
+d_{\min}(t)=\min_i\delta_i(t),
+\label{eq:signed-obb-clearance}
+\end{equation}
+where $\operatorname{mtd}$ is the minimum translation distance required to
+separate two intersecting boxes.  Positive values indicate separation, zero
+indicates contact, and negative values indicate footprint overlap.  This
+definition avoids the ambiguity of centre-to-centre distance for vehicles
+with different dimensions.
+
+Collision incidence is obtained from the CARLA collision sensor.  A
+near-collision is recorded when the positive signed clearance falls below
+0.5~m or the constant-velocity oriented-box TTC falls below 1.0~s.  The two
+indicators are reported independently; an episode that later collides may
+also contain a preceding near-collision interval.
+
+Figure~\ref{fig:carla-two-condition-profiles}(a,b) reports the empty-shadow
+response.  \CarlaEmptyShadowFinding  The empty-shadow conservatism tax for
+controller $m$ is computed within each scene block as
+$CT_v^{(m)}=\bar v_{\mathrm{ego}}^{\mathrm{IDEAM}}-
+\bar v_{\mathrm{ego}}^{(m)}$.  It therefore quantifies defensive speed loss
+relative to the no-field shared-backbone reference.  The follower-disturbance
+metrics in Table~\ref{tab:carla-two-condition} assess short-horizon traffic
+disturbance rather than long-range traffic-wave formation.  \CarlaFollowerFinding
+
+Figure~\ref{fig:carla-two-condition-profiles}(c,d) reports the corresponding
+true-threat response.  \CarlaTrueThreatFinding  Collision and near-collision
+incidence are reported separately from the continuous clearance trace.  This
+separation prevents a smooth average from masking discrete adverse events.
+
+\begin{figure*}[t]
+\centering
+\includegraphics[width=\textwidth]{\CarlaFigureSixFile}
+\caption{Matched closed-loop response to empty and occupied occlusion shadows.
+(a,b) Ego speed and signed nearest-neighbor oriented-box clearance in the
+empty-shadow condition.  (c,d) The corresponding profiles in the true-threat
+condition.  Faint curves show individual scene blocks, bold curves show their
+means, and bands show descriptive 95\% scene-block bootstrap intervals.  Time
+zero marks semantic-LiDAR reveal in the true-threat arm and its matched event
+time in the empty-shadow arm.}
+\label{fig:carla-two-condition-profiles}
+\end{figure*}
+
+\begin{table*}[t]
+\centering
+\caption{Matched two-condition CARLA results over five randomized scene
+blocks.  Incidence entries report episodes out of five.  Continuous entries
+report the scene-block mean [descriptive 95\% bootstrap interval].  No
+population-level significance inference is made.}
+\label{tab:carla-two-condition}
+\scriptsize
+\setlength{\tabcolsep}{3pt}
+\resizebox{\textwidth}{!}{%
+\begin{tabular}{llcccc}
+\toprule
+Condition & Outcome & DREAM & IDEAM & ADA-sourced & APF-sourced \\
+\midrule
+True threat
+& Collision incidence
+& \CarlaTTCollisionDREAM & \CarlaTTCollisionIDEAM
+& \CarlaTTCollisionADA & \CarlaTTCollisionAPF \\
+& Near-collision incidence
+& \CarlaTTNearDREAM & \CarlaTTNearIDEAM
+& \CarlaTTNearADA & \CarlaTTNearAPF \\
+& Minimum signed OBB clearance (m)
+& \CarlaTTClearDREAM & \CarlaTTClearIDEAM
+& \CarlaTTClearADA & \CarlaTTClearAPF \\
+\midrule
+Empty shadow
+& Mean ego speed (m\,s$^{-1}$)
+& \CarlaESSpeedDREAM & \CarlaESSpeedIDEAM
+& \CarlaESSpeedADA & \CarlaESSpeedAPF \\
+& $CT_v$ relative to IDEAM (m\,s$^{-1}$)
+& \CarlaESCTVdream & 0
+& \CarlaESCTVada & \CarlaESCTVapf \\
+& Minimum signed OBB clearance (m)
+& \CarlaESClearDREAM & \CarlaESClearIDEAM
+& \CarlaESClearADA & \CarlaESClearAPF \\
+& Maximum follower speed loss (m\,s$^{-1}$)
+& \CarlaESFollowLossDREAM & \CarlaESFollowLossIDEAM
+& \CarlaESFollowLossADA & \CarlaESFollowLossAPF \\
+& Hard-braking traffic actors (count)
+& \CarlaESHardBrakeDREAM & \CarlaESHardBrakeIDEAM
+& \CarlaESHardBrakeADA & \CarlaESHardBrakeAPF \\
+\bottomrule
+\end{tabular}
+}
+\end{table*}
+
+\subsubsection{Asynchronous execution and latency exposure}
+\label{sec:asynchronous-execution}
+
+The current high-level optimizer remained slower than its nominal 100-ms
+request period.  Its mean, mean per-run 95th percentile, and maximum service
+times were \CarlaHighLevelMeanMs, \CarlaHighLevelPNinetyFiveMs, and
+\CarlaHighLevelMaxMs~ms, respectively.  At the mean true-threat ego speed of
+\CarlaThreatMeanSpeed~m\,s$^{-1}$, these durations corresponded to
+\CarlaTravelAtMeanLatency, \CarlaTravelAtPNinetyFiveLatency, and
+\CarlaTravelAtMaxLatency~m of travel.  The scheduler coalesced pending
+requests and delivered \CarlaHighLevelRateHz{} completed updates per second.
+It discarded \CarlaDroppedRequestsPct\% of requests that had been superseded
+before execution.
+
+The low-level controller ran at 10~Hz while tracking the latest time-stamped
+plan.  Its mean, 95th-percentile, and maximum execution times were
+\CarlaLowLevelMeanMs, \CarlaLowLevelPNinetyFiveMs, and \CarlaLowLevelMaxMs~ms.  The
+20-Hz physics and control loop required \CarlaPhysicsMeanMs,
+\CarlaPhysicsPNinetyFiveMs, and \CarlaPhysicsMaxMs~ms, respectively.  Neither loop
+missed its scheduled deadline in this experiment.  Lane holding and
+visible-actor emergency braking remained available while a new plan was
+pending.  This tracker and fallback layer was identical in all CARLA arms;
+the controller comparison changed the high-level plan supplied to that common
+execution layer.
+
+\begin{table*}[t]
+\centering
+\caption{Measured asynchronous execution in the five DREAM true-threat runs.
+The 95th-percentile column is the mean of the five within-run percentiles, and
+the maximum column is the largest observed value across all five runs.  Timing
+runs were real-time paced and excluded frame encoding.}
+\label{tab:carla-asynchronous-runtime}
+\small
+\begin{tabular}{lccccc}
+\toprule
+Layer & Nominal period & Mean (ms) & Mean P95 (ms) & Maximum (ms) & Scheduling outcome \\
+\midrule
+High-level optimizer & 100 ms request & 442.1 & 521.0 & 536.1 & 2.33 Hz; 76.3\% coalesced \\
+Low-level controller & 100 ms & 1.493 & 2.029 & 3.420 & 0/300 deadline misses \\
+Physics/control loop & 50 ms & 12.557 & 16.574 & 20.677 & 0/600 deadline misses \\
+\bottomrule
+\end{tabular}
+\end{table*}
+
+Timely low-level execution limits actuation delay but does not remove
+high-level planning latency.  A hidden actor can reveal while the controller
+is still tracking a plan computed from older information.  The measured mean
+delay from reveal to application of a hidden-aware DREAM plan was
+\CarlaRevealPlanDelayMeanS~s
+with a descriptive 95\% scene-block bootstrap interval of
+[\CarlaRevealPlanDelayLowS, \CarlaRevealPlanDelayHighS]; the largest observed
+delay was \CarlaRevealPlanDelayMaxS~s.  At the reported mean ego
+speed, these end-to-end delays correspond to approximately
+\CarlaRevealPlanTravelMeanM{} and \CarlaRevealPlanTravelMaxM{}~m of travel,
+respectively.  The 10-Hz layer must
+therefore be interpreted as an execution mechanism, not as a safety
+certificate.  These measurements demonstrate an implemented asynchronous
+proof of concept.  They do not establish 10-Hz feasibility of the current
+high-level optimizer or guaranteed safety during an aggressive reveal.
