@@ -1,7 +1,7 @@
 # CARLA closed-loop occlusion validation
 
 This directory contains the reproducible CARLA 0.9.14 experiment used for the
-revised Section 4.4 and Figure 6. It evaluates the converging-overtake scenario
+ Section 4.4 and Figure 6. It evaluates the converging-overtake scenario
 under two matched conditions:
 
 - `empty_shadow`: the occluded volume contains no hidden vehicle;
@@ -21,7 +21,7 @@ change was introduced between the earlier four-arm pilot and this bank.
 The files `analyze_carla_converging_bank.py`,
 `plot_carla_paper_validation.py`, `frozen_bank/n5_v19`, and
 `results/pilot_n5_v19` are retained only as an explicitly archived development
-record; they do not supply the revised estimates.
+record.
 
 ## Controller identities and baseline fidelity
 
@@ -34,8 +34,7 @@ record; they do not supply the revised estimates.
 
 `OA_CMPC/oa_cmpc_source.py` is retained only as a clearly marked archival
 single-branch risk-source surrogate. It does **not** reproduce the published
-OA-CMPC dual-/multi-branch contingency optimizer and is excluded from every
-revised figure, table, and comparative claim. See
+OA-CMPC dual-/multi-branch contingency optimizer. See
 `manuscript/baseline_code_map.md` and
 `manuscript/baseline_implementation_fidelity_table.tex` for the complete
 fidelity audit.
@@ -80,7 +79,7 @@ timing evidence.
   and the supplied PDF/PNG figure.
 - `manuscript/section_4_4_carla_two_condition.tex`: manuscript-ready subsection.
 - `manuscript/baseline_fidelity_rebuttal.tex`: reviewer response on baseline
-  fidelity and the revised comparison.
+  fidelity and the comparison.
 - `release_manifest.json`: SHA-256 inventory of the active v20 code, evidence,
   figures, tests, and manuscript files.
 
