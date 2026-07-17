@@ -10,6 +10,6 @@
 - `carla_v20_results_summary.md`: concise evidence and artifact index.
 
 The obsolete v19 manuscript and rebuttal drafts are intentionally excluded
-from this release directory. `baseline_fidelity_rebuttal.tex` retains one
-explicit placeholder for the immutable commit URL; replace it only after this
-release has actually been committed and pushed.
+from this release directory. `baseline_fidelity_rebuttal.tex` cites the
+immutable v20 code-and-evidence commit
+`d5f82961eb92ae305741f0f062b842b3a6e25d76`.
