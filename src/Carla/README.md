@@ -189,10 +189,3 @@ shared the same immediate visible-actor safety supervisor, lane-hold fallback,
 and 10 Hz tracker. This is an implemented asynchronous proof of concept, not a
 10 Hz high-level real-time or formal sudden-reveal safety guarantee.
 
-## Manuscript placement
-
-Use `figures/figure6_carla_speed_clearance.pdf` for the revised Figure 6 and
-`manuscript/section_4_4_carla_two_condition.tex` for Section 4.4. Figure 6
-provides aggregate reveal-aligned speed and physical-clearance evidence;
-Figure 7 remains a representative mixed-traffic mechanism illustration. Do
-not use the withdrawn OA surrogate in the old Figure 8 or runtime table.
