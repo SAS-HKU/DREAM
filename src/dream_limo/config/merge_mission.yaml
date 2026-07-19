@@ -1,0 +1,19 @@
+frame_id: map
+
+# Mission semantics, not a surveyed scene map. The live world model discovers
+# visibility boundaries from /scan and visible moving agents from public SFG
+# tracks. The first wheel-odometry pose is anchored at the left-lane start.
+lanes:
+  width: 0.45
+  centers: [0.45, 0.0, -0.45]
+
+# Both experiment arms receive the same requested maneuver. DREAM may veto or
+# delay it from perceived risk; pure_mpc supplies the no-risk baseline.
+route:
+  target_lane: 1
+  merge_request_x: 0.35
+  merge_path_x: [2.80, 3.80]
+  conflict_zone_x: [3.30, 5.30]
+
+# Intentionally no obstacles. Live scene geometry must not leak from YAML.
+obstacles: []

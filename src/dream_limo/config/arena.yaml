@@ -1,0 +1,21 @@
+frame_id: map
+lanes:
+  width: 0.45
+  centers: [0.45, 0.0, -0.45]
+
+# Both experiment arms receive this identical route-level merge objective.
+# DREAM may veto it using sensed occlusion risk; pure_mpc may not.
+route:
+  target_lane: 1
+  merge_request_x: 0.35
+  merge_path_x: [2.80, 3.80]
+  conflict_zone_x: [3.30, 5.30]
+
+# Deterministic SIL-only scene. Live sensor launches use merge_mission.yaml and
+# first-return LiDAR visibility; they do not inject this truck into DRIFT/MPC.
+obstacles:
+  - id: truck
+    class: truck
+    center: [2.40, 0.0]
+    size: [1.20, 0.24]
+    heading: 0.0

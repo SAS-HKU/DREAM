@@ -1,0 +1,9 @@
+# Versions validated on the LIMO onboard x86_64 ROS 2 Humble environment.
+# Install these explicitly before building; setup.py deliberately does not
+# resolve heavy numerical dependencies during a colcon build.
+numpy==1.26.4
+scipy==1.13.0
+cvxpy==1.7.5
+osqp==1.1.1
+casadi==3.7.2
+PyYAML>=5.4
