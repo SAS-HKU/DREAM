@@ -1,0 +1,129 @@
+dream_state_estimator:
+  ros__parameters:
+    odom_topic: /wheel/odom
+    imu_topic: /imu
+    output_topic: /dream/ego_state
+    arena_frame: map
+    odom_frame: odom
+    base_frame: base_link
+    map_to_odom_x: 0.0
+    map_to_odom_y: 0.0
+    map_to_odom_yaw: 0.0
+    # For a short local experiment, map is anchored automatically when the
+    # first wheel-odometry sample arrives. The desired pose is the mission's
+    # left-lane start, not a manually surveyed obstacle pose.
+    initialize_from_first_odom: true
+    initial_map_x: 0.35
+    initial_map_y: 0.45
+    initial_map_yaw: 0.0
+    alignment_topic: /dream/map_alignment
+    publish_map_to_odom_tf: true
+
+dream_world_model:
+  ros__parameters:
+    ego_topic: /dream/ego_state
+    scan_topic: /scan
+    tracked_agents_topic: /tracked_agents
+    tracked_agents_frame: odom
+    arena_frame: map
+    # Live deployment derives unseen cells from measured /scan first returns.
+    # SIL overrides this with surveyed_polygon for deterministic replay.
+    occlusion_source: lidar_first_return
+    map_to_odom_x: 0.0
+    map_to_odom_y: 0.0
+    map_to_odom_yaw: 0.0
+    alignment_topic: /dream/map_alignment
+    laser_x: 0.10
+    laser_y: 0.0
+    laser_yaw: 0.0
+    track_timeout: 0.8
+    ego_timeout: 0.30
+    scan_timeout: 0.40
+    use_merger_odom: false
+    merger_odom_topic: /merger/wheel/odom
+
+dream_drift_field:
+  ros__parameters:
+    update_rate: 5.0
+    input_timeout: 0.50
+    warmup_duration: 5.0
+
+dream_planner:
+  ros__parameters:
+    preset: balanced
+    update_rate: 5.0
+    input_timeout: 0.50
+    route_intent_enabled: true
+    maximum_allowed_cbf_slack: 0.05
+
+dream_command_adapter:
+  ros__parameters:
+    allow_differential: false
+    publish_rate: 20.0
+    control_timeout: 0.50
+    status_timeout: 1.25
+
+dream_safety_supervisor:
+  ros__parameters:
+    publish_rate: 20.0
+
+dream_metrics:
+  ros__parameters:
+    ego_topic: /dream/ego_state
+    merger_odom_topic: /merger/wheel/odom
+    merger_visible_topic: /dream/merger_visible
+    planner_status_topic: /dream/planner_status
+    map_to_odom_x: 0.0
+    map_to_odom_y: 0.0
+    map_to_odom_yaw: 0.0
+    alignment_topic: /dream/map_alignment
+
+dream_visualization:
+  ros__parameters:
+    ego_topic: /dream/ego_state
+    world_topic: /dream/world_model
+    merger_odom_topic: /merger/wheel/odom
+    map_to_odom_x: 0.0
+    map_to_odom_y: 0.0
+    map_to_odom_yaw: 0.0
+    alignment_topic: /dream/map_alignment
+
+dream_camera_evidence:
+  ros__parameters:
+    source_topic: /camera/color/image_raw
+    publish_rate: 5.0
+    source_timeout: 0.35
+    minimum_width: 320
+    minimum_height: 200
+
+# Controlled occluded-merge perception adapter. The upstream SFG node supplies
+# neutral geometry on /sfg/lidar_clusters; DREAM owns the vehicle assumption,
+# motion confirmation, and /tracked_agents output. Static clusters are withheld.
+dream_vehicle_tracker:
+  ros__parameters:
+    clusters_topic: /sfg/lidar_clusters
+    tracked_agents_topic: /tracked_agents
+    markers_topic: /dream/vehicle_track_markers
+    status_topic: /dream/vehicle_tracker_status
+    fixed_frame: odom
+    class_label: car
+    publish_rate_hz: 10.0
+    input_timeout_sec: 0.50
+    minimum_cluster_width_m: 0.08
+    maximum_cluster_width_m: 0.50
+    minimum_cluster_points: 3
+    minimum_cluster_range_m: 0.25
+    maximum_cluster_range_m: 6.0
+    association_distance_m: 0.45
+    velocity_alpha: 0.45
+    position_alpha: 0.70
+    coast_timeout_sec: 0.50
+    stale_remove_sec: 1.00
+    minimum_track_hits: 3
+    motion_window_sec: 0.50
+    motion_enter_speed_mps: 0.10
+    motion_exit_speed_mps: 0.04
+    motion_min_displacement_m: 0.08
+    motion_hold_sec: 0.80
+    nominal_radius_m: 0.18
+    radius_padding_m: 0.04
