@@ -16,12 +16,20 @@ def generate_launch_description():
     use_merger_odom = LaunchConfiguration("use_merger_odom")
     require_camera_evidence = LaunchConfiguration("require_camera_evidence")
     require_perceived_occlusion = LaunchConfiguration("require_perceived_occlusion")
+    expected_cmd_vel_owner = LaunchConfiguration("expected_cmd_vel_owner")
+    expected_arm_owner = LaunchConfiguration("expected_arm_owner")
+    enforce_map_bounds = LaunchConfiguration("enforce_map_bounds")
+    latch_perceived_occlusion = LaunchConfiguration("latch_perceived_occlusion")
     return LaunchDescription(
         [
             DeclareLaunchArgument("preset", default_value="balanced"),
             DeclareLaunchArgument("use_merger_odom", default_value="false"),
             DeclareLaunchArgument("require_camera_evidence", default_value="false"),
             DeclareLaunchArgument("require_perceived_occlusion", default_value="false"),
+            DeclareLaunchArgument("expected_cmd_vel_owner", default_value=""),
+            DeclareLaunchArgument("expected_arm_owner", default_value=""),
+            DeclareLaunchArgument("enforce_map_bounds", default_value="false"),
+            DeclareLaunchArgument("latch_perceived_occlusion", default_value="false"),
             Node(
                 package="dream_limo",
                 executable="dream_state_estimator",
@@ -51,7 +59,14 @@ def generate_launch_description():
                 executable="dream_planner",
                 name="dream_planner",
                 output="screen",
-                parameters=[params, {"preset": preset, "arena_file": mission}],
+                parameters=[
+                    params,
+                    {
+                        "preset": preset,
+                        "arena_file": mission,
+                        "enforce_map_bounds": enforce_map_bounds,
+                    },
+                ],
             ),
             Node(
                 package="dream_limo",
@@ -83,6 +98,9 @@ def generate_launch_description():
                     {
                         "require_camera_evidence": require_camera_evidence,
                         "require_perceived_occlusion": require_perceived_occlusion,
+                        "expected_cmd_vel_owner": expected_cmd_vel_owner,
+                        "expected_arm_owner": expected_arm_owner,
+                        "latch_perceived_occlusion": latch_perceived_occlusion,
                     }
                 ],
             ),

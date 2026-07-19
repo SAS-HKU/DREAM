@@ -176,7 +176,10 @@ class MPCConfig:
     minimum_speed: float = 0.0
     maximum_acceleration: float = 0.35
     minimum_acceleration: float = -0.50
-    maximum_steer: float = radians(25.0)
+    # The installed driver forwards Twist.angular.z as the raw firmware
+    # steering field. Its inner-wheel limit corresponds to about 23.4 degrees
+    # at the bicycle center, so keep the MPC model below that saturation.
+    maximum_steer: float = radians(23.0)
     maximum_steer_rate: float = radians(60.0)
     wheelbase: float = 0.20
     robot_length: float = 0.22
@@ -223,6 +226,7 @@ class SafetyConfig:
     maximum_acceleration: float = 0.35
     front_stop_distance: float = 0.25
     front_sector_half_angle: float = radians(28.0)
+    collision_inflation_margin: float = 0.05
     planner_timeout: float = 0.50
     odom_timeout: float = 0.25
     scan_timeout: float = 0.40

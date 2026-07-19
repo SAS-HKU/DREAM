@@ -20,6 +20,10 @@ def generate_launch_description():
     dream_params = os.path.join(dream_share, "config", "dream_limo.yaml")
     model = LaunchConfiguration("model")
     rviz = LaunchConfiguration("rviz")
+    expected_cmd_vel_owner = LaunchConfiguration("expected_cmd_vel_owner")
+    expected_arm_owner = LaunchConfiguration("expected_arm_owner")
+    enforce_map_bounds = LaunchConfiguration("enforce_map_bounds")
+    latch_perceived_occlusion = LaunchConfiguration("latch_perceived_occlusion")
 
     return LaunchDescription(
         [
@@ -29,6 +33,10 @@ def generate_launch_description():
                 description="Planner arm: balanced (DREAM) or pure_mpc (baseline).",
             ),
             DeclareLaunchArgument("rviz", default_value="true"),
+            DeclareLaunchArgument("expected_cmd_vel_owner", default_value=""),
+            DeclareLaunchArgument("expected_arm_owner", default_value=""),
+            DeclareLaunchArgument("enforce_map_bounds", default_value="false"),
+            DeclareLaunchArgument("latch_perceived_occlusion", default_value="false"),
             # Reuse only SFG's neutral scan-to-cluster public front end.  Do not
             # start its pedestrian detector, generic tracker, or planner here.
             Node(
@@ -51,6 +59,10 @@ def generate_launch_description():
                     "preset": model,
                     "use_merger_odom": "false",
                     "rviz": rviz,
+                    "expected_cmd_vel_owner": expected_cmd_vel_owner,
+                    "expected_arm_owner": expected_arm_owner,
+                    "enforce_map_bounds": enforce_map_bounds,
+                    "latch_perceived_occlusion": latch_perceived_occlusion,
                 }.items(),
             ),
         ]

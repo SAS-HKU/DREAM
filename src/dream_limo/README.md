@@ -2,8 +2,9 @@
 
 ROS 2 Humble deployment of the DREAM occlusion-aware planning framework on an
 AgileX LIMO. This package is a sibling of `sfg_nav`: it does not import, copy,
-or modify SFG source code. Integration is through the public `/tracked_agents`
-topic and standard ROS messages.
+or modify SFG source code. Integration is through SFG's public neutral
+`/sfg/lidar_clusters` output, DREAM's `/tracked_agents` convention, and standard
+ROS messages.
 
 The implementation is pinned to DREAM commit
 `0d298cd6de11c268224173a4d75770e934fd0861`. See
@@ -12,20 +13,28 @@ The implementation is pinned to DREAM commit
 
 ## Safety and current status
 
-> **This repository does not yet authorize physical autonomous motion.**
+> **Physical output is implemented, but this audited robot is not commissioned
+> for motion yet. Keep it stopped until every physical gate below is verified.**
 
-- No included launch file publishes `/cmd_vel`.
-- SIL and live sensor launches end at `/cmd_vel_test`.
-- Do not remap `/cmd_vel_test` to `/cmd_vel`.
-- The live procedure below is a stationary perception/planning dry run.
-- Keep the LIMO chocked or lifted, keep a human at the hardware stop, and stop
-  every competing navigation, teleop, or test-command node before starting.
-- Passing DREAM preflight only qualifies the stationary dry run.
+- SIL and ordinary live-sensor launches still end at `/cmd_vel_test`.
+- Only `dream_hardware_motion.launch.py` starts the reviewed `/cmd_vel` gate.
+  Its checked-in defaults publish a continuous zero command and cannot arm.
+- Never remap `/cmd_vel_test` to `/cmd_vel`.
+- The July 2026 audit found `motion_mode=0` (differential) and `/dev/input/js0`
+  owned by NoMachine rather than a physical joystick. Both are motion blockers.
+- Keep a human at an independent hardware/power stop, and stop every competing
+  navigation, teleop, or command node before hardware commissioning.
+- Passing DREAM preflight is necessary but never sufficient to move.
 
 The safety path fails closed on stale inputs, invalid/fallback MPC output,
 non-finite values, CBF slack above `0.05`, loss of the 0.75 s held-to-run
 heartbeat, a front LiDAR stop, or the wrong drive mode. Raw Ackermann
-`Twist.angular.z` is capped independently at `0.198`.
+`Twist.angular.z` is capped independently at `0.198`. The physical boundary
+adds exact publisher ownership, a retained/inflated LiDAR trajectory gate,
+fresh world/DRIFT/MPC checks, a second software watchdog, a 0.15 m/s
+commissioning cap, and independent speed/steering slew limits. Any failed
+condition outputs zero; the separate platform stale-command test is still
+mandatory because the installed base driver itself has no watchdog.
 
 ## Implemented experiment
 
@@ -57,10 +66,22 @@ adaptation; it is not a claim of reproducing every upstream highway DFS mode.
 3. `dream_drift_field`: CFL-checked DRIFT PDE, five-second warm-up, raw field,
    RViz risk grid, and occlusion mask.
 4. `dream_planner`: reduced IDEAM decision, DREAM veto, and local MPC-CBF.
+   The hardware launch additionally requires footprint-safe grid/road bounds;
+   their presence is reported in every accepted planner status.
 5. `dream_command_adapter`: drive-mode gate and LIMO Ackermann conversion.
 6. `dream_safety_supervisor`: independent watchdog and dry-run-only output.
 7. `dream_camera_evidence`: untouched and annotated front-camera evidence;
    camera data is never a planner input.
+8. `dream_collision_monitor`: transforms
+   each scan at its sensor timestamp, retains/inflates first-return surfaces,
+   treats LiDAR shadow and off-road space as non-traversable, and checks the
+   densely interpolated reference trajectory. It publishes no command topic.
+9. `dream_hardware_deadman`: accepts only one reviewed `joy_node` owner and
+   publishes a 20 Hz arm heartbeat only while two configured buttons are held;
+   a third button requests a latched stop.
+10. `dream_hardware_command_gate`: the sole physical `/cmd_vel` publisher. It
+    continuously rechecks all safety/status owners and heartbeats and otherwise
+    publishes zero at 20 Hz.
 
 The MPC is included in `dream_limo`; it uses CasADi for bicycle-model
 dynamics/Jacobians and CVXPY+OSQP for the QP. ROS `mpc_local_planner` is not
@@ -178,6 +199,17 @@ does not start SFG's pedestrian detector, SFG tracker, or SFG planner. The SIL
 command moves a simulated ego in closed loop. The live command deliberately
 ends at `/cmd_vel_test` and does not move the physical LIMO.
 
+To inspect the complete hardware graph without allowing motion, use the same
+model selector. This owns `/cmd_vel` but publishes only zeros:
+
+```bash
+ROS_DOMAIN_ID=0 ros2 launch dream_limo dream_hardware_motion.launch.py \
+  model:=balanced
+```
+
+Do not add the enabling arguments until the commissioning checklist in
+“Physical motion commissioning” has passed on that specific robot.
+
 ## Perceived scene versus mission intent
 
 The stationary real-sensor launch does **not** require the occluder's center,
@@ -205,11 +237,13 @@ The occluder must still physically intersect the measured LiDAR plane and the
 camera line of sight. That is sensor installation/experiment validation, not a
 manually entered scene polygon.
 
-This first-return mode is intentionally stationary-only. It discovers unseen
-space, but one stationary 2-D scan cannot always recover the far face or full
-footprint of a long occluder. Physical motion remains blocked until a stable
-scan-derived collision envelope is captured, quality-checked, and supplied to
-MPC/CBF; unknown extent must fail closed.
+One 2-D scan cannot always recover the far face or complete footprint of a long
+occluder. The hardware collision monitor therefore treats the measured shadow
+as unknown/non-traversable, retains first-return surfaces briefly, inflates
+them by the robot half-diagonal plus margin, and rejects any reference path
+touching unknown, occupied, off-road, or outside-grid space. This is a final
+trajectory gate; it does not fabricate unseen geometry or leak the hidden
+merger into the vehicle list.
 
 ## Run 1: headless replay
 
@@ -462,7 +496,9 @@ ros2 bag record \
   /dream/planner_status /dream/reference_trajectory /dream/control \
   /dream/cmd_vel_candidate /cmd_vel_test \
   /dream/adapter_status /dream/safety_status \
-  /dream/preflight_status /dream/metrics
+  /dream/collision_grid /dream/collision_status \
+  /dream/deadman_status /dream/hardware_gate_status \
+  /dream/preflight_status /dream/metrics /joy /cmd_vel
 ```
 
 After stopping the bag, run `ros2 bag info <bag-directory>` and verify nonzero
@@ -477,28 +513,75 @@ QoS.
 4. Stop `limo_bringup` last.
 5. Confirm no command publishers or leftover nodes remain.
 
-## Physical A/B protocol — not yet enabled
+## Physical motion commissioning
 
-When a separately reviewed hardware output launch exists, run balanced DREAM
-and pure MPC with identical geometry, initial pose, merger timing, perception
-provider, safety supervisor, and rosbag topic set. Change only `preset`.
+The code path exists, but do not enable it from the currently audited state.
+First satisfy and record every item below:
 
+1. Lift/chock the robot, clear the arena, assign one human to the independent
+   hardware/power stop, and confirm `/cmd_vel` has no publisher before launch.
+2. Mechanically configure both steering latches for Ackermann and verify
+   `/limo_status.motion_mode == 1`; this cannot be changed by a ROS parameter.
+3. Connect and positively identify a physical joystick. `ros2 run joy
+   joy_enumerate_devices` and `/dev/input/by-id` must identify it; the NoMachine
+   virtual `js0` is not acceptable. Verify the chosen hold/confirm/stop button
+   indices while lifted.
+4. With wheels lifted and the human stop present, characterize the base
+   firmware's stale-command behavior. The installed ROS driver has no watchdog,
+   so `platform_watchdog_verified` must remain false until a separate test shows
+   that loss of the sole publisher stops the chassis within the accepted time.
+5. Survey the 0.45 m lane spacing, place the robot at the checked-in left-lane
+   start pose and heading, and verify the RViz `map`, road, scan, collision grid,
+   shadow, and reference trajectory agree. This is what
+   `staging_pose_verified` asserts; obstacle geometry is still perceived.
+6. Run the zero-output commissioning launch above. Require exact owners plus
+   fresh `preflight`, `world`, `drift`, `planner`, `safety`, `collision`, and
+   `deadman` status. Collision must be ready and trajectory-clear. Preflight
+   latches the initial measured route-shadow evidence so the later physical
+   reveal is permitted, but it never latches stale world/scan readiness.
+
+Useful read-only checks while that launch is running:
+
+```bash
+ros2 topic info /cmd_vel --verbose
+ros2 topic echo /dream/hardware_gate_status --full-length --once
+ros2 topic echo /dream/collision_status --full-length --once
+ros2 topic echo /dream/preflight_status --full-length --once
+ros2 topic echo /limo_status --field motion_mode --once
+```
+
+Only after those physical checks have actually passed, the reviewed first-motion
+command is:
+
+```bash
+ROS_DOMAIN_ID=0 ros2 launch dream_limo dream_hardware_motion.launch.py \
+  model:=balanced \
+  start_joy:=true joy_device_id:=<PHYSICAL_DEVICE_ID> \
+  deadman_device_verified:=true \
+  staging_pose_verified:=true \
+  platform_watchdog_verified:=true \
+  operator_kill_verified:=true \
+  enable_physical_motion:=true
+```
+
+The robot remains stopped until both deadman buttons are held continuously and
+the three-second countdown completes. Releasing either button or losing any
+input/status heartbeat commands zero immediately. The initial gate caps speed
+at 0.15 m/s even though the package-wide upper bound is 0.6 m/s. A stop-button,
+collision-bubble, or supervisor latch requires shutdown, root-cause review, and
+a clean relaunch; do not reset it in-place to continue a run.
+
+For the physical A/B, run balanced DREAM and pure MPC sequentially with
+identical geometry, initial pose, merger timing, perception provider, safety
+supervisor, and rosbag topic set. Change only `model:=pure_mpc` for baseline.
 Required metrics include reveal time, route-aware projected conflict-arrival
 margin, minimum clearance, conflict-zone overlap, ego speed/acceleration/jerk,
 veto activations, risk at ego, solver timing, planner rejection, and supervisor
 trigger counts.
 
-Before physical output can be added, this installation still requires:
-
-- a temporally stable scan-derived occluder envelope with bounded downstream
-  extent, route overlap, confidence diagnostics, and fail-closed loss handling;
-- verified mission lane spacing and merge intent;
-- measured camera and LiDAR height/extrinsics;
-- verified Ackermann `motion_mode=1` and steering conversion;
-- a demonstrated human-held kill control;
-- static-world tracking validation;
-- timing acceptance for the chosen 5 Hz deadline;
-- a hardware-only preflight and sole reviewed `/cmd_vel` publisher.
+The current machine still needs the physical checks above, measured camera
+extrinsics for geometric fusion (the camera is evidence-only today), static
+world tracking validation, and timing acceptance for the chosen 5 Hz deadline.
 
 ## Troubleshooting
 

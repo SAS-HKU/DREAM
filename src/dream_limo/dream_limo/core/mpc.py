@@ -77,13 +77,16 @@ class KinematicBicycleModel:
 
 
 class RiskAwareMPC:
-    def __init__(self, config: DeploymentConfig) -> None:
+    def __init__(
+        self, config: DeploymentConfig, *, enforce_map_bounds: bool = False
+    ) -> None:
         self.deployment = config
         self.config = config.mpc
         self.model = KinematicBicycleModel(self.config.dt, self.config.wheelbase)
         self.last_states: Optional[Array] = None
         self.last_controls: Optional[Array] = None
         self.last_applied_control = np.zeros(2, dtype=np.float64)
+        self.enforce_map_bounds = bool(enforce_map_bounds)
 
     def reset(self) -> None:
         self.last_states = None
@@ -226,6 +229,33 @@ class RiskAwareMPC:
                 control[1, :] <= self.config.maximum_steer,
             )
         )
+        if self.enforce_map_bounds:
+            # Physical deployment keeps the complete circular safety footprint
+            # inside the same grid/road corridor as the final collision gate.
+            # Deterministic legacy SIL leaves this off because its surveyed
+            # truck ellipse intentionally overlaps that conservative corridor.
+            footprint_radius = hypot(
+                0.5 * self.config.robot_length,
+                0.5 * self.config.robot_width,
+            ) + self.deployment.safety.collision_inflation_margin
+            grid = self.deployment.grid
+            quantization = 0.5 * grid.resolution
+            center_x_min = grid.x_min + footprint_radius - quantization
+            center_x_max = grid.x_max - footprint_radius + quantization
+            center_y_min = grid.road_y_min + footprint_radius - quantization
+            center_y_max = grid.road_y_max - footprint_radius + quantization
+            if center_x_min >= center_x_max or center_y_min >= center_y_max:
+                raise ValueError("collision footprint leaves no drivable MPC corridor")
+            constraints.extend(
+                (
+                    state[0, 1:] >= center_x_min,
+                    state[0, 1:] <= center_x_max,
+                    # Steering affects lateral position one model step later;
+                    # allow two steps to recover a small measured deviation.
+                    state[1, 2:] >= center_y_min,
+                    state[1, 2:] <= center_y_max,
+                )
+            )
         steer_delta_limit = self.config.maximum_steer_rate * self.config.dt
         constraints.extend(
             (

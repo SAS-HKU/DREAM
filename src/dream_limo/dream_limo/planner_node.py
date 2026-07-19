@@ -38,6 +38,7 @@ class DreamPlannerNode(Node):
         self.declare_parameter(
             "maximum_allowed_cbf_slack", self.config.mpc.maximum_allowed_cbf_slack
         )
+        self.declare_parameter("enforce_map_bounds", False)
         self.declare_parameter("arena_file", "")
         self.config = deployment_config_for_arena(
             str(self.get_parameter("arena_file").value)
@@ -51,7 +52,12 @@ class DreamPlannerNode(Node):
             self.config,
             blocker_trigger_distance=float(self.get_parameter("blocker_trigger_distance").value),
         )
-        self.mpc = RiskAwareMPC(self.config)
+        self.mpc = RiskAwareMPC(
+            self.config,
+            enforce_map_bounds=bool(
+                self.get_parameter("enforce_map_bounds").value
+            ),
+        )
         self.ego: Optional[EgoState] = None
         self.ego_receipt: Optional[float] = None
         self.vehicles: List[Vehicle] = []
@@ -276,6 +282,7 @@ class DreamPlannerNode(Node):
                 "mpc_fallback": result.used_fallback,
                 "maximum_cbf_slack": result.maximum_slack,
                 "maximum_allowed_cbf_slack": maximum_allowed_slack,
+                "map_bounds_enforced": self.mpc.enforce_map_bounds,
             },
             separators=(",", ":"),
         )

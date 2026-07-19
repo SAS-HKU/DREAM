@@ -19,6 +19,9 @@ def test_formula_correct_similarity_values():
     assert config.scale.speed(10.0) == 0.5
     assert config.scale.acceleration(1.0) == 0.025
     assert config.mpc.minimum_speed == 0.0
+    assert config.mpc.maximum_steer < np.deg2rad(23.4)
+    assert config.safety.collision_inflation_margin == 0.05
+    assert config.mpc.cbf_slack_weight == 2.0e4
 
 
 def test_pde_operator_is_similarity_invariant():
