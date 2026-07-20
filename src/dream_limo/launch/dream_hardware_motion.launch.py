@@ -2,28 +2,59 @@
 
 Starting this launch with its checked-in defaults continuously publishes zero
 on /cmd_vel.  Nonzero output needs explicit commissioning assertions plus all
-fresh runtime safety gates and a held two-button physical joystick chord.
+fresh runtime safety gates.  A validated RViz/ROS goal is the default mission
+activation method.  ``auto_forward`` starts the same surveyed merge mission
+without an RViz click; the legacy held-to-run joystick remains opt-in.
 """
 
 import os
+from math import isfinite
 
 from ament_index_python.packages import get_package_share_directory
 from launch import LaunchDescription
-from launch.actions import DeclareLaunchArgument, IncludeLaunchDescription
+from launch.actions import (
+    DeclareLaunchArgument,
+    IncludeLaunchDescription,
+    OpaqueFunction,
+)
 from launch.conditions import IfCondition
 from launch.launch_description_sources import PythonLaunchDescriptionSource
-from launch.substitutions import LaunchConfiguration
+from launch.substitutions import LaunchConfiguration, PythonExpression
 from launch_ros.actions import Node
 from launch_ros.parameter_descriptions import ParameterValue
+
+
+def _validated_target_speed(value):
+    """Return a commissioned speed or raise a launch-facing error."""
+    try:
+        speed = float(value)
+    except (TypeError, ValueError) as error:
+        raise RuntimeError(
+            "target_speed must be a number in (0.03, 0.15] m/s; "
+            f"received {value!r}"
+        ) from error
+    if not isfinite(speed) or not 0.03 < speed <= 0.15:
+        raise RuntimeError(
+            "target_speed must be finite and in (0.03, 0.15] m/s; "
+            f"received {value!r}. Start commissioning at 0.05 m/s."
+        )
+    return speed
+
+
+def _validate_target_speed(context):
+    _validated_target_speed(LaunchConfiguration("target_speed").perform(context))
+    return []
 
 
 def generate_launch_description():
     share = get_package_share_directory("dream_limo")
     params = os.path.join(share, "config", "dream_limo.yaml")
+    mission = os.path.join(share, "config", "merge_mission.yaml")
     live_launch = os.path.join(share, "launch", "dream_live_demo.launch.py")
 
     model = LaunchConfiguration("model")
     rviz = LaunchConfiguration("rviz")
+    activation_mode = LaunchConfiguration("activation_mode")
     enable_physical_motion = LaunchConfiguration("enable_physical_motion")
     staging_pose_verified = LaunchConfiguration("staging_pose_verified")
     platform_watchdog_verified = LaunchConfiguration("platform_watchdog_verified")
@@ -44,6 +75,33 @@ def generate_launch_description():
     target_reference_x = LaunchConfiguration("merger_target_reference_x")
     target_reference_y = LaunchConfiguration("merger_target_reference_y")
     target_reference_yaw = LaunchConfiguration("merger_target_reference_yaw")
+    auto_forward_mode = PythonExpression(
+        ["'", activation_mode, "' == 'auto_forward'"]
+    )
+    authorizer_mode = PythonExpression(
+        [
+            "'",
+            activation_mode,
+            "' in ('goal', 'auto_forward')",
+        ]
+    )
+    joystick_mode = PythonExpression(["'", activation_mode, "' == 'joystick'"])
+    start_joy_in_joystick_mode = PythonExpression(
+        [
+            "'",
+            activation_mode,
+            "' == 'joystick' and '",
+            start_joy,
+            "'.lower() == 'true'",
+        ]
+    )
+    expected_arm_owner = PythonExpression(
+        [
+            "'dream_goal_authorizer' if '",
+            activation_mode,
+            "' in ('goal', 'auto_forward') else 'dream_hardware_deadman'",
+        ]
+    )
 
     return LaunchDescription(
         [
@@ -52,6 +110,16 @@ def generate_launch_description():
                 default_value="balanced",
                 choices=["balanced", "pure_mpc"],
                 description="DREAM or matched pure-MPC experiment arm.",
+            ),
+            DeclareLaunchArgument(
+                "activation_mode",
+                default_value="goal",
+                choices=["goal", "auto_forward", "joystick"],
+                description=(
+                    "Mission activation: validated /goal_pose (default), the "
+                    "configured forward merge mission, or legacy held-to-run "
+                    "joystick."
+                ),
             ),
             DeclareLaunchArgument("rviz", default_value="true"),
             DeclareLaunchArgument("enable_physical_motion", default_value="false"),
@@ -63,8 +131,11 @@ def generate_launch_description():
             DeclareLaunchArgument("joy_device_id", default_value="0"),
             DeclareLaunchArgument(
                 "target_speed",
-                default_value="0.15",
-                description="MPC cruise speed; matched to the first-motion hardware cap.",
+                default_value="0.05",
+                description=(
+                    "MPC cruise speed and final hardware cap; start at 0.05 m/s "
+                    "and do not exceed 0.15 m/s during commissioning."
+                ),
             ),
             DeclareLaunchArgument(
                 "use_merger_odom",
@@ -91,15 +162,17 @@ def generate_launch_description():
             DeclareLaunchArgument("merger_target_reference_x", default_value="0.0"),
             DeclareLaunchArgument("merger_target_reference_y", default_value="0.0"),
             DeclareLaunchArgument("merger_target_reference_yaw", default_value="0.0"),
+            OpaqueFunction(function=_validate_target_speed),
             IncludeLaunchDescription(
                 PythonLaunchDescriptionSource(live_launch),
                 launch_arguments={
                     "model": model,
                     "rviz": rviz,
                     "expected_cmd_vel_owner": "dream_hardware_command_gate",
-                    "expected_arm_owner": "dream_hardware_deadman",
+                    "expected_arm_owner": expected_arm_owner,
                     "enforce_map_bounds": "true",
                     "latch_perceived_occlusion": "true",
+                    "require_mission_goal": authorizer_mode,
                     "target_speed": target_speed,
                     "use_merger_odom": use_merger_odom,
                 }.items(),
@@ -143,6 +216,23 @@ def generate_launch_description():
             ),
             Node(
                 package="dream_limo",
+                executable="dream_goal_authorizer",
+                name="dream_goal_authorizer",
+                output="screen",
+                condition=IfCondition(authorizer_mode),
+                parameters=[
+                    params,
+                    {
+                        "arena_file": mission,
+                        "enabled": True,
+                        "auto_start": ParameterValue(
+                            auto_forward_mode, value_type=bool
+                        ),
+                    },
+                ],
+            ),
+            Node(
+                package="dream_limo",
                 executable="dream_collision_monitor",
                 name="dream_collision_monitor",
                 output="screen",
@@ -153,7 +243,7 @@ def generate_launch_description():
                 executable="joy_node",
                 name="joy_node",
                 output="screen",
-                condition=IfCondition(start_joy),
+                condition=IfCondition(start_joy_in_joystick_mode),
                 parameters=[
                     {
                         "device_id": ParameterValue(joy_device_id, value_type=int),
@@ -167,6 +257,7 @@ def generate_launch_description():
                 executable="dream_hardware_deadman",
                 name="dream_hardware_deadman",
                 output="screen",
+                condition=IfCondition(joystick_mode),
                 parameters=[params, {"enabled": deadman_device_verified}],
             ),
             Node(
@@ -181,6 +272,7 @@ def generate_launch_description():
                         "staging_pose_verified": staging_pose_verified,
                         "platform_watchdog_verified": platform_watchdog_verified,
                         "operator_kill_verified": operator_kill_verified,
+                        "expected_deadman_owner": expected_arm_owner,
                         "maximum_speed": ParameterValue(
                             target_speed, value_type=float
                         ),

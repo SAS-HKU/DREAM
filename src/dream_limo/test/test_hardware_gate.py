@@ -62,6 +62,29 @@ def _evaluate(
     )
 
 
+def _complete_readiness_countdown(
+    core: HardwareCommandGateCore,
+    start: float,
+    *,
+    speed: float = 0.50,
+):
+    """Refresh all evidence at the gate rate until the final countdown expires."""
+    first = None
+    command = None
+    steps = math.ceil(
+        core.config.readiness_countdown_seconds * core.config.publish_rate
+    )
+    for step in range(steps + 1):
+        now = start + step / core.config.publish_rate
+        _prime(core, now, speed=speed)
+        command = _evaluate(core, now)
+        if first is None:
+            first = command
+    assert first is not None and first.reason == "READINESS_COUNTDOWN"
+    assert command is not None and command.valid
+    return now, command
+
+
 def test_checked_in_defaults_can_never_move_without_two_explicit_assertions():
     core = HardwareCommandGateCore(HardwareGateConfig())
     _prime(core, 1.0)
@@ -178,29 +201,30 @@ def test_gate_requires_exact_single_reviewed_publishers(owner_kwargs, reason):
 )
 def test_every_continuous_readiness_condition_fails_closed(break_condition, reason):
     core = HardwareCommandGateCore(HardwareGateConfig())
+    _prime(core, 0.50)
+    assert _evaluate(core, 0.50).reason == "READINESS_COUNTDOWN"
+    assert core.readiness_countdown_started_at == pytest.approx(0.50)
     _prime(core, 1.0)
     break_condition(core, 1.0)
     command = _evaluate(core, 1.0)
     assert not command.valid and command.reason == reason
     assert command.linear_x == 0.0 and command.angular_z == 0.0
+    assert core.readiness_countdown_started_at is None
 
 
 def test_fresh_valid_command_is_independently_capped_and_slew_limited():
     config = HardwareGateConfig()
     core = HardwareCommandGateCore(config)
-    # Establish a stopped cycle; the first enabled cycle then ramps from zero.
-    assert _evaluate(core, 0.95, enabled=False).linear_x == 0.0
-    _prime(core, 1.0, speed=9.0)
-    command = _evaluate(core, 1.0)
-    assert command.valid
+    move_time, command = _complete_readiness_countdown(core, 1.0, speed=9.0)
     assert math.isclose(command.linear_x, config.maximum_acceleration * 0.05)
     assert math.isclose(command.angular_z, config.maximum_ackermann_angular_slew * 0.05)
     assert command.linear_x < config.maximum_speed
     assert command.angular_z < config.maximum_ackermann_angular_command
 
     # Refresh all upstream evidence and confirm another bounded step.
-    _prime(core, 1.05, speed=9.0)
-    second = _evaluate(core, 1.05)
+    second_time = move_time + 0.05
+    _prime(core, second_time, speed=9.0)
+    second = _evaluate(core, second_time)
     assert second.valid
     assert math.isclose(
         second.linear_x - command.linear_x,
@@ -215,18 +239,21 @@ def test_fresh_valid_command_is_independently_capped_and_slew_limited():
 def test_watchdog_or_deadman_release_immediately_zeroes_and_resets_ramp():
     config = HardwareGateConfig()
     core = HardwareCommandGateCore(config)
-    _evaluate(core, 0.95, enabled=False)
-    _prime(core, 1.0)
-    moving = _evaluate(core, 1.0)
+    move_time, moving = _complete_readiness_countdown(core, 1.0)
     assert moving.valid and moving.linear_x > 0.0
 
-    core.update_deadman(ready=True, armed=False, stamp=1.01)
-    stopped = _evaluate(core, 1.01)
+    stop_time = move_time + 0.01
+    core.update_deadman(ready=True, armed=False, stamp=stop_time)
+    stopped = _evaluate(core, stop_time)
     assert not stopped.valid and stopped.reason == "DEADMAN_RELEASED"
     assert (stopped.linear_x, stopped.angular_z) == (0.0, 0.0)
+    assert core.readiness_countdown_started_at is None
 
-    _prime(core, 1.06)
-    resumed = _evaluate(core, 1.06)
+    restart_time = stop_time + 0.05
+    _prime(core, restart_time)
+    waiting = _evaluate(core, restart_time)
+    assert not waiting.valid and waiting.reason == "READINESS_COUNTDOWN"
+    _, resumed = _complete_readiness_countdown(core, restart_time)
     assert resumed.valid
     assert resumed.linear_x <= config.maximum_acceleration * 0.05 + 1.0e-12
 
@@ -234,16 +261,16 @@ def test_watchdog_or_deadman_release_immediately_zeroes_and_resets_ramp():
 def test_stale_collision_status_stops_even_when_all_other_inputs_refresh():
     config = HardwareGateConfig()
     core = HardwareCommandGateCore(config)
-    _evaluate(core, 0.95, enabled=False)
-    _prime(core, 1.0)
-    assert _evaluate(core, 1.0).valid
+    move_time, moving = _complete_readiness_countdown(core, 1.0)
+    assert moving.valid
 
-    stale_time = 1.0 + config.collision_timeout
+    stale_time = move_time + config.collision_timeout + 1.0e-6
     _prime(core, stale_time)
     # Restore only the old collision receipt after refreshing everything else.
-    core.collision_stamp = 1.0
+    core.collision_stamp = move_time
     command = _evaluate(core, stale_time)
     assert not command.valid and command.reason == "STALE_COLLISION_STATUS"
+    assert core.readiness_countdown_started_at is None
 
 
 def test_nonfinite_and_zero_candidates_are_rejected():
@@ -253,6 +280,65 @@ def test_nonfinite_and_zero_candidates_are_rejected():
     assert _evaluate(core, 1.0).reason == "NONFINITE_CANDIDATE"
     _prime(core, 1.05, speed=0.0)
     assert _evaluate(core, 1.05).reason == "ZERO_SPEED"
+    assert core.readiness_countdown_started_at is None
+
+
+@pytest.mark.parametrize(
+    ("break_condition", "reason"),
+    (
+        (
+            lambda core, now: core.update_collision(
+                ready=True, trajectory_clear=False, stamp=now
+            ),
+            "TRAJECTORY_BLOCKED",
+        ),
+        (
+            lambda core, now: core.update_candidate(
+                VelocityCommand(0.0, 0.0, True, "ok"), now
+            ),
+            "ZERO_SPEED",
+        ),
+    ),
+)
+def test_collision_or_zero_candidate_restarts_full_readiness_countdown(
+    break_condition, reason
+):
+    config = HardwareGateConfig()
+    core = HardwareCommandGateCore(config)
+    _prime(core, 1.0)
+    assert _evaluate(core, 1.0).reason == "READINESS_COUNTDOWN"
+
+    interrupted_at = 2.0
+    _prime(core, interrupted_at)
+    break_condition(core, interrupted_at)
+    interrupted = _evaluate(core, interrupted_at)
+    assert interrupted.reason == reason
+    assert core.readiness_countdown_started_at is None
+    assert core.readiness_countdown_remaining(interrupted_at) == pytest.approx(3.0)
+
+    restarted_at = 2.05
+    _prime(core, restarted_at)
+    assert _evaluate(core, restarted_at).reason == "READINESS_COUNTDOWN"
+    assert core.readiness_countdown_started_at == pytest.approx(restarted_at)
+
+    almost_ready = restarted_at + config.readiness_countdown_seconds - 0.01
+    _prime(core, almost_ready)
+    assert _evaluate(core, almost_ready).reason == "READINESS_COUNTDOWN"
+    assert core.readiness_countdown_started_at == pytest.approx(restarted_at)
+
+    ready_at = restarted_at + config.readiness_countdown_seconds
+    _prime(core, ready_at)
+    assert _evaluate(core, ready_at).valid
+
+
+def test_repeated_countdown_cycles_preserve_start_and_report_remaining_time():
+    core = HardwareCommandGateCore(HardwareGateConfig())
+    for now, remaining in ((1.0, 3.0), (1.05, 2.95), (2.0, 2.0), (3.95, 0.05)):
+        _prime(core, now)
+        command = _evaluate(core, now)
+        assert command.reason == "READINESS_COUNTDOWN"
+        assert core.readiness_countdown_started_at == pytest.approx(1.0)
+        assert core.readiness_countdown_remaining(now) == pytest.approx(remaining)
 
 
 def test_hardware_config_rejects_weakened_caps_and_timeouts():
@@ -262,6 +348,8 @@ def test_hardware_config_rejects_weakened_caps_and_timeouts():
         HardwareGateConfig(maximum_acceleration=0.351)
     with pytest.raises(ValueError):
         HardwareGateConfig(candidate_timeout=0.51)
+    with pytest.raises(ValueError):
+        HardwareGateConfig(readiness_countdown_seconds=2.999)
     with pytest.raises(ValueError):
         HardwareGateConfig(required_motion_mode=FOUR_DIFF)
 

@@ -22,6 +22,7 @@ def generate_launch_description():
     enforce_map_bounds = LaunchConfiguration("enforce_map_bounds")
     latch_perceived_occlusion = LaunchConfiguration("latch_perceived_occlusion")
     target_speed = LaunchConfiguration("target_speed")
+    require_mission_goal = LaunchConfiguration("require_mission_goal")
     return LaunchDescription(
         [
             DeclareLaunchArgument("preset", default_value="balanced"),
@@ -33,6 +34,7 @@ def generate_launch_description():
             DeclareLaunchArgument("enforce_map_bounds", default_value="false"),
             DeclareLaunchArgument("latch_perceived_occlusion", default_value="false"),
             DeclareLaunchArgument("target_speed", default_value="0.50"),
+            DeclareLaunchArgument("require_mission_goal", default_value="false"),
             Node(
                 package="dream_limo",
                 executable="dream_state_estimator",
@@ -69,6 +71,9 @@ def generate_launch_description():
                         "arena_file": mission,
                         "enforce_map_bounds": enforce_map_bounds,
                         "target_speed": ParameterValue(target_speed, value_type=float),
+                        "require_mission_goal": ParameterValue(
+                            require_mission_goal, value_type=bool
+                        ),
                     },
                 ],
             ),

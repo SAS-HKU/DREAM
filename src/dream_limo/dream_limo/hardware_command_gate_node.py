@@ -69,6 +69,9 @@ class DreamHardwareCommandGateNode(Node):
         self.declare_parameter("expected_candidate_owner", "dream_safety_supervisor")
         self.declare_parameter("expected_deadman_owner", "dream_hardware_deadman")
         self.declare_parameter("publish_rate", defaults.publish_rate)
+        self.declare_parameter(
+            "readiness_countdown_seconds", defaults.readiness_countdown_seconds
+        )
         self.declare_parameter("maximum_speed", defaults.maximum_speed)
         self.declare_parameter("maximum_acceleration", defaults.maximum_acceleration)
         self.declare_parameter(
@@ -104,6 +107,9 @@ class DreamHardwareCommandGateNode(Node):
                 self.get_parameter("maximum_ackermann_angular_slew").value
             ),
             publish_rate=float(self.get_parameter("publish_rate").value),
+            readiness_countdown_seconds=float(
+                self.get_parameter("readiness_countdown_seconds").value
+            ),
             candidate_timeout=float(self.get_parameter("candidate_timeout").value),
             odom_timeout=float(self.get_parameter("odom_timeout").value),
             scan_timeout=float(self.get_parameter("scan_timeout").value),
@@ -366,6 +372,10 @@ class DreamHardwareCommandGateNode(Node):
             output_owner_ok=output_owner_ok,
             deadman_owner_ok=deadman_owner_ok,
         )
+        readiness_countdown_remaining = self.core.readiness_countdown_remaining(now)
+        readiness_countdown_started = (
+            self.core.readiness_countdown_started_at is not None
+        )
         output = Twist()
         output.linear.x = command.linear_x
         output.angular.z = command.angular_z
@@ -381,6 +391,16 @@ class DreamHardwareCommandGateNode(Node):
             "staging_pose_verified": staging_verified,
             "platform_watchdog_verified": platform_watchdog_verified,
             "operator_kill_verified": operator_kill_verified,
+            "readiness_countdown_seconds": (
+                self.gate_config.readiness_countdown_seconds
+            ),
+            "readiness_countdown_remaining": readiness_countdown_remaining,
+            "readiness_countdown_active": bool(
+                readiness_countdown_started and readiness_countdown_remaining > 0.0
+            ),
+            "readiness_countdown_complete": bool(
+                readiness_countdown_started and readiness_countdown_remaining <= 0.0
+            ),
             "output_topic": self.OUTPUT_TOPIC,
             "linear_x": command.linear_x,
             "angular_z": command.angular_z,

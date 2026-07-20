@@ -32,6 +32,7 @@ class HardwareGateConfig:
     maximum_ackermann_angular_command: float = 0.198
     maximum_ackermann_angular_slew: float = 0.40
     publish_rate: float = 20.0
+    readiness_countdown_seconds: float = 3.0
     candidate_timeout: float = 0.20
     odom_timeout: float = 0.25
     scan_timeout: float = 0.40
@@ -52,6 +53,7 @@ class HardwareGateConfig:
             self.maximum_ackermann_angular_command,
             self.maximum_ackermann_angular_slew,
             self.publish_rate,
+            self.readiness_countdown_seconds,
             self.candidate_timeout,
             self.odom_timeout,
             self.scan_timeout,
@@ -76,6 +78,8 @@ class HardwareGateConfig:
             raise ValueError("raw Ackermann slew cap must not exceed 0.40/s")
         if self.publish_rate < 20.0:
             raise ValueError("hardware command gate must publish at 20 Hz or faster")
+        if self.readiness_countdown_seconds < 3.0:
+            raise ValueError("hardware readiness countdown must be at least 3.0 s")
         timeout_limits = (
             (self.candidate_timeout, 0.50),
             (self.odom_timeout, 0.50),
@@ -136,6 +140,7 @@ class HardwareCommandGateCore:
         self._last_speed = 0.0
         self._last_angular = 0.0
         self._last_evaluation_stamp: Optional[float] = None
+        self.readiness_countdown_started_at: Optional[float] = None
 
     def update_candidate(self, command: VelocityCommand, stamp: float) -> None:
         self.candidate = command
@@ -214,12 +219,31 @@ class HardwareCommandGateCore:
     def _stale(now: float, stamp: Optional[float], timeout: float) -> bool:
         return stamp is None or now < stamp or now - stamp >= timeout
 
-    def _stop(self, now: float, reason: str) -> VelocityCommand:
+    def readiness_countdown_remaining(self, now: float) -> float:
+        """Return seconds left before the final physical gate may move."""
+        now = float(now)
+        started = self.readiness_countdown_started_at
+        if started is None or not isfinite(now) or now < started:
+            return self.config.readiness_countdown_seconds
+        return max(
+            0.0,
+            self.config.readiness_countdown_seconds - (now - started),
+        )
+
+    def _stop(
+        self,
+        now: float,
+        reason: str,
+        *,
+        reset_readiness_countdown: bool = True,
+    ) -> VelocityCommand:
         # Every rejected cycle resets the ramp. Re-enabling can never resume at
         # a previously commanded speed or steering value.
         self._last_speed = 0.0
         self._last_angular = 0.0
         self._last_evaluation_stamp = float(now)
+        if reset_readiness_countdown:
+            self.readiness_countdown_started_at = None
         return VelocityCommand.zero(reason)
 
     def evaluate(
@@ -340,8 +364,22 @@ class HardwareCommandGateCore:
         )
         if target_speed <= 1.0e-9:
             return self._stop(now, "ZERO_SPEED")
+        if self._last_evaluation_stamp is not None and now < self._last_evaluation_stamp:
+            return self._stop(now, "CLOCK_ROLLBACK")
 
-        if self._last_evaluation_stamp is None or now < self._last_evaluation_stamp:
+        # Start only after every independently checked prerequisite and a
+        # nonzero candidate are simultaneously valid. Countdown stop cycles
+        # preserve their own start time; every other stop path resets it.
+        if self.readiness_countdown_started_at is None:
+            self.readiness_countdown_started_at = now
+        if self.readiness_countdown_remaining(now) > 0.0:
+            return self._stop(
+                now,
+                "READINESS_COUNTDOWN",
+                reset_readiness_countdown=False,
+            )
+
+        if self._last_evaluation_stamp is None:
             return self._stop(now, "CLOCK_ROLLBACK")
         nominal_dt = 1.0 / self.config.publish_rate
         dt = min(max(now - self._last_evaluation_stamp, 0.0), 2.0 * nominal_dt)

@@ -12,17 +12,48 @@ import rclpy
 from geometry_msgs.msg import PoseStamped, TwistStamped
 from nav_msgs.msg import Odometry, Path
 from rclpy.node import Node
+from rclpy.qos import DurabilityPolicy, HistoryPolicy, QoSProfile, ReliabilityPolicy
 from sensor_msgs.msg import Image
 from std_msgs.msg import Bool, String
 
 from .core.decision import IDEAMDREAMDecision
 from .core.command_adapter import gate_mpc_output
+from .core.goal_mission import (
+    EgoMissionState,
+    GoalRequest,
+    goal_mission_config_from_deployment,
+    validate_goal_request,
+)
 from .core.mission import MissionEndGuard
 from .core.mpc import RiskAwareMPC
 from .core.risk_field import DREAMRiskField
 from .core.types import EgoState, Vehicle
-from .limo_scale import default_deployment_config, deployment_config_for_arena, get_preset
-from .ros_utils import ego_from_odometry, vehicle_from_mapping, yaw_to_quaternion
+from .limo_scale import (
+    DeploymentConfig,
+    default_deployment_config,
+    deployment_config_for_arena,
+    get_preset,
+)
+from .ros_utils import (
+    ego_from_odometry,
+    stamp_to_seconds,
+    vehicle_from_mapping,
+    yaw_to_quaternion,
+)
+
+
+def deployment_for_mission_goal(
+    config: DeploymentConfig, *, goal_x: float, target_lane: int
+) -> DeploymentConfig:
+    """Return a deployment whose route endpoint is an independently validated goal."""
+    return replace(
+        config,
+        arena=replace(
+            config.arena,
+            mission_goal_x=float(goal_x),
+            target_lane=int(target_lane),
+        ),
+    )
 
 
 class DreamPlannerNode(Node):
@@ -41,6 +72,8 @@ class DreamPlannerNode(Node):
             "maximum_allowed_cbf_slack", self.config.mpc.maximum_allowed_cbf_slack
         )
         self.declare_parameter("enforce_map_bounds", False)
+        self.declare_parameter("require_mission_goal", False)
+        self.declare_parameter("mission_goal_topic", "/dream/mission_goal")
         self.declare_parameter("arena_file", "")
         self.config = deployment_config_for_arena(
             str(self.get_parameter("arena_file").value)
@@ -56,6 +89,19 @@ class DreamPlannerNode(Node):
         self.declare_parameter("route_intent_enabled", True)
         self.declare_parameter("route_target_lane", self.config.arena.target_lane)
         self.declare_parameter("route_merge_start_x", self.config.arena.merge_request_x)
+        self.require_mission_goal = bool(
+            self.get_parameter("require_mission_goal").value
+        )
+        self.mission_goal_received = False
+        self.pending_mission_goal: Optional[PoseStamped] = None
+        self.mission_goal_source = (
+            "waiting" if self.require_mission_goal else "configured_arena"
+        )
+        self.mission_goal_last_rejection = ""
+        self.route_target_lane = int(self.get_parameter("route_target_lane").value)
+        self.enforce_map_bounds = bool(
+            self.get_parameter("enforce_map_bounds").value
+        )
         self.preset = get_preset(str(self.get_parameter("preset").value))
         self.field = DREAMRiskField(self.config)
         self.decision = IDEAMDREAMDecision(
@@ -64,9 +110,7 @@ class DreamPlannerNode(Node):
         )
         self.mpc = RiskAwareMPC(
             self.config,
-            enforce_map_bounds=bool(
-                self.get_parameter("enforce_map_bounds").value
-            ),
+            enforce_map_bounds=self.enforce_map_bounds,
         )
         self.mission = MissionEndGuard(
             goal_x=self.config.arena.mission_goal_x,
@@ -80,6 +124,7 @@ class DreamPlannerNode(Node):
         self.risk_receipt: Optional[float] = None
         self.ready_receipt: Optional[float] = None
         self.drift_ready = False
+        self.goal_contract = goal_mission_config_from_deployment(self.config)
 
         self.create_subscription(
             Odometry, str(self.get_parameter("ego_topic").value), self._on_ego, 10
@@ -93,6 +138,18 @@ class DreamPlannerNode(Node):
         self.create_subscription(
             Bool, str(self.get_parameter("ready_topic").value), self._on_ready, 10
         )
+        mission_goal_qos = QoSProfile(
+            history=HistoryPolicy.KEEP_LAST,
+            depth=1,
+            reliability=ReliabilityPolicy.RELIABLE,
+            durability=DurabilityPolicy.TRANSIENT_LOCAL,
+        )
+        self.create_subscription(
+            PoseStamped,
+            str(self.get_parameter("mission_goal_topic").value),
+            self._on_mission_goal,
+            mission_goal_qos,
+        )
         self.control_publisher = self.create_publisher(TwistStamped, "/dream/control", 10)
         self.path_publisher = self.create_publisher(Path, "/dream/reference_trajectory", 2)
         self.status_publisher = self.create_publisher(String, "/dream/planner_status", 10)
@@ -104,6 +161,12 @@ class DreamPlannerNode(Node):
     def _on_ego(self, message: Odometry) -> None:
         self.ego = ego_from_odometry(message)
         self.ego_receipt = self._now()
+        if (
+            self.require_mission_goal
+            and not self.mission_goal_received
+            and self.pending_mission_goal is not None
+        ):
+            self._consider_pending_mission_goal()
 
     def _on_world(self, message: String) -> None:
         try:
@@ -139,17 +202,142 @@ class DreamPlannerNode(Node):
         self.drift_ready = bool(message.data)
         self.ready_receipt = self._now()
 
+    def _on_mission_goal(self, message: PoseStamped) -> None:
+        if not self.require_mission_goal:
+            return
+        if self.mission_goal_received:
+            self.get_logger().warning("Ignored later mission goal after one-shot acceptance")
+            return
+        self.pending_mission_goal = message
+        self._consider_pending_mission_goal()
+
+    def _consider_pending_mission_goal(self) -> None:
+        message = self.pending_mission_goal
+        if message is None or self.mission_goal_received:
+            return
+        now = self._now()
+        ego = None
+        if self.ego is not None:
+            ego = EgoMissionState(
+                x=self.ego.x,
+                y=self.ego.y,
+                speed=self.ego.speed,
+                source_stamp=self.ego.stamp,
+                receipt_stamp=(
+                    float(self.ego_receipt) if self.ego_receipt is not None else 0.0
+                ),
+            )
+        pose = message.pose
+        validation = validate_goal_request(
+            GoalRequest(
+                frame_id=str(message.header.frame_id),
+                x=float(pose.position.x),
+                y=float(pose.position.y),
+                z=float(pose.position.z),
+                qx=float(pose.orientation.x),
+                qy=float(pose.orientation.y),
+                qz=float(pose.orientation.z),
+                qw=float(pose.orientation.w),
+                source_stamp=stamp_to_seconds(message.header.stamp),
+                receipt_stamp=now,
+            ),
+            ego,
+            now=now,
+            config=self.goal_contract,
+        )
+        if not validation.accepted:
+            self.mission_goal_last_rejection = validation.reason
+            if validation.reason not in {
+                "EGO_UNAVAILABLE",
+                "STALE_EGO_RECEIPT",
+                "STALE_EGO_SOURCE",
+            }:
+                self.pending_mission_goal = None
+            self.mpc.reset()
+            self._publish_stop(validation.reason, {"stamp": now})
+            self.get_logger().warning(
+                f"Rejected sanitized mission goal independently: {validation.reason}"
+            )
+            return
+        try:
+            self._activate_mission_goal(
+                goal_x=float(validation.goal_x),
+                target_lane=int(validation.target_lane),
+            )
+        except (TypeError, ValueError, RuntimeError) as exc:
+            self.mission_goal_last_rejection = "GOAL_CONFIGURATION_REJECTED"
+            self.pending_mission_goal = None
+            self.mpc.reset()
+            self._publish_stop(
+                "GOAL_CONFIGURATION_REJECTED",
+                {"stamp": now, "goal_error": str(exc)},
+            )
+            self.get_logger().error(f"Rejected mission goal configuration: {exc}")
+            return
+        self.mission_goal_source = str(self.get_parameter("mission_goal_topic").value)
+        self.mission_goal_last_rejection = ""
+        self.mission_goal_received = True
+        self.pending_mission_goal = None
+        self.get_logger().info(
+            "Activated one-shot planner mission: "
+            f"x={self.config.arena.mission_goal_x:.3f}, lane={self.route_target_lane}"
+        )
+
+    def _activate_mission_goal(self, *, goal_x: float, target_lane: int) -> None:
+        config = deployment_for_mission_goal(
+            self.config,
+            goal_x=goal_x,
+            target_lane=target_lane,
+        )
+        decision = IDEAMDREAMDecision(
+            config,
+            blocker_trigger_distance=float(
+                self.get_parameter("blocker_trigger_distance").value
+            ),
+        )
+        mpc = RiskAwareMPC(config, enforce_map_bounds=self.enforce_map_bounds)
+        mission = MissionEndGuard(
+            goal_x=config.arena.mission_goal_x,
+            position_tolerance=config.mpc.mission_position_tolerance,
+            stop_speed_tolerance=config.mpc.mission_stop_speed_tolerance,
+        )
+        self.mpc.reset()
+        self.config = config
+        # The validated goal changes only the route endpoint/lane. Keep the
+        # received DRIFT field and its warm-up state; update its immutable
+        # geometry reference so risk queries use the same mission definition.
+        self.field.config = config
+        self.decision = decision
+        self.mpc = mpc
+        self.mission = mission
+        self.route_target_lane = target_lane
+
     def _publish_stop(self, reason: str, details: Optional[dict] = None) -> None:
         control = TwistStamped()
         control.header.stamp = self.get_clock().now().to_msg()
         control.header.frame_id = "base_link"
         self.control_publisher.publish(control)
         status = String()
-        payload = {"ready": False, "preset": self.preset.name, "reason": reason}
+        payload = {
+            "ready": False,
+            "preset": self.preset.name,
+            "reason": reason,
+            **self._mission_status_fields(),
+        }
         if details:
             payload.update(details)
         status.data = json.dumps(payload, separators=(",", ":"))
         self.status_publisher.publish(status)
+
+    def _mission_status_fields(self) -> dict:
+        return {
+            "mission_goal_required": self.require_mission_goal,
+            "mission_goal_received": self.mission_goal_received,
+            "mission_goal_source": self.mission_goal_source,
+            "mission_goal_target_lane": self.route_target_lane,
+            "mission_goal_x": self.config.arena.mission_goal_x,
+            "mission_goal_last_rejection": self.mission_goal_last_rejection,
+        }
 
     def _publish_trajectory(self, states: np.ndarray) -> None:
         if states.size == 0:
@@ -186,6 +374,10 @@ class DreamPlannerNode(Node):
 
     def _plan(self) -> None:
         now = self._now()
+        if self.require_mission_goal and not self.mission_goal_received:
+            self.mpc.reset()
+            self._publish_stop("WAITING_FOR_MISSION_GOAL", {"stamp": now})
+            return
         # Completion is a process-lifetime latch. Keep publishing zero with an
         # unambiguous status even if perception inputs later become stale.
         if self.mission.complete:
@@ -226,7 +418,7 @@ class DreamPlannerNode(Node):
                 and ego.x >= float(self.get_parameter("route_merge_start_x").value)
             )
             requested_lane = (
-                int(self.get_parameter("route_target_lane").value)
+                self.route_target_lane
                 if route_active
                 else None
             )
@@ -308,7 +500,7 @@ class DreamPlannerNode(Node):
                     else "pure_mpc"
                 ),
                 "route_intent_active": route_active,
-                "route_target_lane": int(self.get_parameter("route_target_lane").value),
+                "route_target_lane": self.route_target_lane,
                 "maneuver": decision.maneuver,
                 "current_lane": decision.current_lane,
                 "requested_lane": decision.requested_lane,
@@ -330,6 +522,7 @@ class DreamPlannerNode(Node):
                 "maximum_cbf_slack": result.maximum_slack,
                 "maximum_allowed_cbf_slack": maximum_allowed_slack,
                 "map_bounds_enforced": self.mpc.enforce_map_bounds,
+                **self._mission_status_fields(),
             },
             separators=(",", ":"),
         )

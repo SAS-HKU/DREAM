@@ -25,6 +25,7 @@ def generate_launch_description():
     enforce_map_bounds = LaunchConfiguration("enforce_map_bounds")
     latch_perceived_occlusion = LaunchConfiguration("latch_perceived_occlusion")
     target_speed = LaunchConfiguration("target_speed")
+    require_mission_goal = LaunchConfiguration("require_mission_goal")
     return LaunchDescription(
         [
             DeclareLaunchArgument("preset", default_value="balanced"),
@@ -35,6 +36,7 @@ def generate_launch_description():
             DeclareLaunchArgument("enforce_map_bounds", default_value="false"),
             DeclareLaunchArgument("latch_perceived_occlusion", default_value="false"),
             DeclareLaunchArgument("target_speed", default_value="0.50"),
+            DeclareLaunchArgument("require_mission_goal", default_value="false"),
             IncludeLaunchDescription(
                 PythonLaunchDescriptionSource(dry_run),
                 launch_arguments={
@@ -47,6 +49,7 @@ def generate_launch_description():
                     "enforce_map_bounds": enforce_map_bounds,
                     "latch_perceived_occlusion": latch_perceived_occlusion,
                     "target_speed": target_speed,
+                    "require_mission_goal": require_mission_goal,
                 }.items(),
             ),
             Node(

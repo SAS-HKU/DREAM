@@ -56,6 +56,7 @@ setup(
             "dream_collision_monitor = dream_limo.collision_monitor_node:main",
             "dream_hardware_command_gate = dream_limo.hardware_command_gate_node:main",
             "dream_hardware_deadman = dream_limo.hardware_deadman_node:main",
+            "dream_goal_authorizer = dream_limo.goal_authorizer_node:main",
             "dream_merger_odometry_adapter = dream_limo.merger_odometry_adapter_node:main",
             "dream_stage1_replay = dream_limo.stage1_cli:main",
             "dream_mpc_benchmark = dream_limo.mpc_benchmark:main",

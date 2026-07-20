@@ -13,21 +13,24 @@ The implementation is pinned to DREAM commit
 
 ## Safety and current status
 
-> **Physical output is implemented, but this audited robot is not commissioned
-> for motion yet. Keep it stopped until every physical gate below is verified.**
+> **Physical output is implemented but disabled by default. Enable it only
+> after every physical gate below is verified for that run.**
 
 - SIL and ordinary live-sensor launches still end at `/cmd_vel_test`.
 - Only `dream_hardware_motion.launch.py` starts the reviewed `/cmd_vel` gate.
-  Its checked-in defaults publish a continuous zero command and cannot arm.
+  Its checked-in defaults publish a continuous zero command and cannot forward
+  motion, even if a goal is submitted.
 - Never remap `/cmd_vel_test` to `/cmd_vel`.
-- The July 2026 audit found `motion_mode=0` (differential) and `/dev/input/js0`
-  owned by NoMachine rather than a physical joystick. Both are motion blockers.
+- Verify `motion_mode=1` after every chassis power cycle. Goal activation is
+  the default and does not require a joystick. `activation_mode:=auto_forward`
+  automatically selects the configured forward merge mission, while a
+  joystick is used only for the optional `activation_mode:=joystick` path.
 - Keep a human at an independent hardware/power stop, and stop every competing
   navigation, teleop, or command node before hardware commissioning.
 - Passing DREAM preflight is necessary but never sufficient to move.
 
 The safety path fails closed on stale inputs, invalid/fallback MPC output,
-non-finite values, CBF slack above `0.05`, loss of the 0.75 s held-to-run
+non-finite values, CBF slack above `0.05`, loss of the selected activation
 heartbeat, a front LiDAR stop, or the wrong drive mode. Raw Ackermann
 `Twist.angular.z` is capped independently at `0.198`. The physical boundary
 adds exact publisher ownership, a retained/inflated LiDAR trajectory gate,
@@ -86,9 +89,12 @@ adaptation; it is not a claim of reproducing every upstream highway DFS mode.
    each scan at its sensor timestamp, retains/inflates first-return surfaces,
    treats LiDAR shadow and off-road space as non-traversable, and checks the
    densely interpolated reference trajectory. It publishes no command topic.
-10. `dream_hardware_deadman`: accepts only one reviewed `joy_node` owner and
-   publishes a 20 Hz arm heartbeat only while two configured buttons are held;
-   a third button requests a latched stop.
+10. `dream_goal_authorizer`: the default hardware activator. It validates a
+    map-frame `/goal_pose`, or synthesizes the same validated one-shot goal from
+    `merge_mission.yaml` in `auto_forward` mode. It publishes
+    `/dream/mission_goal` and owns the arm/status heartbeat until completion or
+    a stop request. `dream_hardware_deadman` is the optional joystick
+    alternative.
 11. `dream_hardware_command_gate`: the sole physical `/cmd_vel` publisher. It
     continuously rechecks all safety/status owners and heartbeats and otherwise
     publishes zero at 20 Hz.
@@ -210,7 +216,8 @@ command moves a simulated ego in closed loop. The live command deliberately
 ends at `/cmd_vel_test` and does not move the physical LIMO.
 
 To inspect the complete hardware graph without allowing motion, use the same
-model selector. This owns `/cmd_vel` but publishes only zeros:
+model selector. This owns `/cmd_vel` but publishes only zeros. The default
+`activation_mode:=goal` starts no joystick node:
 
 ```bash
 ROS_DOMAIN_ID=0 ros2 launch dream_limo dream_hardware_motion.launch.py \
@@ -219,6 +226,11 @@ ROS_DOMAIN_ID=0 ros2 launch dream_limo dream_hardware_motion.launch.py \
 
 Do not add the enabling arguments until the commissioning checklist in
 “Physical motion commissioning” has passed on that specific robot.
+
+After those checks pass, the no-click forward mission is selected with
+`activation_mode:=auto_forward`. It still waits for a stopped ego, fresh
+camera/LiDAR/planner data, passed preflight, the supervisor countdown, and all
+physical-output gates; it does not bypass any motion check.
 
 ## Perceived scene versus mission intent
 
@@ -550,6 +562,7 @@ ros2 bag record \
   /dream/risk_field /dream/risk_field_raw \
   /dream/drift_status /dream/drift_ready \
   /dream/planner_status /dream/reference_trajectory /dream/control \
+  /goal_pose /dream/mission_goal \
   /dream/cmd_vel_candidate /cmd_vel_test \
   /dream/adapter_status /dream/safety_status \
   /dream/collision_grid /dream/collision_status \
@@ -571,17 +584,16 @@ QoS.
 
 ## Physical motion commissioning
 
-The code path exists, but do not enable it from the currently audited state.
-First satisfy and record every item below:
+The code path exists, but do not enable it until the operator has satisfied and
+recorded every item below for the current setup:
 
 1. Lift/chock the robot, clear the arena, assign one human to the independent
    hardware/power stop, and confirm `/cmd_vel` has no publisher before launch.
 2. Mechanically configure both steering latches for Ackermann and verify
    `/limo_status.motion_mode == 1`; this cannot be changed by a ROS parameter.
-3. Connect and positively identify a physical joystick. `ros2 run joy
-   joy_enumerate_devices` and `/dev/input/by-id` must identify it; the NoMachine
-   virtual `js0` is not acceptable. Verify the chosen hold/confirm/stop button
-   indices while lifted.
+3. Verify the independent hardware/power stop with its assigned operator. The
+   default goal-activation path is autonomous after a valid destination is
+   accepted and therefore does not use a joystick as a held-to-run control.
 4. Verify the reviewed serial-boundary watchdog, rebuild `limo_base`, then
    characterize it with wheels lifted and the human stop present. The patch is
    [`patches/limo_base_cmd_vel_watchdog.patch`](patches/limo_base_cmd_vel_watchdog.patch):
@@ -608,10 +620,17 @@ First satisfy and record every item below:
 5. Survey the 0.45 m lane spacing, place the robot at the checked-in left-lane
    start pose and heading, and verify the RViz `map`, road, scan, collision grid,
    shadow, and reference trajectory agree. This is what
-   `staging_pose_verified` asserts; obstacle geometry is still perceived.
+   `staging_pose_verified` asserts; obstacle geometry is still perceived. The
+   tall occluder must block line of sight without entering the inflated ego
+   trajectory. On the audited staging, its nearest face was only about
+   0.20--0.22 m from the planned path, so the collision monitor correctly held
+   zero. Move the occluder and path roughly 0.15 m farther apart (about 0.35 m
+   path-centerline-to-face as a starting geometry), then rely on the measured
+   collision status rather than the nominal placement.
 6. Run the zero-output commissioning launch above. Require exact owners plus
    fresh `preflight`, `world`, `drift`, `planner`, `safety`, `collision`, and
-   `deadman` status. Collision must be ready and trajectory-clear. Preflight
+   activation status. In default goal mode the activation owner must be
+   `dream_goal_authorizer`. Collision must be ready and trajectory-clear. Preflight
    latches the initial measured route-shadow evidence so the later physical
    reveal is permitted, but it never latches stale world/scan readiness.
 
@@ -625,31 +644,95 @@ ros2 topic echo /dream/preflight_status --full-length --once
 ros2 topic echo /limo_status --field motion_mode --once
 ```
 
-Only after those physical checks have actually passed, set the positively
-identified joystick device number and run the reviewed first-motion command:
+Stop the zero-output commissioning launch with `Ctrl-C` and wait for all of
+its child processes to exit before starting the enabled launch below. Confirm
+that the old graph is gone; this check must report no publisher on `/cmd_vel`:
 
 ```bash
-: "${PHYSICAL_JOY_ID:?set the verified physical joystick device id}"
+ros2 topic info /cmd_vel --verbose
+```
 
+Do not run the commissioning and enabled hardware graphs at the same time.
+Duplicate DREAM nodes or command publishers invalidate the ownership checks.
+
+Only after those physical checks have actually passed, run the reviewed
+first-motion command. This mode needs neither a joystick nor an RViz click. It
+uses the target lane and terminal station in `merge_mission.yaml`, then DREAM
+or pure MPC reacts to LiDAR-perceived occlusion, visible agents, and obstacles:
+
+```bash
 ROS_DOMAIN_ID=0 ros2 launch dream_limo dream_hardware_motion.launch.py \
   model:=balanced \
-  target_speed:=0.15 \
-  start_joy:=true joy_device_id:="$PHYSICAL_JOY_ID" \
-  deadman_device_verified:=true \
+  activation_mode:=auto_forward \
+  target_speed:=0.05 \
   staging_pose_verified:=true \
   platform_watchdog_verified:=true \
   operator_kill_verified:=true \
   enable_physical_motion:=true
 ```
 
-The robot remains stopped until both deadman buttons are held continuously and
-the three-second countdown completes. Releasing either button or losing any
-input/status heartbeat commands zero immediately. The initial gate caps speed
-at the same 0.15 m/s used by the MPC. Near the checked-in `x=5.55` endpoint,
-the common mission profile brakes both experiment arms toward zero and latches
-`MISSION_COMPLETE`. A stop-button, collision-bubble, or supervisor latch
-requires shutdown, root-cause review, and a clean relaunch; do not reset it
-in-place to continue a run.
+Start at `0.05 m/s`; `target_speed` is both the planner cruise target and the
+final hardware-gate maximum. The hardware launch accepts only
+`0.03 < target_speed <= 0.15 m/s` and rejects values such as `0.35` before
+constructing the motion graph.
+
+For operator-selected goal activation instead, change only
+`activation_mode:=goal`. The robot then remains stopped after launch. In RViz
+select **2D Goal Pose**, then click the middle-lane destination near
+`x=5.55, y=0.0` with its arrow pointing along positive `x`. The equivalent
+terminal command is:
+
+```bash
+ros2 topic pub --once /goal_pose geometry_msgs/msg/PoseStamped \
+  "{header: {stamp: now, frame_id: map}, pose: {position: {x: 5.55, y: 0.0, z: 0.0}, orientation: {w: 1.0}}}"
+```
+
+Only a validated goal is copied to `/dream/mission_goal`. The authorizer stays
+unarmed until the stopped ego, passed preflight, and planner status are all
+fresh and agree with that goal. The supervisor performs its countdown, and the
+final hardware gate independently requires three continuous seconds in which
+collision, perception, planner, ownership, motion-mode, watchdog, and command
+checks are all valid. Any failed check resets that final countdown. Only then
+can DREAM/MPC command forward motion and react to perceived visible/occluded
+agents. Never reposition an occluder or robot while an enabled launch is
+running. A goal selects the destination along this package's three-lane merge
+mission; this is not a Nav2 free-space path planner for arbitrary destinations.
+
+Confirm activation before allowing the arena run:
+
+```bash
+ros2 topic echo /dream/deadman_status --once
+ros2 topic echo /dream/hardware_gate_status --once
+```
+
+In goal or auto-forward mode, activation status must report
+`owner=dream_goal_authorizer`, `reason=GOAL_ACTIVE`, `ready=true`, and
+`armed=true`. Any waiting/rejection reason means the robot must remain stopped
+while that named condition is fixed.
+
+To stop the mission through ROS, call:
+
+```bash
+ros2 service call /dream/stop_mission std_srvs/srv/Trigger "{}"
+```
+
+Keep the human at the independent power stop throughout the run; the ROS
+service is not a substitute for it. Losing any input/status heartbeat also
+commands zero. Near the accepted endpoint, the common mission profile brakes
+both experiment arms toward zero and latches `MISSION_COMPLETE`. A stop
+request, collision-bubble, or supervisor latch requires shutdown, root-cause
+review, and a clean relaunch; do not reset it in-place to continue a run.
+After repeatable `0.05 m/s` runs pass, an operator may explicitly use
+`target_speed:=0.10`; the reviewed commissioning limit is `0.15 m/s`.
+
+The old physical-joystick activation remains available only when explicitly
+selected. In that mode identify the real device (never NoMachine's virtual
+`js0`) and append:
+
+```bash
+activation_mode:=joystick start_joy:=true \
+joy_device_id:="$PHYSICAL_JOY_ID" deadman_device_verified:=true
+```
 
 For the controlled second-LIMO provider, append `use_merger_odom:=true`,
 `merger_alignment_verified:=true`, and the same six verified merger-frame
@@ -664,10 +747,10 @@ margin, minimum clearance, conflict-zone overlap, ego speed/acceleration/jerk,
 veto activations, risk at ego, solver timing, planner rejection, and supervisor
 trigger counts.
 
-The current machine still needs the physical checks above, live static-world
-tracking validation, and timing acceptance with every sensor and recorder
-active. Camera extrinsics are intentionally out of scope because the camera is
-evidence-only and never enters planning.
+Repeat the physical checks above and timing acceptance with every sensor and
+recorder active before each experiment series. Camera extrinsics are
+intentionally out of scope because the camera is evidence-only and never
+enters planning.
 
 ## Troubleshooting
 
@@ -692,6 +775,19 @@ evidence-only and never enters planning.
 - **TF conflict:** ensure only one owner publishes each of `map -> odom`,
   `odom -> base_link`, and `base_link -> laser_link`.
 - **Mode mismatch:** inspect `/limo_status`; do not bypass the adapter.
+- **Goal submitted but no motion:** inspect `/dream/deadman_status`. Fix its
+  explicit rejection/wait reason; the ego must be stopped, the goal must be a
+  fresh `map` pose near the middle lane and beyond the conflict exit, and both
+  preflight and matching planner status must be fresh. Never force `/dream/arm`.
+- **Auto-forward does not start:** inspect `/dream/deadman_status`,
+  `/dream/preflight_status`, `/dream/collision_status`, and
+  `/dream/hardware_gate_status`. Auto-forward synthesizes the configured goal
+  but still requires a stopped ego, matching planner acknowledgement, passed
+  preflight, fresh collision/sensor inputs, every commissioning assertion, and
+  a supported target speed. If collision reports `OCCUPIED_SURFACE`, reposition
+  the physical occluder away from the path; do not reduce collision inflation
+  merely to make the robot move. The audited failed staging measured only about
+  0.20--0.22 m clearance where the first unsafe trajectory point occurred.
 - **MPC fallback/slack rejection:** inspect `/dream/planner_status` and stop the
   experiment.
 - **MPC over 150 ms p99 or any solve over 200 ms:** reduce load or keep the
