@@ -28,3 +28,12 @@ def test_optional_merger_adapter_is_exported_by_dream_package():
     setup = (root / "setup.py").read_text()
     assert "dream_merger_odometry_adapter" in setup
     assert "dream_limo.merger_odometry_adapter_node:main" in setup
+
+
+def test_goal_authorizer_is_exported_with_trigger_service_dependency():
+    root = Path(__file__).resolve().parents[1]
+    setup = (root / "setup.py").read_text()
+    package = (root / "package.xml").read_text()
+    assert "dream_goal_authorizer" in setup
+    assert "dream_limo.goal_authorizer_node:main" in setup
+    assert "<exec_depend>std_srvs</exec_depend>" in package

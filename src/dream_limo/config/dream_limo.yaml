@@ -82,13 +82,17 @@ dream_planner:
     update_rate: 5.0
     input_timeout: 0.50
     # Legacy SIL/dry-run cruise speed. The guarded hardware launch overrides
-    # this through its target_speed argument, whose default is 0.15 m/s.
+    # this through its target_speed argument, whose default is 0.05 m/s.
     target_speed: 0.50
     route_intent_enabled: true
     maximum_allowed_cbf_slack: 0.05
     # Dedicated hardware launch overrides this. Legacy surveyed-truck SIL keeps
     # its historical regression behavior unchanged.
     enforce_map_bounds: false
+    # Hardware goal activation overrides this to true. The planner then stays
+    # stopped until a validated goal is accepted on /dream/mission_goal.
+    require_mission_goal: false
+    mission_goal_topic: /dream/mission_goal
 
 dream_command_adapter:
   ros__parameters:
@@ -206,6 +210,7 @@ dream_hardware_command_gate:
     planner_status_topic: /dream/planner_status
     gate_status_topic: /dream/hardware_gate_status
     expected_candidate_owner: dream_safety_supervisor
+    # The hardware launch overrides this to match its selected activation mode.
     expected_deadman_owner: dream_hardware_deadman
     publish_rate: 20.0
     # Stage-3 first-motion cap; intentionally below the package-wide 0.6 m/s cap.
@@ -226,8 +231,8 @@ dream_hardware_command_gate:
     planner_status_timeout: 0.50
     required_motion_mode: 1
 
-# A physical, positively identified joystick must publish /joy through the
-# single reviewed joy_node.  The current checked-in state cannot arm.
+# Optional legacy held-to-run activation. A physical, positively identified
+# joystick must publish /joy through the single reviewed joy_node.
 dream_hardware_deadman:
   ros__parameters:
     enabled: false
@@ -240,4 +245,30 @@ dream_hardware_deadman:
     confirm_button: 5
     stop_button: 1
     joy_timeout: 0.25
+    publish_rate: 20.0
+
+# Default hardware mission activator. It validates a map-frame destination,
+# publishes the accepted goal and the same fail-closed arm/status contract used
+# by the hardware gate. The hardware launch starts it only in goal mode.
+dream_goal_authorizer:
+  ros__parameters:
+    enabled: false
+    goal_topic: /goal_pose
+    accepted_goal_topic: /dream/mission_goal
+    ego_topic: /dream/ego_state
+    planner_status_topic: /dream/planner_status
+    preflight_status_topic: /dream/preflight_status
+    arm_topic: /dream/arm
+    status_topic: /dream/deadman_status
+    external_stop_topic: /dream/external_stop
+    stop_service: /dream/stop_mission
+    goal_frame: map
+    lane_tolerance: 0.18
+    minimum_ahead_distance: 0.50
+    maximum_stopped_speed: 0.03
+    goal_timeout: 1.00
+    ego_timeout: 0.50
+    planner_timeout: 0.75
+    preflight_timeout: 2.0
+    future_tolerance: 0.10
     publish_rate: 20.0

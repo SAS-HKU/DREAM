@@ -168,10 +168,14 @@ class ArenaConfig:
             raise ValueError("merge-path limits are reversed")
         if not isfinite(self.mission_goal_x):
             raise ValueError("mission goal must be finite")
-        if self.mission_goal_x <= max(
-            self.merge_path_x_max, self.conflict_zone_x_max
+        if (
+            self.target_lane != self.ego_lane
+            and self.mission_goal_x
+            <= max(self.merge_path_x_max, self.conflict_zone_x_max)
         ):
-            raise ValueError("mission goal must lie after the merge and conflict zone")
+            raise ValueError(
+                "lane-change mission goal must lie after the merge and conflict zone"
+            )
 
 
 @dataclass(frozen=True)
