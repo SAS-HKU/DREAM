@@ -41,6 +41,34 @@ dream_world_model:
     scan_timeout: 0.40
     use_merger_odom: false
     merger_odom_topic: /merger/wheel/odom
+    merger_adapter_status_topic: /dream/merger_odometry_adapter_status
+    merger_adapter_status_timeout: 0.50
+
+# Optional controlled two-LIMO provider. This converts the second robot's
+# unrelated local odometry into the ego odom frame before the LiDAR
+# line-of-sight gate. It is disabled unless use_merger_odom:=true, and its
+# measured alignment must be explicitly verified.
+dream_merger_odometry_adapter:
+  ros__parameters:
+    input_topic: /merger/raw/wheel/odom
+    output_topic: /merger/wheel/odom
+    status_topic: /dream/merger_odometry_adapter_status
+    expected_source_frame: merger/odom
+    expected_source_child_frame: merger/base_link
+    output_frame: odom
+    output_child_frame: merger/base_link
+    allow_source_output_frame_alias: false
+    alignment_mode: measured_correspondence
+    alignment_verified: false
+    source_reference_x: 0.0
+    source_reference_y: 0.0
+    source_reference_yaw: 0.0
+    target_reference_x: 0.0
+    target_reference_y: 0.0
+    target_reference_yaw: 0.0
+    maximum_input_age: 0.50
+    maximum_future_skew: 0.05
+    status_rate: 10.0
 
 dream_drift_field:
   ros__parameters:
@@ -53,6 +81,9 @@ dream_planner:
     preset: balanced
     update_rate: 5.0
     input_timeout: 0.50
+    # Legacy SIL/dry-run cruise speed. The guarded hardware launch overrides
+    # this through its target_speed argument, whose default is 0.15 m/s.
+    target_speed: 0.50
     route_intent_enabled: true
     maximum_allowed_cbf_slack: 0.05
     # Dedicated hardware launch overrides this. Legacy surveyed-truck SIL keeps

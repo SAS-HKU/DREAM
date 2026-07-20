@@ -18,6 +18,7 @@ from .core.types import EgoState, Vehicle
 from .core.route import anchored_lane_change_y
 from .limo_scale import default_deployment_config, deployment_config_for_arena
 from .ros_utils import (
+    child_velocity_to_parent,
     ego_from_odometry,
     quaternion_to_yaw,
     transform_planar,
@@ -174,12 +175,18 @@ class DreamVisualizationNode(Node):
     def _on_merger(self, message: Odometry) -> None:
         pose = message.pose.pose
         twist = message.twist.twist
+        source_yaw = quaternion_to_yaw(pose.orientation)
+        odom_vx, odom_vy = child_velocity_to_parent(
+            float(twist.linear.x),
+            float(twist.linear.y),
+            child_yaw=source_yaw,
+        )
         tx, ty, yaw = self.map_alignment
         x, y, vx, vy = transform_planar(
             float(pose.position.x),
             float(pose.position.y),
-            float(twist.linear.x),
-            float(twist.linear.y),
+            odom_vx,
+            odom_vy,
             tx=tx,
             ty=ty,
             yaw=yaw,
@@ -190,9 +197,7 @@ class DreamVisualizationNode(Node):
             y,
             vx=vx,
             vy=vy,
-            heading=(
-                quaternion_to_yaw(pose.orientation) + yaw
-            ),
+            heading=source_yaw + yaw,
             length=0.22,
             width=0.22,
         )
@@ -260,7 +265,14 @@ class DreamVisualizationNode(Node):
         self._set_color(marker, *color)
         return marker
 
-    def _box(self, marker_id: int, namespace: str, vehicle: Vehicle, color, height: float) -> Marker:
+    def _box(
+        self,
+        marker_id: int,
+        namespace: str,
+        vehicle: Vehicle,
+        color,
+        height: float,
+    ) -> Marker:
         marker = self._base_marker(marker_id, Marker.CUBE, namespace)
         marker.pose.position.x = vehicle.x
         marker.pose.position.y = vehicle.y
@@ -283,7 +295,10 @@ class DreamVisualizationNode(Node):
                 self._line(
                     10 + index,
                     "lanes",
-                    ((self.config.grid.x_min, center, 0.012), (self.config.grid.x_max, center, 0.012)),
+                    (
+                        (self.config.grid.x_min, center, 0.012),
+                        (self.config.grid.x_max, center, 0.012),
+                    ),
                     (0.82, 0.82, 0.82, 0.65),
                     0.012,
                 )
@@ -307,7 +322,10 @@ class DreamVisualizationNode(Node):
                 self._line(
                     30 + index,
                     "road_bounds",
-                    ((self.config.grid.x_min, boundary, 0.01), (self.config.grid.x_max, boundary, 0.01)),
+                    (
+                        (self.config.grid.x_min, boundary, 0.01),
+                        (self.config.grid.x_max, boundary, 0.01),
+                    ),
                     (1.0, 1.0, 1.0, 0.45),
                     0.02,
                 )
@@ -526,8 +544,26 @@ class DreamVisualizationNode(Node):
             f"max MPC: {1000.0 * float(self.metrics.get('maximum_mpc_seconds', 0.0)):.0f} ms"
         )
         markers = [
-            self._text(500, "scenario_text", 3.0, 0.82, 0.35, scenario_text, (1.0, 1.0, 1.0, 1.0), 0.105),
-            self._text(501, "metrics_text", 4.65, -0.78, 0.35, metric_text, (0.2, 0.95, 1.0, 1.0), 0.09),
+            self._text(
+                500,
+                "scenario_text",
+                3.0,
+                0.82,
+                0.35,
+                scenario_text,
+                (1.0, 1.0, 1.0, 1.0),
+                0.105,
+            ),
+            self._text(
+                501,
+                "metrics_text",
+                4.65,
+                -0.78,
+                0.35,
+                metric_text,
+                (0.2, 0.95, 1.0, 1.0),
+                0.09,
+            ),
         ]
         if self.smoke:
             passed = bool(self.smoke.get("passed", False))

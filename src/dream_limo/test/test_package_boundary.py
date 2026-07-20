@@ -21,3 +21,10 @@ def test_dream_has_no_sfg_python_imports_and_one_reviewed_cmd_vel_publisher():
     assert 'self.declare_parameter("platform_watchdog_verified", False)' in gate
     assert 'self.declare_parameter("operator_kill_verified", False)' in gate
     assert 'OUTPUT_TOPIC = "/cmd_vel"' in gate
+
+
+def test_optional_merger_adapter_is_exported_by_dream_package():
+    root = Path(__file__).resolve().parents[1]
+    setup = (root / "setup.py").read_text()
+    assert "dream_merger_odometry_adapter" in setup
+    assert "dream_limo.merger_odometry_adapter_node:main" in setup

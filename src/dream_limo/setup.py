@@ -24,6 +24,11 @@ setup(
         ("share/" + package_name + "/config", glob("config/*.yaml")),
         ("share/" + package_name + "/launch", glob("launch/*.launch.py")),
         ("share/" + package_name + "/rviz", glob("rviz/*.rviz")),
+        ("share/" + package_name + "/patches", glob("patches/*.patch")),
+        (
+            "share/" + package_name + "/benchmark_results",
+            glob("benchmark_results/*.json"),
+        ),
         ("share/" + package_name + "/scripts", ["scripts/run_stage1_replay.py"]),
     ],
     install_requires=["setuptools"],
@@ -51,7 +56,9 @@ setup(
             "dream_collision_monitor = dream_limo.collision_monitor_node:main",
             "dream_hardware_command_gate = dream_limo.hardware_command_gate_node:main",
             "dream_hardware_deadman = dream_limo.hardware_deadman_node:main",
+            "dream_merger_odometry_adapter = dream_limo.merger_odometry_adapter_node:main",
             "dream_stage1_replay = dream_limo.stage1_cli:main",
+            "dream_mpc_benchmark = dream_limo.mpc_benchmark:main",
         ],
     },
 )

@@ -5,6 +5,7 @@ import os
 from ament_index_python.packages import get_package_share_directory
 from launch import LaunchDescription
 from launch.actions import DeclareLaunchArgument, IncludeLaunchDescription
+from launch.conditions import UnlessCondition
 from launch.launch_description_sources import PythonLaunchDescriptionSource
 from launch.substitutions import LaunchConfiguration
 from launch_ros.actions import Node
@@ -24,6 +25,8 @@ def generate_launch_description():
     expected_arm_owner = LaunchConfiguration("expected_arm_owner")
     enforce_map_bounds = LaunchConfiguration("enforce_map_bounds")
     latch_perceived_occlusion = LaunchConfiguration("latch_perceived_occlusion")
+    target_speed = LaunchConfiguration("target_speed")
+    use_merger_odom = LaunchConfiguration("use_merger_odom")
 
     return LaunchDescription(
         [
@@ -37,6 +40,8 @@ def generate_launch_description():
             DeclareLaunchArgument("expected_arm_owner", default_value=""),
             DeclareLaunchArgument("enforce_map_bounds", default_value="false"),
             DeclareLaunchArgument("latch_perceived_occlusion", default_value="false"),
+            DeclareLaunchArgument("target_speed", default_value="0.50"),
+            DeclareLaunchArgument("use_merger_odom", default_value="false"),
             # Reuse only SFG's neutral scan-to-cluster public front end.  Do not
             # start its pedestrian detector, generic tracker, or planner here.
             Node(
@@ -45,6 +50,7 @@ def generate_launch_description():
                 name="lidar_cluster_buffer_node",
                 output="screen",
                 parameters=[perception_params],
+                condition=UnlessCondition(use_merger_odom),
             ),
             Node(
                 package="dream_limo",
@@ -52,17 +58,19 @@ def generate_launch_description():
                 name="dream_vehicle_tracker",
                 output="screen",
                 parameters=[dream_params],
+                condition=UnlessCondition(use_merger_odom),
             ),
             IncludeLaunchDescription(
                 PythonLaunchDescriptionSource(sensor_launch),
                 launch_arguments={
                     "preset": model,
-                    "use_merger_odom": "false",
+                    "use_merger_odom": use_merger_odom,
                     "rviz": rviz,
                     "expected_cmd_vel_owner": expected_cmd_vel_owner,
                     "expected_arm_owner": expected_arm_owner,
                     "enforce_map_bounds": enforce_map_bounds,
                     "latch_perceived_occlusion": latch_perceived_occlusion,
+                    "target_speed": target_speed,
                 }.items(),
             ),
         ]

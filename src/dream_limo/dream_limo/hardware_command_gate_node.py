@@ -48,9 +48,10 @@ class DreamHardwareCommandGateNode(Node):
         # the checked-in mission start pose.
         self.declare_parameter("hardware_output_enabled", False)
         self.declare_parameter("staging_pose_verified", False)
-        # The installed base driver has no ROS command watchdog.  These remain
-        # false until a wheels-off-ground stale-command test and the human's
-        # independent stop control have both been demonstrated for this unit.
+        # The serial-boundary watchdog is installed but is not yet physically
+        # commissioned. These remain false until a wheels-off-ground stale-
+        # command test and the human's independent stop control have both been
+        # demonstrated for this unit.
         self.declare_parameter("platform_watchdog_verified", False)
         self.declare_parameter("operator_kill_verified", False)
         self.declare_parameter("candidate_topic", "/cmd_vel_test")

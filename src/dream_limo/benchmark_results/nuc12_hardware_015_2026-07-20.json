@@ -1,0 +1,126 @@
+{
+  "platform": {
+    "system": "Linux-6.8.0-124-generic-x86_64-with-glibc2.35",
+    "machine": "x86_64",
+    "logical_cpus": 16,
+    "python": "3.10.12"
+  },
+  "dependencies": {
+    "numpy": "1.26.4",
+    "scipy": "1.13.0",
+    "cvxpy": "1.7.5",
+    "casadi": "3.7.2",
+    "osqp": "1.1.1",
+    "cvxpy_solvers": [
+      "CLARABEL",
+      "DIFFCP",
+      "ECOS",
+      "ECOS_BB",
+      "OSQP",
+      "SCIPY",
+      "SCS"
+    ]
+  },
+  "configuration": {
+    "horizon": 6,
+    "dt_seconds": 0.2,
+    "control_period_seconds": 0.2,
+    "target_speed_mps": 0.15,
+    "osqp_time_limit_seconds": 0.15,
+    "map_bounds_enforced": true,
+    "maximum_allowed_cbf_slack": 0.05,
+    "iterations_per_case": 50
+  },
+  "cases": {
+    "balanced:standstill_clear": {
+      "count": 50,
+      "cold_ms": 57.172896999873046,
+      "warm_median_ms": 45.69752099996549,
+      "p95_ms": 62.51203315001703,
+      "p99_ms": 65.45213451995096,
+      "maximum_ms": 65.45931400000882,
+      "fallbacks": 0,
+      "statuses": [
+        "optimal"
+      ],
+      "maximum_cbf_slack": 0.0,
+      "all_finite": true
+    },
+    "balanced:occluded_truck_lane_keep": {
+      "count": 50,
+      "cold_ms": 62.30097699994985,
+      "warm_median_ms": 61.423308000030374,
+      "p95_ms": 113.13069159998577,
+      "p99_ms": 124.68876020007198,
+      "maximum_ms": 130.98002700007783,
+      "fallbacks": 0,
+      "statuses": [
+        "optimal"
+      ],
+      "maximum_cbf_slack": 1.3262234765669715e-09,
+      "all_finite": true
+    },
+    "balanced:revealed_merger_merge": {
+      "count": 50,
+      "cold_ms": 80.52557499991053,
+      "warm_median_ms": 62.217548000035094,
+      "p95_ms": 82.52692349993822,
+      "p99_ms": 86.23130421000496,
+      "maximum_ms": 87.28395699995417,
+      "fallbacks": 0,
+      "statuses": [
+        "optimal"
+      ],
+      "maximum_cbf_slack": 3.302311249850356e-08,
+      "all_finite": true
+    },
+    "pure_mpc:standstill_clear": {
+      "count": 50,
+      "cold_ms": 43.97472999994534,
+      "warm_median_ms": 47.21652099988205,
+      "p95_ms": 71.52036530000031,
+      "p99_ms": 75.32819261004306,
+      "maximum_ms": 76.22166400005881,
+      "fallbacks": 0,
+      "statuses": [
+        "optimal"
+      ],
+      "maximum_cbf_slack": 0.0,
+      "all_finite": true
+    },
+    "pure_mpc:occluded_truck_lane_keep": {
+      "count": 50,
+      "cold_ms": 56.364088999998785,
+      "warm_median_ms": 60.29976499985423,
+      "p95_ms": 83.21688294990962,
+      "p99_ms": 86.20426878999297,
+      "maximum_ms": 86.4631009999357,
+      "fallbacks": 0,
+      "statuses": [
+        "optimal"
+      ],
+      "maximum_cbf_slack": 2.9976161482633176e-09,
+      "all_finite": true
+    },
+    "pure_mpc:revealed_merger_merge": {
+      "count": 50,
+      "cold_ms": 58.65623199997572,
+      "warm_median_ms": 61.89674400002332,
+      "p95_ms": 109.21725969994895,
+      "p99_ms": 124.36795165001509,
+      "maximum_ms": 134.1148429999066,
+      "fallbacks": 0,
+      "statuses": [
+        "optimal"
+      ],
+      "maximum_cbf_slack": 3.321833215830495e-08,
+      "all_finite": true
+    }
+  },
+  "verification": {
+    "passed": true,
+    "maximum_p99_ms": 150.0,
+    "failures": [],
+    "motion_output_possible": false
+  }
+}

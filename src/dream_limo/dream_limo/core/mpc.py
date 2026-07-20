@@ -20,6 +20,7 @@ import numpy as np
 
 from dream_limo.limo_scale import DeploymentConfig, IntegrationPreset
 
+from .mission import stopping_speed_limit
 from .risk_field import DREAMRiskField
 from .route import anchored_lane_change_y
 from .types import ControlCommand, EgoState, Vehicle
@@ -102,7 +103,19 @@ class RiskAwareMPC:
         progress = np.linspace(0.0, 1.0, count)
         blend = progress * progress * (3.0 - 2.0 * progress)
         reference = np.zeros((4, count), dtype=np.float64)
-        reference[0] = ego.x + self.config.target_speed * self.config.dt * np.arange(count)
+        goal_x = self.deployment.arena.mission_goal_x
+        reference[0, 0] = ego.x
+        for index in range(count):
+            reference[2, index] = stopping_speed_limit(
+                goal_x - reference[0, index],
+                cruise_speed=self.config.target_speed,
+                braking_deceleration=self.config.mission_braking_deceleration,
+            )
+            if index + 1 < count:
+                reference[0, index + 1] = min(
+                    goal_x,
+                    reference[0, index] + self.config.dt * reference[2, index],
+                )
         if target_lane == self.deployment.arena.target_lane:
             arena = self.deployment.arena
             reference[1] = anchored_lane_change_y(
@@ -115,8 +128,8 @@ class RiskAwareMPC:
         else:
             reference[1] = ego.y + blend * (target_y - ego.y)
         dy = np.gradient(reference[1], self.config.dt)
-        reference[3] = np.arctan2(dy, np.maximum(self.config.target_speed, 1.0e-3))
-        reference[2] = self.config.target_speed
+        dx = np.gradient(reference[0], self.config.dt)
+        reference[3] = np.arctan2(dy, np.maximum(dx, 1.0e-3))
         return reference
 
     def _warm_start(self, initial: Array, reference: Array) -> Tuple[Array, Array]:
@@ -229,6 +242,14 @@ class RiskAwareMPC:
                 control[1, :] <= self.config.maximum_steer,
             )
         )
+        # Never plan beyond the declared mission endpoint. A small tolerance
+        # matches the completion latch and avoids infeasibility from odometry
+        # quantization immediately before the goal.
+        constraints.append(
+            state[0, 1:]
+            <= self.deployment.arena.mission_goal_x
+            + self.config.mission_position_tolerance
+        )
         if self.enforce_map_bounds:
             # Physical deployment keeps the complete circular safety footprint
             # inside the same grid/road corridor as the final collision gate.
@@ -287,7 +308,10 @@ class RiskAwareMPC:
             A, B, offset = self.model.linearize(
                 linearization_states[:, step], linearization_controls[:, step]
             )
-            constraints.append(state[:, step + 1] == A @ state[:, step] + B @ control[:, step] + offset)
+            constraints.append(
+                state[:, step + 1]
+                == A @ state[:, step] + B @ control[:, step] + offset
+            )
             objective += self.config.position_weight * cp.square(
                 state[1, step] - reference[1, step]
             )
@@ -321,6 +345,9 @@ class RiskAwareMPC:
         terminal = self.config.terminal_multiplier
         objective += terminal * self.config.position_weight * cp.square(
             state[1, horizon] - reference[1, horizon]
+        )
+        objective += 0.05 * terminal * self.config.position_weight * cp.square(
+            state[0, horizon] - reference[0, horizon]
         )
         objective += terminal * self.config.heading_weight * cp.square(
             state[3, horizon] - reference[3, horizon]

@@ -1,0 +1,2 @@
+# Third-party patch context preserves the upstream driver's whitespace.
+patches/*.patch -whitespace

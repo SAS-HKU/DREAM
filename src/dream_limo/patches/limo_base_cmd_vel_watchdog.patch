@@ -1,0 +1,208 @@
+diff --git a/limo_base/include/limo_base/limo_driver.h b/limo_base/include/limo_base/limo_driver.h
+index cc1550a..5414a45 100644
+--- a/limo_base/include/limo_base/limo_driver.h
++++ b/limo_base/include/limo_base/limo_driver.h
+@@ -79,6 +79,8 @@ private:
+     void enableMcMode();
+     void processErrorCode(uint16_t error_code);
+     void twistCmdCallback(const geometry_msgs::msg::Twist::SharedPtr msg);
++    void commandWatchdogCallback();
++    void sendStopCommand();
+     double normalizeAngle(double angle);
+     double degToRad(double deg);
+     double convertInnerAngleToCentral(double inner_angle);
+@@ -104,11 +106,17 @@ private:
+ 
+     bool pub_odom_tf_ = false;
+     bool use_mcnamu_ = false;
++    double cmd_vel_timeout_ = 0.25;
++    std::chrono::steady_clock::time_point last_command_time_;
++    bool command_received_ = false;
++    bool command_watchdog_stopped_ = true;
++    bool nonfinite_command_reported_ = false;
+     double present_theta_,last_theta_,delta_theta_,real_theta_,rad;
+     rclcpp::Publisher<nav_msgs::msg::Odometry>::SharedPtr odom_publisher_;
+     rclcpp::Publisher<limo_msgs::msg::LimoStatus>::SharedPtr status_publisher_;
+ 
+     rclcpp::Subscription<geometry_msgs::msg::Twist>::SharedPtr motion_cmd_sub_;
++    rclcpp::TimerBase::SharedPtr command_watchdog_timer_;
+     // rclcpp::Subscription<scout_msgs::msg::ScoutLightCmd>::SharedPtr
+     //   light_cmd_sub_;
+     rclcpp::Publisher<sensor_msgs::msg::Imu>::SharedPtr imu_publisher_;
+@@ -126,7 +134,7 @@ private:
+     double theta_ = 0.0;
+ 
+     ImuData imu_data_;
+-    uint8_t motion_mode_;  // current motion type
++    uint8_t motion_mode_ = 0xff;  // unsupported until the base reports its mode
+ 
+     static constexpr double max_inner_angle_ = 0.48869;  // 28 degree
+     static constexpr double track_ = 0.172;           // m (left right wheel distance)
+diff --git a/limo_base/src/limo_driver.cpp b/limo_base/src/limo_driver.cpp
+index 171b71b..f4fd27b 100644
+--- a/limo_base/src/limo_driver.cpp
++++ b/limo_base/src/limo_driver.cpp
+@@ -30,6 +30,9 @@
+ 
+ #include "limo_base/limo_driver.h"
+ 
++#include <cmath>
++#include <stdexcept>
++
+ int flag=0; 
+ 
+ namespace AgileX {
+@@ -44,12 +47,18 @@ LimoDriver::LimoDriver(std::string node_name):rclcpp::Node(node_name),keep_runni
+     this->declare_parameter("control_rate",50);
+     this->declare_parameter("pub_odom_tf",false);
+     this->declare_parameter("use_mcnamu",false);
++    this->declare_parameter("cmd_vel_timeout",0.25);
+     //获取参数   
+     this->get_parameter_or<std::string>("port_name", port_name, "ttylimo");
+     this->get_parameter_or<std::string>("odom_frame", odom_frame_, "odom");
+     this->get_parameter_or<std::string>("base_frame", base_frame_, "base_link");
+     this->get_parameter_or<bool>("pub_odom_tf", pub_odom_tf_, "false");
+     this->get_parameter_or<bool>("use_mcnamu", use_mcnamu_, "false");
++    this->get_parameter_or<double>("cmd_vel_timeout", cmd_vel_timeout_, 0.25);
++    if (!std::isfinite(cmd_vel_timeout_) || cmd_vel_timeout_ <= 0.0 ||
++        cmd_vel_timeout_ > 1.0) {
++        throw std::invalid_argument("cmd_vel_timeout must be finite and in (0, 1.0] seconds");
++    }
+     
+ 
+     std::cout << "Loading parameters: " << std::endl;
+@@ -58,6 +67,7 @@ LimoDriver::LimoDriver(std::string node_name):rclcpp::Node(node_name),keep_runni
+     std::cout << "- base frame name: " << base_frame_ << std::endl;
+     std::cout << "- pub odom tf: " << pub_odom_tf_ << std::endl;
+     std::cout << "-use_mcnamu: " << use_mcnamu_ << std::endl;
++    std::cout << "- cmd_vel timeout: " << cmd_vel_timeout_ << " s" << std::endl;
+ 
+     tf_broadcaster_=std::make_shared<tf2_ros::TransformBroadcaster>(*this);
+     tf_static_broadcaster_ = std::make_shared<tf2_ros::StaticTransformBroadcaster>(*this);
+@@ -76,6 +86,11 @@ LimoDriver::LimoDriver(std::string node_name):rclcpp::Node(node_name),keep_runni
+         keep_running_=true;
+         this->connect(port_name, B460800);
+         this->enableCommandedMode();
++        this->sendStopCommand();
++        last_command_time_ = std::chrono::steady_clock::now();
++        command_watchdog_timer_ = this->create_wall_timer(
++            std::chrono::milliseconds(20),
++            std::bind(&LimoDriver::commandWatchdogCallback, this));
+ 
+     if(use_mcnamu_) {
+         motion_mode_ = MODE_MCNAMU;
+@@ -83,12 +98,20 @@ LimoDriver::LimoDriver(std::string node_name):rclcpp::Node(node_name),keep_runni
+     }
+ 
+         RCLCPP_INFO(this->get_logger(),"Open the serial port:'%s'",port_name.c_str());
++        RCLCPP_INFO(
++            this->get_logger(),
++            "Serial command watchdog enabled (timeout %.3f s); output starts stopped",
++            cmd_vel_timeout_);
+         
+     }
+ }
+ 
+ LimoDriver::~LimoDriver() {
+-
++    command_watchdog_timer_.reset();
++    if (port_ && port_->isOpen() == 0) {
++        sendStopCommand();
++        RCLCPP_INFO(this->get_logger(), "Sent zero motion command during orderly shutdown");
++    }
+ }
+ 
+ void LimoDriver::run(){
+@@ -418,11 +441,55 @@ void LimoDriver::sendFrame(const LimoFrame& frame) {
+ 
+     port_->writeData(data, frame_len);
+ }
++
++void LimoDriver::sendStopCommand()
++{
++    setMotionCommand(0.0, 0.0, 0.0, 0.0);
++}
++
++void LimoDriver::commandWatchdogCallback()
++{
++    const auto now = std::chrono::steady_clock::now();
++    const double age = std::chrono::duration<double>(now - last_command_time_).count();
++    if (!command_received_ || age >= cmd_vel_timeout_) {
++        // Repeat the zero frame while stale so loss of the DREAM gate cannot
++        // leave the last nonzero serial command active in the base.
++        sendStopCommand();
++        if (!command_watchdog_stopped_) {
++            RCLCPP_WARN(
++                this->get_logger(),
++                "cmd_vel stale for %.3f s (limit %.3f s); serial output forced to zero",
++                age, cmd_vel_timeout_);
++            command_watchdog_stopped_ = true;
++        }
++    }
++}
++
+ void LimoDriver::twistCmdCallback(const geometry_msgs::msg::Twist::SharedPtr msg)
+ {
++    const double values[] = {
++        msg->linear.x, msg->linear.y, msg->linear.z,
++        msg->angular.x, msg->angular.y, msg->angular.z};
++    for (const double value : values) {
++        if (!std::isfinite(value)) {
++            sendStopCommand();
++            command_received_ = false;
++            command_watchdog_stopped_ = true;
++            if (!nonfinite_command_reported_) {
++                RCLCPP_ERROR(
++                    this->get_logger(),
++                    "Rejected non-finite cmd_vel; serial output forced to zero");
++                nonfinite_command_reported_ = true;
++            }
++            return;
++        }
++    }
++
++    bool command_forwarded = false;
+     switch (motion_mode_) {
+         case MODE_FOUR_DIFF: {
+             setMotionCommand(msg->linear.x, msg->angular.z, 0, 0);
++            command_forwarded = true;
+             break;
+         }
+         case MODE_ACKERMANN: {
+@@ -452,16 +519,30 @@ void LimoDriver::twistCmdCallback(const geometry_msgs::msg::Twist::SharedPtr msg
+ 
+             //setMotionCommand(msg->linear.x, 0, 0, steering_angle);
+             setMotionCommand(msg->linear.x, 0, 0, msg->angular.z);
++            command_forwarded = true;
+             break;
+         }
+         case MODE_MCNAMU: {
+             setMotionCommand(msg->linear.x, msg->angular.z, msg->linear.y, 0);
++            command_forwarded = true;
+             break;
+         }
+         default:
+             // ROS_INFO("motion mode not supported in receive cmd_vel");waring
+             break;
+     }
++
++    if (command_forwarded) {
++        last_command_time_ = std::chrono::steady_clock::now();
++        command_received_ = true;
++        nonfinite_command_reported_ = false;
++        if (command_watchdog_stopped_) {
++            RCLCPP_INFO(
++                this->get_logger(),
++                "Received finite cmd_vel; serial watchdog released");
++            command_watchdog_stopped_ = false;
++        }
++    }
+ }
+ 
+ void LimoDriver::publishIMUData(double stamp) {
+@@ -679,5 +760,3 @@ double LimoDriver::convertCentralAngleToInner(double central_angle) {
+ }
+ 
+ }
+-
+-
