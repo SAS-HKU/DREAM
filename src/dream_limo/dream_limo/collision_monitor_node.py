@@ -45,6 +45,9 @@ class DreamCollisionMonitorNode(Node):
         self.future_stamp_tolerance = self._nonnegative_parameter(
             "future_stamp_tolerance"
         )
+        self.occlusion_shadow_blocks_trajectory = bool(
+            self.get_parameter("occlusion_shadow_blocks_trajectory").value
+        )
 
         grid = self.config.grid
         self.spec = CollisionGridSpec(
@@ -155,6 +158,10 @@ class DreamCollisionMonitorNode(Node):
         self.declare_parameter("future_stamp_tolerance", 0.05)
         self.declare_parameter("surface_retention_seconds", 0.75)
         self.declare_parameter("minimum_valid_rays", 20)
+        # Default fail-closed for direct node use.  The reviewed hardware YAML
+        # explicitly selects risk-only shadows because DRIFT and its veto own
+        # occlusion response; measured LiDAR returns remain hard obstacles.
+        self.declare_parameter("occlusion_shadow_blocks_trajectory", True)
         self.declare_parameter(
             "inflation_margin", self.config.safety.collision_inflation_margin
         )
@@ -309,8 +316,9 @@ class DreamCollisionMonitorNode(Node):
         if values.size != self.spec.width * self.spec.height:
             self.mask_error = "MASK_PAYLOAD_SIZE_MISMATCH"
             return
-        # Both explicit OccupancyGrid unknown (-1) and DREAM shadow (>0) are
-        # non-traversable at the physical gate.
+        # Both explicit OccupancyGrid unknown (-1) and DREAM shadow (>0) become
+        # UNKNOWN in the diagnostic grid.  The configured policy determines
+        # whether UNKNOWN blocks the trajectory; it never changes surfaces.
         self.shadow_unknown = (values.reshape(self.spec.shape) != 0)
         self.mask_ok = True
         self.mask_error = "ok"
@@ -399,10 +407,20 @@ class DreamCollisionMonitorNode(Node):
             else np.ones(self.spec.shape, dtype=bool)
         )
         assessment = TrajectoryAssessment(False, reason, 0)
+        trajectory_shadow_overlap_samples = None
         try:
             grid, digest = self.envelope.render(shadow, now=now)
             if ready:
-                assessment = self.envelope.assess_trajectory(self.path_points, grid)
+                trajectory_shadow_overlap_samples = (
+                    self.envelope.trajectory_mask_overlap_samples(
+                        self.path_points, self.shadow_unknown
+                    )
+                )
+                assessment = self.envelope.assess_trajectory(
+                    self.path_points,
+                    grid,
+                    unknown_is_collision=self.occlusion_shadow_blocks_trajectory,
+                )
                 reason = assessment.reason
         except ValueError as exc:
             ready = False
@@ -420,6 +438,14 @@ class DreamCollisionMonitorNode(Node):
             "trajectory_clear": trajectory_clear,
             "reason": reason,
             "frame_id": self.map_frame,
+            "shadow_policy": (
+                "hard_collision"
+                if self.occlusion_shadow_blocks_trajectory
+                else "risk_only"
+            ),
+            "occlusion_shadow_blocks_trajectory": (
+                self.occlusion_shadow_blocks_trajectory
+            ),
             "scan_fresh": self._fresh(now, self.last_scan_receipt, self.scan_timeout),
             "mask_fresh": self._fresh(now, self.last_mask_receipt, self.mask_timeout),
             "path_fresh": self._fresh(now, self.last_path_receipt, self.path_timeout),
@@ -450,6 +476,7 @@ class DreamCollisionMonitorNode(Node):
             ),
             "blocked_cells": None if digest is None else digest.blocked_cells,
             "trajectory_samples": assessment.evaluated_samples,
+            "trajectory_shadow_overlap_samples": trajectory_shadow_overlap_samples,
             "first_unsafe": (
                 None
                 if assessment.first_unsafe_x is None

@@ -83,12 +83,15 @@ adaptation; it is not a claim of reproducing every upstream highway DFS mode.
 7. `dream_safety_supervisor`: independent watchdog and non-physical candidate
    output on `/cmd_vel_test`; only the hardware gate can publish physically.
 8. `dream_camera_evidence`: untouched and annotated front-camera evidence.
-   Camera freshness is an experiment-evidence preflight gate, but pixels and
-   annotations never enter DRIFT, decision-making, or MPC.
+   Stationary sensor-smoke mode checks camera freshness. Physical-motion mode
+   keeps publishing/recording the view but does not use camera freshness as a
+   readiness gate; pixels and annotations never enter DRIFT, decision-making,
+   or MPC.
 9. `dream_collision_monitor`: transforms
    each scan at its sensor timestamp, retains/inflates first-return surfaces,
-   treats LiDAR shadow and off-road space as non-traversable, and checks the
-   densely interpolated reference trajectory. It publishes no command topic.
+   keeps LiDAR shadow visible as risk-only diagnostic space, and checks the
+   densely interpolated reference trajectory. Measured surfaces and off-road
+   or outside-grid poses remain non-traversable. It publishes no command topic.
 10. `dream_goal_authorizer`: the default hardware activator. It validates a
     map-frame `/goal_pose`, or synthesizes the same validated one-shot goal from
     `merge_mission.yaml` in `auto_forward` mode. It publishes
@@ -229,8 +232,9 @@ Do not add the enabling arguments until the commissioning checklist in
 
 After those checks pass, the no-click forward mission is selected with
 `activation_mode:=auto_forward`. It still waits for a stopped ego, fresh
-camera/LiDAR/planner data, passed preflight, the supervisor countdown, and all
-physical-output gates; it does not bypass any motion check.
+LiDAR/planner data, passed preflight, the supervisor countdown, and all
+physical-output gates; it does not bypass any motion check. Camera evidence
+remains visible and recordable but is not a planner or physical-motion gate.
 
 ## Perceived scene versus mission intent
 
@@ -261,12 +265,14 @@ camera line of sight. That is sensor installation/experiment validation, not a
 manually entered scene polygon.
 
 One 2-D scan cannot always recover the far face or complete footprint of a long
-occluder. The hardware collision monitor therefore treats the measured shadow
-as unknown/non-traversable, retains first-return surfaces briefly, inflates
-them by the robot half-diagonal plus margin, and rejects any reference path
-touching unknown, occupied, off-road, or outside-grid space. This is a final
-trajectory gate; it does not fabricate unseen geometry or leak the hidden
-merger into the vehicle list.
+occluder. The collision grid therefore displays the measured shadow as unknown,
+but the hardware experiment config treats that shadow as DREAM risk evidence,
+not as a fabricated solid wall. It retains first-return surfaces briefly,
+inflates them by the robot half-diagonal plus margin, and rejects paths touching
+those measured surfaces, off-road space, or outside-grid space. Stale or missing
+scan/mask/path/TF inputs still fail closed. This preserves the intended
+`Q_occ`/veto/MPC response and does not leak the hidden merger into the vehicle
+list.
 
 ## Run 1: headless replay
 
@@ -405,8 +411,15 @@ source /opt/ros/humble/setup.bash
 source "$HOME/agilex_ws/install/setup.bash"
 source "$HOME/limo_lvv_ws/install/setup.bash"
 
-ros2 launch astra_camera dabai.launch.py
+ros2 launch astra_camera dabai.launch.py \
+  enable_point_cloud:=false \
+  enable_colored_point_cloud:=false \
+  enable_depth:=false \
+  enable_ir:=false
 ```
+
+Only RGB is needed for driver-view evidence. Disabling unused depth, IR, and
+point-cloud streams leaves substantially more CPU time for DRIFT and MPC.
 
 ### Terminal 3 — verify live inputs before DREAM
 
@@ -644,6 +657,11 @@ ros2 topic echo /dream/preflight_status --full-length --once
 ros2 topic echo /limo_status --field motion_mode --once
 ```
 
+`/dream/hardware_gate_status.reason` is the authoritative explanation for a
+zero command. If it is `TRAJECTORY_BLOCKED`, inspect
+`/dream/collision_status.reason` and `first_unsafe`; republishing a goal or
+raising `target_speed` cannot override the collision gate.
+
 Stop the zero-output commissioning launch with `Ctrl-C` and wait for all of
 its child processes to exit before starting the enabled launch below. Confirm
 that the old graph is gone; this check must report no publisher on `/cmd_vel`:
@@ -674,7 +692,8 @@ ROS_DOMAIN_ID=0 ros2 launch dream_limo dream_hardware_motion.launch.py \
 Start at `0.05 m/s`; `target_speed` is both the planner cruise target and the
 final hardware-gate maximum. The hardware launch accepts only
 `0.03 < target_speed <= 0.15 m/s` and rejects values such as `0.35` before
-constructing the motion graph.
+constructing the motion graph. It is a nominal target/cap, not a forced speed:
+balanced DREAM may command less when the risk field is high.
 
 For operator-selected goal activation instead, change only
 `activation_mode:=goal`. The robot then remains stopped after launch. In RViz
@@ -697,6 +716,13 @@ can DREAM/MPC command forward motion and react to perceived visible/occluded
 agents. Never reposition an occluder or robot while an enabled launch is
 running. A goal selects the destination along this package's three-lane merge
 mission; this is not a Nav2 free-space path planner for arbitrary destinations.
+
+`auto_forward` has already submitted its one-shot configured goal and therefore
+intentionally ignores later `/goal_pose` clicks. Use `activation_mode:=goal`
+when a clicked or published goal should trigger the run. In a clear, healthy
+startup, allow roughly 11 seconds before first motion: about five seconds of
+DRIFT warm-up, three seconds in the supervisor, and three seconds in the final
+hardware gate. Any changing failure reason resets the applicable countdown.
 
 Confirm activation before allowing the arena run:
 

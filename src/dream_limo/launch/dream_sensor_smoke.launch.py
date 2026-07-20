@@ -20,6 +20,7 @@ def generate_launch_description():
     preset = LaunchConfiguration("preset")
     use_merger_odom = LaunchConfiguration("use_merger_odom")
     rviz = LaunchConfiguration("rviz")
+    require_camera_evidence = LaunchConfiguration("require_camera_evidence")
     expected_cmd_vel_owner = LaunchConfiguration("expected_cmd_vel_owner")
     expected_arm_owner = LaunchConfiguration("expected_arm_owner")
     enforce_map_bounds = LaunchConfiguration("enforce_map_bounds")
@@ -31,6 +32,7 @@ def generate_launch_description():
             DeclareLaunchArgument("preset", default_value="balanced"),
             DeclareLaunchArgument("use_merger_odom", default_value="false"),
             DeclareLaunchArgument("rviz", default_value="true"),
+            DeclareLaunchArgument("require_camera_evidence", default_value="true"),
             DeclareLaunchArgument("expected_cmd_vel_owner", default_value=""),
             DeclareLaunchArgument("expected_arm_owner", default_value=""),
             DeclareLaunchArgument("enforce_map_bounds", default_value="false"),
@@ -42,7 +44,7 @@ def generate_launch_description():
                 launch_arguments={
                     "preset": preset,
                     "use_merger_odom": use_merger_odom,
-                    "require_camera_evidence": "true",
+                    "require_camera_evidence": require_camera_evidence,
                     "require_perceived_occlusion": "true",
                     "expected_cmd_vel_owner": expected_cmd_vel_owner,
                     "expected_arm_owner": expected_arm_owner,

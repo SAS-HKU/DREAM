@@ -79,6 +79,30 @@ def test_shadow_unknown_is_nontraversable_and_sparse_path_is_interpolated():
     assert assessment.evaluated_samples > 2
 
 
+def test_risk_only_shadow_clears_but_measured_surface_still_blocks():
+    envelope = make_envelope(inflation_radius=0.0)
+    shadow = np.zeros(make_spec().shape)
+    shadow[10, 10] = 100
+    path = np.asarray([[0.5, 1.0], [1.5, 1.0]])
+    grid, _ = envelope.render(shadow, now=1.0)
+
+    assert envelope.trajectory_mask_overlap_samples(path, shadow) > 0
+    risk_only = envelope.assess_trajectory(
+        path, grid, unknown_is_collision=False
+    )
+    assert risk_only.clear
+
+    envelope.record_scan(
+        np.asarray([[1.0, 1.0]]), receipt_time=1.0, valid_ray_count=3
+    )
+    grid, _ = envelope.render(shadow, now=1.1)
+    measured_surface = envelope.assess_trajectory(
+        path, grid, unknown_is_collision=False
+    )
+    assert not measured_surface.clear
+    assert measured_surface.reason == "OCCUPIED_SURFACE"
+
+
 def test_surface_between_sparse_path_poses_is_not_skipped():
     envelope = make_envelope(inflation_radius=0.0)
     envelope.record_scan(
@@ -109,13 +133,17 @@ def test_outside_grid_and_outside_road_are_distinct_fail_closed_reasons():
     assert grid[2, 10] == CollisionEnvelope.OCCUPIED
 
     off_road = envelope.assess_trajectory(
-        np.asarray([[0.5, 0.4], [1.0, 0.4]]), grid
+        np.asarray([[0.5, 0.4], [1.0, 0.4]]),
+        grid,
+        unknown_is_collision=False,
     )
     assert not off_road.clear
     assert off_road.reason == "OUTSIDE_ROAD"
 
     outside = envelope.assess_trajectory(
-        np.asarray([[0.5, 1.0], [2.1, 1.0]]), grid
+        np.asarray([[0.5, 1.0], [2.1, 1.0]]),
+        grid,
+        unknown_is_collision=False,
     )
     assert not outside.clear
     assert outside.reason == "OUTSIDE_GRID"
@@ -147,6 +175,11 @@ def test_ros_node_uses_scan_stamp_and_has_no_command_interface():
     assert "create_publisher(Twist" not in source
     assert '"/cmd_vel"' not in source
     assert '"/dream/arm"' not in source
+    assert '"shadow_policy"' in source
+    assert '"trajectory_shadow_overlap_samples"' in source
+
+    hardware_config = (root / "config" / "dream_limo.yaml").read_text()
+    assert "occlusion_shadow_blocks_trajectory: false" in hardware_config
 
     # Only the dedicated, disabled-by-default hardware boundary may include it;
     # existing SIL/live dry-run behavior remains unchanged.
