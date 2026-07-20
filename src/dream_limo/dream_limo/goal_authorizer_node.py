@@ -24,6 +24,7 @@ from .core.goal_mission import (
     PreflightReadiness,
     evaluate_goal_authorization,
     goal_mission_config_from_deployment,
+    validate_configured_auto_goal,
     validate_goal_request,
 )
 from .limo_scale import default_deployment_config, deployment_config_for_arena
@@ -39,6 +40,7 @@ class DreamGoalAuthorizerNode(Node):
         default_contract = goal_mission_config_from_deployment(defaults)
         self.declare_parameter("arena_file", "")
         self.declare_parameter("enabled", False)
+        self.declare_parameter("auto_start", False)
         self.declare_parameter("goal_topic", "/goal_pose")
         self.declare_parameter("ego_topic", "/dream/ego_state")
         self.declare_parameter("accepted_goal_topic", "/dream/mission_goal")
@@ -84,6 +86,9 @@ class DreamGoalAuthorizerNode(Node):
         )
         publish_rate = float(self.get_parameter("publish_rate").value)
         self.enabled = bool(self.get_parameter("enabled").value)
+        self.auto_start = bool(self.get_parameter("auto_start").value)
+        self.configured_goal_x = float(deployment.arena.mission_goal_x)
+        self.configured_target_lane = deployment.arena.target_lane
         self.planner_timeout = float(self.get_parameter("planner_timeout").value)
         self.preflight_timeout = float(
             self.get_parameter("preflight_timeout").value
@@ -109,6 +114,19 @@ class DreamGoalAuthorizerNode(Node):
             reliability=ReliabilityPolicy.RELIABLE,
             durability=DurabilityPolicy.TRANSIENT_LOCAL,
         )
+        self.state = GoalMissionLatch()
+        self.ego: Optional[EgoMissionState] = None
+        self.planner: Optional[PlannerGoalReadiness] = None
+        self.preflight: Optional[PreflightReadiness] = None
+        # Auto-start waits until the planner has advertised its fail-closed
+        # WAITING_FOR_MISSION_GOAL state.  This prevents the one-shot, latched
+        # goal from aging out if the authorizer receives odometry before the
+        # planner has finished constructing its subscriptions.
+        self.planner_waiting_for_goal = False
+        self.accepted_goal_source_stamp: Optional[float] = None
+        self.accepted_goal_receipt_stamp: Optional[float] = None
+        self.accepted_goal_source = "waiting"
+
         self.mission_goal_publisher = self.create_publisher(
             PoseStamped,
             str(self.get_parameter("accepted_goal_topic").value),
@@ -153,12 +171,6 @@ class DreamGoalAuthorizerNode(Node):
             self._on_stop_mission,
         )
         self.create_timer(1.0 / publish_rate, self._publish_heartbeat)
-        self.state = GoalMissionLatch()
-        self.ego: Optional[EgoMissionState] = None
-        self.planner: Optional[PlannerGoalReadiness] = None
-        self.preflight: Optional[PreflightReadiness] = None
-        self.accepted_goal_source_stamp: Optional[float] = None
-        self.accepted_goal_receipt_stamp: Optional[float] = None
 
     def _now(self) -> float:
         return self.get_clock().now().nanoseconds * 1.0e-9
@@ -172,11 +184,46 @@ class DreamGoalAuthorizerNode(Node):
             source_stamp=stamp_to_seconds(message.header.stamp),
             receipt_stamp=self._now(),
         )
+        if self.auto_start:
+            self._try_auto_start()
+
+    def _try_auto_start(self) -> None:
+        """Accept the configured mission once a fresh, stopped ego is available."""
+        if (
+            not self.enabled
+            or not self.auto_start
+            or not self.planner_waiting_for_goal
+            or self.state.accepted_goal is not None
+            or self.state.stop_latched
+            or self.state.mission_complete
+        ):
+            return
+        now = self._now()
+        validation = validate_configured_auto_goal(
+            self.ego,
+            now=now,
+            config=self.contract,
+            mission_goal_x=self.configured_goal_x,
+            target_lane=self.configured_target_lane,
+        )
+        self._consider_and_publish_goal(
+            validation,
+            source_stamp=now,
+            receipt_stamp=now,
+            source="auto_forward",
+            warn_on_rejection=False,
+        )
 
     def _on_goal(self, message: PoseStamped) -> None:
         now = self._now()
         if not self.enabled:
             self.state.consider(GoalValidation(False, "DISABLED"))
+            self._publish_heartbeat()
+            return
+        if self.auto_start:
+            self.get_logger().warning(
+                "Ignoring operator goal because configured auto-start is active"
+            )
             self._publish_heartbeat()
             return
         pose = message.pose
@@ -197,10 +244,29 @@ class DreamGoalAuthorizerNode(Node):
             now=now,
             config=self.contract,
         )
+        self._consider_and_publish_goal(
+            validation,
+            source_stamp=stamp_to_seconds(message.header.stamp),
+            receipt_stamp=now,
+            source="operator_goal",
+            warn_on_rejection=True,
+        )
+
+    def _consider_and_publish_goal(
+        self,
+        validation: GoalValidation,
+        *,
+        source_stamp: float,
+        receipt_stamp: float,
+        source: str,
+        warn_on_rejection: bool,
+    ) -> bool:
+        previous_reason = self.state.reason
         if not self.state.consider(validation):
-            self.get_logger().warning(f"Goal rejected: {self.state.reason}")
+            if warn_on_rejection or self.state.reason != previous_reason:
+                self.get_logger().warning(f"Goal rejected: {self.state.reason}")
             self._publish_heartbeat()
-            return
+            return False
 
         goal = PoseStamped()
         goal.header.stamp = self.get_clock().now().to_msg()
@@ -210,14 +276,16 @@ class DreamGoalAuthorizerNode(Node):
         goal.pose.orientation.z = sin(0.5 * float(validation.goal_yaw))
         goal.pose.orientation.w = cos(0.5 * float(validation.goal_yaw))
         self.mission_goal_publisher.publish(goal)
-        self.accepted_goal_source_stamp = stamp_to_seconds(message.header.stamp)
-        self.accepted_goal_receipt_stamp = now
+        self.accepted_goal_source_stamp = float(source_stamp)
+        self.accepted_goal_receipt_stamp = float(receipt_stamp)
+        self.accepted_goal_source = str(source)
         self.get_logger().info(
             "Accepted one-shot mission goal: "
             f"x={validation.goal_x:.3f}, y={validation.goal_y:.3f}, "
-            f"lane={validation.target_lane}"
+            f"lane={validation.target_lane}, source={source}"
         )
         self._publish_heartbeat()
+        return True
 
     def _on_planner_status(self, message: String) -> None:
         now = self._now()
@@ -236,6 +304,13 @@ class DreamGoalAuthorizerNode(Node):
         if not isinstance(payload, dict):
             self.planner = PlannerGoalReadiness(False, None, None, now)
             return
+        if (
+            self.auto_start
+            and payload.get("mission_goal_required") is True
+            and payload.get("mission_goal_received") is False
+            and payload.get("reason") == "WAITING_FOR_MISSION_GOAL"
+        ):
+            self.planner_waiting_for_goal = True
         goal_x = payload.get("mission_goal_x")
         lane = payload.get(
             "mission_goal_target_lane", payload.get("route_target_lane")
@@ -254,6 +329,8 @@ class DreamGoalAuthorizerNode(Node):
             target_lane=lane,
             receipt_stamp=now,
         )
+        if self.auto_start:
+            self._try_auto_start()
 
     def _on_preflight_status(self, message: String) -> None:
         now = self._now()
@@ -301,6 +378,7 @@ class DreamGoalAuthorizerNode(Node):
             "external_stop": self.state.stop_latched,
             "reason": authorization.reason,
             "goal_active": self.state.active,
+            "goal_source": self.accepted_goal_source,
             "goal_received": self.state.goal_received,
             "goal_accepted": goal is not None,
             "target_lane": None if goal is None else goal.target_lane,
@@ -329,6 +407,8 @@ class DreamGoalAuthorizerNode(Node):
             "mission_complete": self.state.mission_complete,
             "stop_latched": self.state.stop_latched,
             "enabled": self.enabled,
+            "auto_start": self.auto_start,
+            "auto_start_planner_waiting_seen": self.planner_waiting_for_goal,
         }
 
     def _authorization(self, now: Optional[float] = None) -> GoalAuthorization:

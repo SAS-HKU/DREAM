@@ -3,7 +3,8 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, replace
-from math import asin, atan2, hypot, isfinite, pi
+from math import asin, atan2, cos, hypot, isfinite, pi, sin
+from operator import index
 from typing import Optional, Sequence, Tuple
 
 
@@ -389,6 +390,53 @@ def validate_goal_request(
         ego_source_age=ego_source_age,
         ego_receipt_age=ego_receipt_age,
     )
+
+
+def validate_configured_auto_goal(
+    ego: Optional[EgoMissionState],
+    *,
+    now: float,
+    config: GoalMissionConfig,
+    mission_goal_x: float,
+    target_lane: int,
+) -> GoalValidation:
+    """Synthesize and validate the configured one-shot autonomous goal.
+
+    The arena configuration remains the only source of mission geometry.  The
+    synthesized request deliberately passes through :func:`validate_goal_request`
+    so auto-start cannot bypass the stopped-ego, freshness, map-boundary, or
+    adjacent-lane checks applied to an operator-selected goal.
+    """
+    if isinstance(target_lane, bool):
+        return GoalValidation(False, "AUTO_TARGET_LANE_INVALID")
+    try:
+        lane_index = index(target_lane)
+    except TypeError:
+        return GoalValidation(False, "AUTO_TARGET_LANE_INVALID")
+    if lane_index < 0 or lane_index >= len(config.lane_centers):
+        return GoalValidation(False, "AUTO_TARGET_LANE_INVALID")
+    if not isfinite(float(now)) or float(now) <= 0.0:
+        return GoalValidation(False, "INVALID_CURRENT_TIME")
+
+    try:
+        goal_x = float(mission_goal_x)
+    except (TypeError, ValueError, OverflowError):
+        return GoalValidation(False, "NONFINITE_GOAL")
+
+    yaw = float(config.lane_heading)
+    request = GoalRequest(
+        frame_id=config.frame_id,
+        x=goal_x,
+        y=float(config.lane_centers[lane_index]),
+        z=0.0,
+        qx=0.0,
+        qy=0.0,
+        qz=sin(0.5 * yaw),
+        qw=cos(0.5 * yaw),
+        source_stamp=float(now),
+        receipt_stamp=float(now),
+    )
+    return validate_goal_request(request, ego, now=now, config=config)
 
 
 def evaluate_goal_authorization(

@@ -2,6 +2,8 @@ from dataclasses import replace
 from math import cos, sin
 
 import pytest
+from builtin_interfaces.msg import Time
+from std_msgs.msg import String
 
 from dream_limo.core.goal_mission import (
     EgoMissionState,
@@ -12,9 +14,11 @@ from dream_limo.core.goal_mission import (
     evaluate_goal_authorization,
     goal_mission_config_from_deployment,
     nearest_lane,
+    validate_configured_auto_goal,
     validate_goal_request,
 )
 from dream_limo.limo_scale import default_deployment_config
+from dream_limo.goal_authorizer_node import DreamGoalAuthorizerNode
 
 
 NOW = 100.0
@@ -133,6 +137,190 @@ def test_nonadjacent_lane_goal_is_rejected():
     result = _validate(goal=_goal(y=-0.45))
     assert not result.accepted
     assert result.reason == "NONADJACENT_LANE_GOAL"
+
+
+def test_configured_auto_goal_uses_arena_destination_and_same_validator():
+    result = validate_configured_auto_goal(
+        _ego(),
+        now=NOW,
+        config=_config(),
+        mission_goal_x=5.55,
+        target_lane=1,
+    )
+    assert result.accepted
+    assert result.reason == "GOAL_ACCEPTED"
+    assert result.goal_x == pytest.approx(5.55)
+    assert result.goal_y == pytest.approx(0.0)
+    assert result.target_lane == 1
+
+
+@pytest.mark.parametrize("target_lane", (-1, 3, 1.0, True, "1"))
+def test_configured_auto_goal_rejects_invalid_target_lane(target_lane):
+    result = validate_configured_auto_goal(
+        _ego(),
+        now=NOW,
+        config=_config(),
+        mission_goal_x=5.55,
+        target_lane=target_lane,
+    )
+    assert not result.accepted
+    assert result.reason == "AUTO_TARGET_LANE_INVALID"
+
+
+@pytest.mark.parametrize("goal_x", (None, "bad", float("inf"), float("nan")))
+def test_configured_auto_goal_rejects_malformed_destination(goal_x):
+    result = validate_configured_auto_goal(
+        _ego(),
+        now=NOW,
+        config=_config(),
+        mission_goal_x=goal_x,
+        target_lane=1,
+    )
+    assert not result.accepted
+    assert result.reason == "NONFINITE_GOAL"
+
+
+def test_configured_auto_goal_cannot_bypass_stop_or_adjacent_lane_validation():
+    moving = validate_configured_auto_goal(
+        _ego(speed=0.04),
+        now=NOW,
+        config=_config(),
+        mission_goal_x=5.55,
+        target_lane=1,
+    )
+    assert not moving.accepted
+    assert moving.reason == "EGO_NOT_STOPPED"
+
+    nonadjacent = validate_configured_auto_goal(
+        _ego(),
+        now=NOW,
+        config=_config(),
+        mission_goal_x=5.55,
+        target_lane=2,
+    )
+    assert not nonadjacent.accepted
+    assert nonadjacent.reason == "NONADJACENT_LANE_GOAL"
+
+    latch = GoalMissionLatch()
+    latch.stop()
+    assert not latch.consider(
+        validate_configured_auto_goal(
+            _ego(),
+            now=NOW,
+            config=_config(),
+            mission_goal_x=5.55,
+            target_lane=1,
+        )
+    )
+    assert latch.stop_latched
+    assert latch.reason == "STOP_LATCHED"
+
+
+class _RecordingPublisher:
+    def __init__(self):
+        self.messages = []
+
+    def publish(self, message):
+        self.messages.append(message)
+
+
+class _RecordingLogger:
+    def __init__(self):
+        self.info_messages = []
+        self.warning_messages = []
+
+    def info(self, message):
+        self.info_messages.append(message)
+
+    def warning(self, message):
+        self.warning_messages.append(message)
+
+
+class _FixedClock:
+    class _Instant:
+        @staticmethod
+        def to_msg():
+            return Time(sec=int(NOW), nanosec=0)
+
+    @staticmethod
+    def now():
+        return _FixedClock._Instant()
+
+
+class _AutoStartPlannerHandshakeHarness:
+    def __init__(self):
+        self.enabled = True
+        self.auto_start = True
+        self.planner_waiting_for_goal = False
+        self.planner = None
+        self.state = GoalMissionLatch()
+        self.ego = _ego()
+        self.contract = _config()
+        self.configured_goal_x = 5.55
+        self.configured_target_lane = 1
+        self.accepted_goal_source_stamp = None
+        self.accepted_goal_receipt_stamp = None
+        self.accepted_goal_source = "waiting"
+        self.mission_goal_publisher = _RecordingPublisher()
+        self.logger = _RecordingLogger()
+        self.heartbeat_count = 0
+
+    def _now(self):
+        return NOW
+
+    def _try_auto_start(self):
+        DreamGoalAuthorizerNode._try_auto_start(self)
+
+    def _consider_and_publish_goal(self, *args, **kwargs):
+        return DreamGoalAuthorizerNode._consider_and_publish_goal(
+            self, *args, **kwargs
+        )
+
+    def _publish_heartbeat(self):
+        self.heartbeat_count += 1
+
+    @staticmethod
+    def get_clock():
+        return _FixedClock()
+
+    def get_logger(self):
+        return self.logger
+
+
+def test_auto_start_waits_for_planner_waiting_heartbeat_before_goal_publication():
+    harness = _AutoStartPlannerHandshakeHarness()
+    unrelated = String(
+        data=(
+            '{"ready":false,"reason":"STALE_INPUT",'
+            '"mission_goal_required":true,"mission_goal_received":false,'
+            '"mission_goal_x":5.55,"mission_goal_target_lane":1}'
+        )
+    )
+    DreamGoalAuthorizerNode._on_planner_status(harness, unrelated)
+    assert not harness.planner_waiting_for_goal
+    assert not harness.state.active
+    assert harness.mission_goal_publisher.messages == []
+
+    waiting = String(
+        data=(
+            '{"ready":false,"reason":"WAITING_FOR_MISSION_GOAL",'
+            '"mission_goal_required":true,"mission_goal_received":false,'
+            '"mission_goal_x":5.55,"mission_goal_target_lane":1}'
+        )
+    )
+    DreamGoalAuthorizerNode._on_planner_status(harness, waiting)
+    assert harness.planner_waiting_for_goal
+    assert harness.state.active
+    assert harness.accepted_goal_source == "auto_forward"
+    assert len(harness.mission_goal_publisher.messages) == 1
+    goal = harness.mission_goal_publisher.messages[0]
+    assert goal.header.frame_id == "map"
+    assert goal.pose.position.x == pytest.approx(5.55)
+    assert goal.pose.position.y == pytest.approx(0.0)
+
+    # Repeated planner heartbeats cannot republish or replace the one-shot goal.
+    DreamGoalAuthorizerNode._on_planner_status(harness, waiting)
+    assert len(harness.mission_goal_publisher.messages) == 1
 
 
 def test_nearest_lane_requires_configured_tolerance():

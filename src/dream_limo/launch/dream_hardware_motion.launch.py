@@ -3,19 +3,47 @@
 Starting this launch with its checked-in defaults continuously publishes zero
 on /cmd_vel.  Nonzero output needs explicit commissioning assertions plus all
 fresh runtime safety gates.  A validated RViz/ROS goal is the default mission
-activation method; the legacy held-to-run joystick remains opt-in.
+activation method.  ``auto_forward`` starts the same surveyed merge mission
+without an RViz click; the legacy held-to-run joystick remains opt-in.
 """
 
 import os
+from math import isfinite
 
 from ament_index_python.packages import get_package_share_directory
 from launch import LaunchDescription
-from launch.actions import DeclareLaunchArgument, IncludeLaunchDescription
+from launch.actions import (
+    DeclareLaunchArgument,
+    IncludeLaunchDescription,
+    OpaqueFunction,
+)
 from launch.conditions import IfCondition
 from launch.launch_description_sources import PythonLaunchDescriptionSource
 from launch.substitutions import LaunchConfiguration, PythonExpression
 from launch_ros.actions import Node
 from launch_ros.parameter_descriptions import ParameterValue
+
+
+def _validated_target_speed(value):
+    """Return a commissioned speed or raise a launch-facing error."""
+    try:
+        speed = float(value)
+    except (TypeError, ValueError) as error:
+        raise RuntimeError(
+            "target_speed must be a number in (0.03, 0.15] m/s; "
+            f"received {value!r}"
+        ) from error
+    if not isfinite(speed) or not 0.03 < speed <= 0.15:
+        raise RuntimeError(
+            "target_speed must be finite and in (0.03, 0.15] m/s; "
+            f"received {value!r}. Start commissioning at 0.05 m/s."
+        )
+    return speed
+
+
+def _validate_target_speed(context):
+    _validated_target_speed(LaunchConfiguration("target_speed").perform(context))
+    return []
 
 
 def generate_launch_description():
@@ -47,7 +75,16 @@ def generate_launch_description():
     target_reference_x = LaunchConfiguration("merger_target_reference_x")
     target_reference_y = LaunchConfiguration("merger_target_reference_y")
     target_reference_yaw = LaunchConfiguration("merger_target_reference_yaw")
-    goal_mode = PythonExpression(["'", activation_mode, "' == 'goal'"])
+    auto_forward_mode = PythonExpression(
+        ["'", activation_mode, "' == 'auto_forward'"]
+    )
+    authorizer_mode = PythonExpression(
+        [
+            "'",
+            activation_mode,
+            "' in ('goal', 'auto_forward')",
+        ]
+    )
     joystick_mode = PythonExpression(["'", activation_mode, "' == 'joystick'"])
     start_joy_in_joystick_mode = PythonExpression(
         [
@@ -62,7 +99,7 @@ def generate_launch_description():
         [
             "'dream_goal_authorizer' if '",
             activation_mode,
-            "' == 'goal' else 'dream_hardware_deadman'",
+            "' in ('goal', 'auto_forward') else 'dream_hardware_deadman'",
         ]
     )
 
@@ -77,10 +114,11 @@ def generate_launch_description():
             DeclareLaunchArgument(
                 "activation_mode",
                 default_value="goal",
-                choices=["goal", "joystick"],
+                choices=["goal", "auto_forward", "joystick"],
                 description=(
-                    "Mission activation: validated /goal_pose (default) or "
-                    "legacy held-to-run joystick."
+                    "Mission activation: validated /goal_pose (default), the "
+                    "configured forward merge mission, or legacy held-to-run "
+                    "joystick."
                 ),
             ),
             DeclareLaunchArgument("rviz", default_value="true"),
@@ -124,6 +162,7 @@ def generate_launch_description():
             DeclareLaunchArgument("merger_target_reference_x", default_value="0.0"),
             DeclareLaunchArgument("merger_target_reference_y", default_value="0.0"),
             DeclareLaunchArgument("merger_target_reference_yaw", default_value="0.0"),
+            OpaqueFunction(function=_validate_target_speed),
             IncludeLaunchDescription(
                 PythonLaunchDescriptionSource(live_launch),
                 launch_arguments={
@@ -133,7 +172,7 @@ def generate_launch_description():
                     "expected_arm_owner": expected_arm_owner,
                     "enforce_map_bounds": "true",
                     "latch_perceived_occlusion": "true",
-                    "require_mission_goal": goal_mode,
+                    "require_mission_goal": authorizer_mode,
                     "target_speed": target_speed,
                     "use_merger_odom": use_merger_odom,
                 }.items(),
@@ -180,8 +219,17 @@ def generate_launch_description():
                 executable="dream_goal_authorizer",
                 name="dream_goal_authorizer",
                 output="screen",
-                condition=IfCondition(goal_mode),
-                parameters=[params, {"arena_file": mission, "enabled": True}],
+                condition=IfCondition(authorizer_mode),
+                parameters=[
+                    params,
+                    {
+                        "arena_file": mission,
+                        "enabled": True,
+                        "auto_start": ParameterValue(
+                            auto_forward_mode, value_type=bool
+                        ),
+                    },
+                ],
             ),
             Node(
                 package="dream_limo",

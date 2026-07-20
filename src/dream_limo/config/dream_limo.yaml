@@ -213,6 +213,9 @@ dream_hardware_command_gate:
     # The hardware launch overrides this to match its selected activation mode.
     expected_deadman_owner: dream_hardware_deadman
     publish_rate: 20.0
+    # Begins only after every final-gate prerequisite is simultaneously valid.
+    # Any failed prerequisite, blocked trajectory, or zero candidate resets it.
+    readiness_countdown_seconds: 3.0
     # Stage-3 first-motion cap; intentionally below the package-wide 0.6 m/s cap.
     maximum_speed: 0.15
     maximum_acceleration: 0.35
@@ -249,10 +252,15 @@ dream_hardware_deadman:
 
 # Default hardware mission activator. It validates a map-frame destination,
 # publishes the accepted goal and the same fail-closed arm/status contract used
-# by the hardware gate. The hardware launch starts it only in goal mode.
+# by the hardware gate. The hardware launch starts it in goal or auto-forward
+# mode; joystick mode uses the separate held-to-run node.
 dream_goal_authorizer:
   ros__parameters:
     enabled: false
+    # Hardware launch overrides this only for activation_mode=auto_forward.
+    # The synthesized mission goal comes from merge_mission.yaml and still
+    # waits for a fresh stopped ego, planner agreement, and passed preflight.
+    auto_start: false
     goal_topic: /goal_pose
     accepted_goal_topic: /dream/mission_goal
     ego_topic: /dream/ego_state
