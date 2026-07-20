@@ -171,6 +171,30 @@ def test_hardware_preflight_owner_arguments_reach_the_preflight_node():
         assert "require_mission_goal" in content
 
 
+def test_hardware_gate_reports_stop_reason_transitions():
+    source = (ROOT / "dream_limo" / "hardware_command_gate_node.py").read_text()
+    assert "_last_reported_gate_reason" in source
+    assert "Physical command gate holding zero:" in source
+    assert "Physical command gate READY" in source
+
+
+def test_camera_evidence_gate_is_threaded_and_disabled_only_for_motion():
+    sensor = (ROOT / "launch" / "dream_sensor_smoke.launch.py").read_text()
+    live = (ROOT / "launch" / "dream_live_demo.launch.py").read_text()
+    hardware = (ROOT / "launch" / "dream_hardware_motion.launch.py").read_text()
+
+    for content in (sensor, live):
+        assert (
+            'DeclareLaunchArgument("require_camera_evidence", default_value="true")'
+            in content
+        )
+        assert '"require_camera_evidence": require_camera_evidence' in content
+
+    assert 'executable="dream_camera_evidence"' in sensor
+    assert '"rviz": rviz' in live
+    assert '"require_camera_evidence": "false"' in hardware
+
+
 def test_live_rviz_exposes_map_goal_tool():
     rviz = (ROOT / "rviz" / "dream_sensor.rviz").read_text()
     assert "rviz_default_plugins/SetGoal" in rviz

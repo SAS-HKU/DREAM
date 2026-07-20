@@ -168,6 +168,10 @@ def generate_launch_description():
                 launch_arguments={
                     "model": model,
                     "rviz": rviz,
+                    # The camera remains visible and recorded as experiment
+                    # evidence, but it is deliberately not a planner input or
+                    # a physical-motion readiness gate.
+                    "require_camera_evidence": "false",
                     "expected_cmd_vel_owner": "dream_hardware_command_gate",
                     "expected_arm_owner": expected_arm_owner,
                     "enforce_map_bounds": "true",

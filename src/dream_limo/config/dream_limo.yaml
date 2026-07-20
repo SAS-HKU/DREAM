@@ -185,6 +185,10 @@ dream_collision_monitor:
     future_stamp_tolerance: 0.05
     surface_retention_seconds: 0.75
     minimum_valid_rays: 20
+    # The shadow is DREAM risk/veto evidence, not a sensed solid surface.
+    # Stale/missing masks still fail readiness; measured LiDAR returns, road
+    # limits, and grid limits remain hard collision constraints.
+    occlusion_shadow_blocks_trajectory: false
     # Inflation radius = half-diagonal(0.22 x 0.22 m LIMO) + this margin.
     inflation_margin: 0.05
     trajectory_interpolation_spacing: 0.0125

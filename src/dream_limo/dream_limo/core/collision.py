@@ -2,9 +2,10 @@
 
 DRIFT risk is intentionally not a collision map.  This module keeps measured
 LiDAR first-return surfaces, inflates them by the complete circular robot
-footprint, and treats the externally supplied occlusion/shadow mask as unknown
-space.  It is conservative by design: unknown, occupied, and outside-grid
-trajectory samples are all unsafe.
+footprint, and represents the externally supplied occlusion/shadow mask as
+unknown space.  Unknown space is fail-closed by default, but a caller may use
+it as risk-only evidence while measured surfaces, road limits, and grid limits
+remain hard constraints.
 """
 
 from __future__ import annotations
@@ -202,7 +203,34 @@ class CollisionEnvelope:
         )
         return grid, digest
 
-    def assess_trajectory(self, path_points: Array, collision_grid: Array) -> TrajectoryAssessment:
+    def trajectory_mask_overlap_samples(self, path_points: Array, mask: Array) -> int:
+        """Count densely sampled trajectory points that overlap a grid mask."""
+
+        values = np.asarray(mask)
+        if values.shape != self.spec.shape:
+            raise ValueError("trajectory-mask shape mismatch")
+        if not np.all(np.isfinite(values)):
+            raise ValueError("trajectory mask must be finite")
+        points = interpolate_polyline(path_points, self.interpolation_spacing)
+        if len(points) == 0:
+            return 0
+        ix, iy, inside = self.spec.indices(points)
+        return int(np.count_nonzero(values[iy[inside], ix[inside]]))
+
+    def assess_trajectory(
+        self,
+        path_points: Array,
+        collision_grid: Array,
+        *,
+        unknown_is_collision: bool = True,
+    ) -> TrajectoryAssessment:
+        """Assess a path while keeping unknown-space policy explicit.
+
+        ``unknown_is_collision=False`` is intended only for an occlusion mask
+        that is already consumed by DREAM's risk field and decision veto.  It
+        never relaxes measured surfaces, the road footprint, or grid bounds.
+        """
+
         grid = np.asarray(collision_grid)
         if grid.shape != self.spec.shape:
             raise ValueError("collision-grid shape mismatch")
@@ -239,6 +267,8 @@ class CollisionEnvelope:
                     int(grid[iy[index], ix[index]]),
                 )
             value = int(grid[iy[index], ix[index]])
+            if value < int(self.FREE) and not unknown_is_collision:
+                continue
             if value != int(self.FREE):
                 return TrajectoryAssessment(
                     False,

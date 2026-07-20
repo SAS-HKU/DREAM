@@ -189,6 +189,7 @@ class DreamHardwareCommandGateNode(Node):
         self.gate_status_publisher = self.create_publisher(
             String, str(self.get_parameter("gate_status_topic").value), reliable
         )
+        self._last_reported_gate_reason: Optional[str] = None
         self.create_timer(1.0 / self.gate_config.publish_rate, self._publish)
 
         if not bool(self.get_parameter("hardware_output_enabled").value):
@@ -372,6 +373,21 @@ class DreamHardwareCommandGateNode(Node):
             output_owner_ok=output_owner_ok,
             deadman_owner_ok=deadman_owner_ok,
         )
+        if command.reason != self._last_reported_gate_reason:
+            if command.valid:
+                self.get_logger().info(
+                    "Physical command gate READY; forwarding the capped planner command"
+                )
+            else:
+                hint = (
+                    "; inspect /dream/collision_status and increase physical clearance"
+                    if command.reason == "TRAJECTORY_BLOCKED"
+                    else ""
+                )
+                self.get_logger().warning(
+                    f"Physical command gate holding zero: {command.reason}{hint}"
+                )
+            self._last_reported_gate_reason = command.reason
         readiness_countdown_remaining = self.core.readiness_countdown_remaining(now)
         readiness_countdown_started = (
             self.core.readiness_countdown_started_at is not None
