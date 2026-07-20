@@ -799,5 +799,4 @@ enters planning.
 ## License
 
 `dream_limo` is distributed under the MIT license in [`LICENSE`](LICENSE),
-including the upstream DREAM copyright attribution. SFG source is not copied.
-No GPLv3 source from `mpc_local_planner` is incorporated.
+including the upstream DREAM copyright attribution. 
