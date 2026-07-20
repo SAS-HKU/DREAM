@@ -8,6 +8,7 @@ from dream_limo.core.collision import (
     axis_aligned_road_mask,
     CollisionEnvelope,
     CollisionGridSpec,
+    footprint_self_return_mask,
     interpolate_polyline,
     transform_points,
 )
@@ -160,6 +161,59 @@ def test_rigid_transform_math_used_after_timestamped_tf_lookup():
     assert transformed[0, 1] == pytest.approx(4.0)
 
 
+def test_under_range_filter_rejects_only_returns_inside_robot_footprint():
+    angle = np.deg2rad(109.726)
+    local_points = np.asarray(
+        [
+            [0.011 * np.cos(angle), 0.011 * np.sin(angle), 0.0],
+            [0.011, 0.0, 0.0],
+            [-0.060, 0.0, 0.0],
+        ]
+    )
+    points_in_base = transform_points(
+        local_points,
+        translation_xyz=(0.10, 0.0, 0.18),
+        quaternion_xyzw=(0.0, 0.0, 0.0, 1.0),
+    )
+    rejected = footprint_self_return_mask(
+        points_in_base,
+        np.asarray([0.011, 0.011, 0.060]),
+        maximum_self_return_range=0.05,
+        footprint_length=0.22,
+        footprint_width=0.22,
+    )
+
+    # The observed +109.726 degree YDLidar artifact lands inside the chassis.
+    assert rejected.tolist() == [True, False, False]
+    # Equally close evidence just beyond the front bumper is not hidden.
+    assert points_in_base[1, 0] > 0.5 * 0.22
+
+
+def test_self_return_filter_preserves_fail_closed_minimum_ray_gate():
+    envelope = make_envelope(minimum_valid_rays=3)
+    points_in_base = np.asarray(
+        [[0.09, 0.00], [0.10, 0.01], [0.30, 0.00], [0.40, 0.00]]
+    )
+    ranges = np.asarray([0.01, 0.02, 0.20, 0.30])
+    rejected = footprint_self_return_mask(
+        points_in_base,
+        ranges,
+        maximum_self_return_range=0.05,
+        footprint_length=0.22,
+        footprint_width=0.22,
+    )
+    kept = points_in_base[~rejected]
+
+    accepted = envelope.record_scan(
+        kept,
+        receipt_time=1.0,
+        valid_ray_count=len(kept),
+    )
+    assert len(kept) == 2
+    assert accepted == 0
+    assert not envelope.last_scan_accepted
+
+
 def test_polyline_interpolation_spacing_is_bounded():
     points = interpolate_polyline(np.asarray([[0.0, 0.0], [0.31, 0.0]]), 0.1)
     distances = np.linalg.norm(np.diff(points, axis=0), axis=1)
@@ -177,9 +231,12 @@ def test_ros_node_uses_scan_stamp_and_has_no_command_interface():
     assert '"/dream/arm"' not in source
     assert '"shadow_policy"' in source
     assert '"trajectory_shadow_overlap_samples"' in source
+    assert '"self_return_rejections"' in source
 
     hardware_config = (root / "config" / "dream_limo.yaml").read_text()
     assert "occlusion_shadow_blocks_trajectory: false" in hardware_config
+    assert "self_return_filter_enabled: true" in hardware_config
+    assert "self_return_max_range: 0.05" in hardware_config
 
     # Only the dedicated, disabled-by-default hardware boundary may include it;
     # existing SIL/live dry-run behavior remains unchanged.

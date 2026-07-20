@@ -56,6 +56,9 @@ class VehicleTrack:
     dynamic_confirmed: bool = False
     last_dynamic_sec: float = -math.inf
     motion_window_speed: float = 0.0
+    consistent_motion_windows: int = 0
+    last_motion_dx: float = 0.0
+    last_motion_dy: float = 0.0
 
     def age(self, now_sec: float) -> float:
         return max(0.0, float(now_sec) - self.last_update_sec)
@@ -151,6 +154,9 @@ class MergerVehicleTracker:
         self,
         *,
         association_distance_m: float = 0.45,
+        association_noise_margin_m: float = 0.06,
+        maximum_vehicle_speed_mps: float = 0.60,
+        maximum_width_change_m: float = 0.12,
         velocity_alpha: float = 0.45,
         position_alpha: float = 0.70,
         coast_timeout_sec: float = 0.50,
@@ -161,9 +167,22 @@ class MergerVehicleTracker:
         motion_min_displacement_m: float = 0.08,
         motion_hold_sec: float = 0.80,
         minimum_track_hits: int = 3,
+        minimum_consistent_motion_windows: int = 2,
+        minimum_direction_cosine: float = 0.50,
     ) -> None:
         if association_distance_m <= 0.0:
             raise ValueError("association distance must be positive")
+        if (
+            association_noise_margin_m < 0.0
+            or association_noise_margin_m > association_distance_m
+        ):
+            raise ValueError(
+                "association noise margin must lie in [0, association distance]"
+            )
+        if maximum_vehicle_speed_mps <= 0.0:
+            raise ValueError("maximum vehicle speed must be positive")
+        if maximum_width_change_m < 0.0:
+            raise ValueError("maximum width change cannot be negative")
         if not 0.0 < velocity_alpha <= 1.0:
             raise ValueError("velocity alpha must lie in (0, 1]")
         if not 0.0 < position_alpha <= 1.0:
@@ -180,8 +199,17 @@ class MergerVehicleTracker:
             raise ValueError("motion displacement cannot be negative")
         if minimum_track_hits < 2:
             raise ValueError("at least two track hits are required")
+        if minimum_consistent_motion_windows < 2:
+            raise ValueError(
+                "at least two direction-consistent motion windows are required"
+            )
+        if not -1.0 <= minimum_direction_cosine <= 1.0:
+            raise ValueError("minimum direction cosine must lie in [-1, 1]")
 
         self.association_distance_m = float(association_distance_m)
+        self.association_noise_margin_m = float(association_noise_margin_m)
+        self.maximum_vehicle_speed_mps = float(maximum_vehicle_speed_mps)
+        self.maximum_width_change_m = float(maximum_width_change_m)
         self.velocity_alpha = float(velocity_alpha)
         self.position_alpha = float(position_alpha)
         self.coast_timeout_sec = float(coast_timeout_sec)
@@ -194,6 +222,10 @@ class MergerVehicleTracker:
         )
         self.motion_hold_sec = float(motion_hold_sec)
         self.minimum_track_hits = int(minimum_track_hits)
+        self.minimum_consistent_motion_windows = int(
+            minimum_consistent_motion_windows
+        )
+        self.minimum_direction_cosine = float(minimum_direction_cosine)
         self.tracks: list[VehicleTrack] = []
         self.next_track_id = 1
 
@@ -210,11 +242,22 @@ class MergerVehicleTracker:
         candidate_pairs: list[tuple[float, int, int]] = []
         for track_index, track in enumerate(self.tracks):
             pred_x, pred_y = track.predicted_position(now_sec)
+            update_age = max(0.0, now_sec - track.last_update_sec)
+            plausible_innovation = min(
+                self.association_distance_m,
+                self.association_noise_margin_m
+                + self.maximum_vehicle_speed_mps * update_age,
+            )
             for measurement_index, measurement in enumerate(measurements):
+                if (
+                    abs(measurement.width - track.width)
+                    > self.maximum_width_change_m
+                ):
+                    continue
                 distance = math.hypot(
                     measurement.x - pred_x, measurement.y - pred_y
                 )
-                if distance <= self.association_distance_m:
+                if distance <= plausible_innovation:
                     candidate_pairs.append(
                         (distance, track_index, measurement_index)
                     )
@@ -295,6 +338,7 @@ class MergerVehicleTracker:
         alpha_v = self.velocity_alpha
         track.vx = (1.0 - alpha_v) * track.vx + alpha_v * measured_vx
         track.vy = (1.0 - alpha_v) * track.vy + alpha_v * measured_vy
+        track.vx, track.vy = self._bounded_velocity(track.vx, track.vy)
         track.x = new_x
         track.y = new_y
         track.width = (
@@ -326,15 +370,46 @@ class MergerVehicleTracker:
         )
         moving = (
             track.motion_window_speed >= speed_threshold
+            and track.motion_window_speed <= self.maximum_vehicle_speed_mps
             and displacement >= displacement_threshold
         )
         if moving:
-            track.dynamic_confirmed = True
-            track.last_dynamic_sec = now_sec
-            # Window velocity is much less sensitive to cluster-edge jitter
-            # than scan-to-scan differentiation.
-            track.vx = dx / max(elapsed, 1.0e-6)
-            track.vy = dy / max(elapsed, 1.0e-6)
+            previous_norm = math.hypot(
+                track.last_motion_dx, track.last_motion_dy
+            )
+            direction_cosine = None
+            if previous_norm > 1.0e-9 and displacement > 1.0e-9:
+                direction_cosine = (
+                    dx * track.last_motion_dx + dy * track.last_motion_dy
+                ) / (displacement * previous_norm)
+
+            if direction_cosine is None:
+                track.consistent_motion_windows = 1
+            elif direction_cosine >= self.minimum_direction_cosine:
+                track.consistent_motion_windows += 1
+            else:
+                # A centroid that walks back and forth along a static wall must
+                # not remain a dynamic vehicle. A real reversing object can be
+                # confirmed again after two windows in its new direction.
+                if direction_cosine < 0.0:
+                    track.dynamic_confirmed = False
+                    track.last_dynamic_sec = -math.inf
+                track.consistent_motion_windows = 1
+
+            track.last_motion_dx = dx
+            track.last_motion_dy = dy
+            window_vx, window_vy = self._bounded_velocity(
+                dx / max(elapsed, 1.0e-6),
+                dy / max(elapsed, 1.0e-6),
+            )
+            track.vx = window_vx
+            track.vy = window_vy
+            if (
+                track.consistent_motion_windows
+                >= self.minimum_consistent_motion_windows
+            ):
+                track.dynamic_confirmed = True
+                track.last_dynamic_sec = now_sec
         elif (
             track.dynamic_confirmed
             and now_sec - track.last_dynamic_sec > self.motion_hold_sec
@@ -342,10 +417,26 @@ class MergerVehicleTracker:
             track.dynamic_confirmed = False
             track.vx = 0.0
             track.vy = 0.0
+            track.consistent_motion_windows = 0
+            track.last_motion_dx = 0.0
+            track.last_motion_dy = 0.0
+        elif not track.dynamic_confirmed:
+            track.consistent_motion_windows = 0
+            track.last_motion_dx = 0.0
+            track.last_motion_dy = 0.0
 
         track.motion_anchor_x = track.x
         track.motion_anchor_y = track.y
         track.motion_anchor_sec = now_sec
+
+    def _bounded_velocity(self, vx: float, vy: float) -> tuple[float, float]:
+        """Limit an internal estimate to the configured physical speed."""
+
+        speed = math.hypot(vx, vy)
+        if speed <= self.maximum_vehicle_speed_mps or speed <= 1.0e-12:
+            return float(vx), float(vy)
+        scale = self.maximum_vehicle_speed_mps / speed
+        return float(vx * scale), float(vy * scale)
 
     def _remove_stale(self, now_sec: float) -> None:
         self.tracks = [
@@ -392,3 +483,37 @@ def _finite_float(value: Any, name: str) -> float:
     if not math.isfinite(result):
         raise ValueError(f"{name} must be finite")
     return result
+
+
+def validate_cluster_source_stamp(
+    source_stamp: float,
+    *,
+    receipt_stamp: float,
+    previous_source_stamp: float | None,
+    maximum_age: float,
+    future_tolerance: float,
+) -> float:
+    """Validate one cluster frame's source time and return its receipt age.
+
+    Tracking uses sensor time, not callback receipt time. Strict monotonicity
+    prevents duplicate or reordered scan frames from manufacturing velocity.
+    """
+
+    source = _finite_float(source_stamp, "source_stamp")
+    receipt = _finite_float(receipt_stamp, "receipt_stamp")
+    maximum = _finite_float(maximum_age, "maximum_age")
+    future = _finite_float(future_tolerance, "future_tolerance")
+    if source <= 0.0:
+        raise ValueError("cluster source stamp must be positive")
+    if maximum <= 0.0 or future < 0.0:
+        raise ValueError("cluster source timing limits are invalid")
+    age = receipt - source
+    if age < -future:
+        raise ValueError("cluster source stamp is in the future")
+    if age > maximum:
+        raise ValueError("cluster source stamp is stale")
+    if previous_source_stamp is not None:
+        previous = _finite_float(previous_source_stamp, "previous_source_stamp")
+        if source <= previous:
+            raise ValueError("cluster source stamp is not strictly monotonic")
+    return max(0.0, age)

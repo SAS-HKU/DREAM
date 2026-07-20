@@ -100,6 +100,63 @@ def select_perception_tracks(
     return list(agents)
 
 
+def filter_live_track_envelope(
+    vehicles: List[Vehicle],
+    *,
+    grid_x_min: float,
+    grid_x_max: float,
+    road_y_min: float,
+    road_y_max: float,
+    maximum_speed: float,
+) -> Tuple[List[Vehicle], int]:
+    """Keep only physically plausible tracks wholly inside the live arena.
+
+    SFG supplies neutral cluster geometry in odometry coordinates.  After the
+    measured map alignment is applied, a perceived vehicle must fit inside the
+    configured road/grid envelope before it can reach DRIFT or MPC.  This
+    prevents wall-fragment tracks outside the experiment corridor from
+    creating CBF constraints while preserving all three surveyed lane centers.
+    """
+
+    bounds = (
+        grid_x_min,
+        grid_x_max,
+        road_y_min,
+        road_y_max,
+        maximum_speed,
+    )
+    if not all(np.isfinite(value) for value in bounds):
+        raise ValueError("live-track envelope values must be finite")
+    if grid_x_min >= grid_x_max or road_y_min >= road_y_max:
+        raise ValueError("live-track envelope bounds must be ordered")
+    if maximum_speed <= 0.0:
+        raise ValueError("maximum live-track speed must be positive")
+
+    accepted: List[Vehicle] = []
+    rejected = 0
+    for vehicle in vehicles:
+        heading_cos = abs(cos(vehicle.heading))
+        heading_sin = abs(sin(vehicle.heading))
+        half_x = 0.5 * (
+            heading_cos * vehicle.length + heading_sin * vehicle.width
+        )
+        half_y = 0.5 * (
+            heading_sin * vehicle.length + heading_cos * vehicle.width
+        )
+        inside = (
+            vehicle.speed <= maximum_speed
+            and vehicle.x - half_x >= grid_x_min
+            and vehicle.x + half_x <= grid_x_max
+            and vehicle.y - half_y >= road_y_min
+            and vehicle.y + half_y <= road_y_max
+        )
+        if inside:
+            accepted.append(vehicle)
+        else:
+            rejected += 1
+    return accepted, rejected
+
+
 class DreamWorldModel(Node):
     def __init__(self) -> None:
         super().__init__("dream_world_model")
@@ -119,6 +176,7 @@ class DreamWorldModel(Node):
         self.declare_parameter("laser_y", 0.0)
         self.declare_parameter("laser_yaw", 0.0)
         self.declare_parameter("track_timeout", 0.8)
+        self.declare_parameter("maximum_live_track_speed", 1.0)
         self.declare_parameter("ego_timeout", 0.30)
         self.declare_parameter("scan_timeout", 0.40)
         self.declare_parameter("use_merger_odom", False)
@@ -135,6 +193,14 @@ class DreamWorldModel(Node):
         self.config = deployment_config_for_arena(
             str(self.get_parameter("arena_file").value)
         )
+        self.maximum_live_track_speed = float(
+            self.get_parameter("maximum_live_track_speed").value
+        )
+        if (
+            not np.isfinite(self.maximum_live_track_speed)
+            or self.maximum_live_track_speed <= 0.0
+        ):
+            raise RuntimeError("maximum_live_track_speed must be positive")
         self.use_merger_odom = bool(self.get_parameter("use_merger_odom").value)
         self.merger_adapter_status_timeout = float(
             self.get_parameter("merger_adapter_status_timeout").value
@@ -176,6 +242,7 @@ class DreamWorldModel(Node):
         self.scan: Optional[PlanarScan] = None
         self.scan_receipt: Optional[float] = None
         self.agents: List[Vehicle] = []
+        self.rejected_track_envelope_count = 0
         self.agents_receipt: Optional[float] = None
         self.raw_merger: Optional[Vehicle] = None
         self.raw_merger_receipt: Optional[float] = None
@@ -364,7 +431,16 @@ class DreamWorldModel(Node):
                         stamp=agent.stamp,
                     )
                 )
-            self.agents = vehicles
+            self.agents, self.rejected_track_envelope_count = (
+                filter_live_track_envelope(
+                    vehicles,
+                    grid_x_min=self.config.grid.x_min,
+                    grid_x_max=self.config.grid.x_max,
+                    road_y_min=self.config.grid.road_y_min,
+                    road_y_max=self.config.grid.road_y_max,
+                    maximum_speed=self.maximum_live_track_speed,
+                )
+            )
             self.agents_receipt = now
         except (ValueError, KeyError, TypeError, json.JSONDecodeError) as exc:
             self.get_logger().warning(f"Rejected tracked_agents payload: {exc}")
@@ -645,6 +721,9 @@ class DreamWorldModel(Node):
                     "ego_fresh": ego_fresh,
                     "scan_fresh": scan_fresh,
                     "tracks_fresh": tracks_fresh,
+                    "rejected_track_envelope_count": (
+                        self.rejected_track_envelope_count
+                    ),
                     "occlusion_source": self.occlusion_source,
                     "alignment_received": self.alignment_received,
                     **merger_contract,
@@ -680,6 +759,9 @@ class DreamWorldModel(Node):
                     else "perception_only_no_merger_ground_truth"
                 ),
                 "dynamic_track_count": len(dynamic),
+                "rejected_track_envelope_count": (
+                    self.rejected_track_envelope_count
+                ),
                 "shadow_cells": int(np.count_nonzero(mask)),
                 "shadow_route_samples": shadow_route_samples,
                 "route_samples": route_samples,
@@ -707,6 +789,9 @@ class DreamWorldModel(Node):
                     else "perception_only_no_merger_ground_truth"
                 ),
                 "dynamic_track_count": len(dynamic),
+                "rejected_track_envelope_count": (
+                    self.rejected_track_envelope_count
+                ),
                 "shadow_cells": int(np.count_nonzero(mask)),
                 "shadow_route_samples": shadow_route_samples,
                 "route_samples": route_samples,

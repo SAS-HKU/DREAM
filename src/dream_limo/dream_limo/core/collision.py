@@ -315,6 +315,58 @@ def interpolate_polyline(points: Array, spacing: float) -> Array:
     return np.asarray(sampled, dtype=np.float64)
 
 
+def footprint_self_return_mask(
+    points_in_base: Array,
+    ranges: Array,
+    *,
+    maximum_self_return_range: float,
+    footprint_length: float,
+    footprint_width: float,
+    footprint_padding: float = 0.0,
+) -> Array:
+    """Identify under-range returns whose endpoints lie inside the robot body.
+
+    The range gate alone is deliberately insufficient: a very close return in
+    front of the bumper remains a real obstacle. A return is classified as a
+    sensor/self artifact only when it is both within the configured under-range
+    band and its endpoint, transformed into ``base_link``, lies inside the
+    known rectangular chassis footprint.
+    """
+
+    points = _points_array(points_in_base)
+    measured_ranges = np.asarray(ranges, dtype=np.float64)
+    if (
+        measured_ranges.ndim != 1
+        or measured_ranges.shape[0] != points.shape[0]
+    ):
+        raise ValueError("ranges must have one value per planar point")
+    if not np.all(np.isfinite(measured_ranges)) or np.any(
+        measured_ranges <= 0.0
+    ):
+        raise ValueError("ranges must be finite and positive")
+    if (
+        not isfinite(maximum_self_return_range)
+        or maximum_self_return_range <= 0.0
+    ):
+        raise ValueError(
+            "maximum self-return range must be finite and positive"
+        )
+    if not isfinite(footprint_length) or footprint_length <= 0.0:
+        raise ValueError("footprint length must be finite and positive")
+    if not isfinite(footprint_width) or footprint_width <= 0.0:
+        raise ValueError("footprint width must be finite and positive")
+    if not isfinite(footprint_padding) or footprint_padding < 0.0:
+        raise ValueError("footprint padding must be finite and nonnegative")
+
+    half_length = 0.5 * footprint_length + footprint_padding
+    half_width = 0.5 * footprint_width + footprint_padding
+    inside_footprint = (
+        (np.abs(points[:, 0]) <= half_length)
+        & (np.abs(points[:, 1]) <= half_width)
+    )
+    return (measured_ranges <= maximum_self_return_range) & inside_footprint
+
+
 def transform_points(
     points_xyz: Array,
     *,

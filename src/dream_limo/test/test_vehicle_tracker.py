@@ -6,6 +6,7 @@ from dream_limo.core.vehicle_tracker import (
     MergerVehicleTracker,
     parse_cluster_payload,
     track_to_agent_payload,
+    validate_cluster_source_stamp,
 )
 
 
@@ -90,20 +91,26 @@ def test_motion_confirmed_vehicle_publishes_existing_agent_schema():
         motion_min_displacement_m=0.08,
         minimum_track_hits=3,
     )
-    for now, x in ((0.0, 0.0), (0.2, 0.06), (0.4, 0.13), (0.6, 0.19)):
+    for now, x in (
+        (0.0, 0.0),
+        (0.2, 0.06),
+        (0.4, 0.13),
+        (0.6, 0.19),
+        (0.8, 0.25),
+    ):
         tracker.update([cluster(x)], now)
 
-    tracks = tracker.publishable_tracks(0.6)
+    tracks = tracker.publishable_tracks(0.8)
     assert len(tracks) == 1
     assert tracks[0].dynamic_confirmed
     assert tracks[0].vx > 0.10
 
-    agent = track_to_agent_payload(tracks[0], 0.6)
+    agent = track_to_agent_payload(tracks[0], 0.8)
     assert agent["class_label"] == "car"
     assert agent["source"] == "dream_lidar_vehicle_tracker"
     assert agent["motion_state"] == "dynamic"
     assert "pedestrian" not in str(agent)
-    parsed = parse_tracked_agents([agent], now=0.6)
+    parsed = parse_tracked_agents([agent], now=0.8)
     assert len(parsed) == 1
     assert parsed[0].class_label == "car"
 
@@ -115,18 +122,138 @@ def test_confirmed_track_coasts_briefly_then_expires():
         motion_window_sec=0.4,
         motion_min_displacement_m=0.08,
     )
-    for now, x in ((0.0, 0.0), (0.2, 0.06), (0.4, 0.13)):
+    for now, x in (
+        (0.0, 0.0),
+        (0.2, 0.06),
+        (0.4, 0.13),
+        (0.6, 0.19),
+        (0.8, 0.25),
+    ):
         tracker.update([cluster(x)], now)
-    assert len(tracker.publishable_tracks(0.8)) == 1
-    assert tracker.publishable_tracks(0.91) == []
-    tracker.update([], 1.41)
+    assert len(tracker.publishable_tracks(1.2)) == 1
+    assert tracker.publishable_tracks(1.31) == []
+    tracker.update([], 1.81)
     assert tracker.tracks == []
 
 
 def test_vehicle_radius_covers_nominal_body_and_observed_width():
     tracker = MergerVehicleTracker(motion_window_sec=0.2)
-    for now, x in ((0.0, 0.0), (0.1, 0.08), (0.2, 0.17)):
+    for now, x in (
+        (0.0, 0.0),
+        (0.1, 0.05),
+        (0.2, 0.11),
+        (0.3, 0.17),
+        (0.4, 0.23),
+    ):
         tracker.update([cluster(x, width=0.40)], now)
-    track = tracker.publishable_tracks(0.2)[0]
-    payload_out = track_to_agent_payload(track, 0.2)
+    track = tracker.publishable_tracks(0.4)[0]
+    payload_out = track_to_agent_payload(track, 0.4)
     assert payload_out["radius"] >= 0.24
+
+
+def test_observed_wall_centroid_oscillation_never_confirms_motion():
+    """Regression for the stationary wall sequence observed on the LIMO."""
+
+    tracker = MergerVehicleTracker(
+        motion_window_sec=0.50,
+        motion_enter_speed_mps=0.10,
+        motion_min_displacement_m=0.08,
+    )
+    wall_sequence = (
+        (0.0, -0.55),
+        (0.2, -0.48),
+        (0.4, -0.35),
+        (0.6, -0.35),
+        (0.8, -0.45),
+        (1.0, -0.55),
+        (1.2, -0.55),
+        (1.4, -0.45),
+        (1.6, -0.35),
+        (1.8, -0.35),
+    )
+    for now, y in wall_sequence:
+        tracker.update([cluster(1.0, y=y, width=0.30)], now)
+        assert tracker.publishable_tracks(now) == []
+
+
+def test_monotonic_merger_needs_two_consistent_windows_then_confirms():
+    tracker = MergerVehicleTracker(
+        motion_window_sec=0.50,
+        motion_enter_speed_mps=0.10,
+        motion_min_displacement_m=0.08,
+    )
+    merger_sequence = (
+        (0.0, 0.00),
+        (0.2, 0.05),
+        (0.4, 0.10),
+        (0.6, 0.15),
+        (0.8, 0.20),
+        (1.0, 0.25),
+        (1.2, 0.30),
+    )
+    for now, y in merger_sequence[:-1]:
+        tracker.update([cluster(1.0, y=y)], now)
+        assert tracker.publishable_tracks(now) == []
+
+    now, y = merger_sequence[-1]
+    tracker.update([cluster(1.0, y=y)], now)
+    tracks = tracker.publishable_tracks(now)
+    assert len(tracks) == 1
+    assert tracks[0].consistent_motion_windows == 2
+    assert 0.10 < tracks[0].speed <= 0.60
+
+
+def test_direction_reversal_immediately_deconfirms_track():
+    tracker = MergerVehicleTracker(motion_window_sec=0.50)
+    for now, y in (
+        (0.0, 0.00),
+        (0.2, 0.05),
+        (0.4, 0.10),
+        (0.6, 0.15),
+        (0.8, 0.20),
+        (1.0, 0.25),
+        (1.2, 0.30),
+    ):
+        tracker.update([cluster(1.0, y=y)], now)
+    assert len(tracker.publishable_tracks(1.2)) == 1
+
+    for now, y in ((1.4, 0.25), (1.6, 0.20), (1.8, 0.15)):
+        tracker.update([cluster(1.0, y=y)], now)
+    assert tracker.publishable_tracks(1.8) == []
+
+
+def test_association_rejects_implausible_innovation_and_width_change():
+    innovation_tracker = MergerVehicleTracker()
+    innovation_tracker.update([cluster(0.0)], 0.0)
+    innovation_tracker.update([cluster(0.25)], 0.1)
+    assert len(innovation_tracker.tracks) == 2
+
+    width_tracker = MergerVehicleTracker()
+    width_tracker.update([cluster(0.0, width=0.20)], 0.0)
+    width_tracker.update([cluster(0.01, width=0.40)], 0.1)
+    assert len(width_tracker.tracks) == 2
+
+
+def test_cluster_source_stamp_must_be_fresh_and_strictly_monotonic():
+    assert validate_cluster_source_stamp(
+        9.8,
+        receipt_stamp=10.0,
+        previous_source_stamp=9.7,
+        maximum_age=0.5,
+        future_tolerance=0.05,
+    ) == pytest.approx(0.2)
+
+    for source_stamp, previous, error in (
+        (9.8, 9.8, "strictly monotonic"),
+        (9.7, 9.8, "strictly monotonic"),
+        (9.4, None, "stale"),
+        (10.06, None, "future"),
+    ):
+        with pytest.raises(ValueError, match=error):
+            validate_cluster_source_stamp(
+                source_stamp,
+                receipt_stamp=10.0,
+                previous_source_stamp=previous,
+                maximum_age=0.5,
+                future_tolerance=0.05,
+            )

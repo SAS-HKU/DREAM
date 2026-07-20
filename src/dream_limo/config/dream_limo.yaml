@@ -37,6 +37,9 @@ dream_world_model:
     laser_y: 0.0
     laser_yaw: 0.0
     track_timeout: 0.8
+    # Reject odom-aligned wall fragments outside the measured road/grid and
+    # motion faster than the commissioned LIMO envelope before DRIFT/MPC.
+    maximum_live_track_speed: 1.0
     ego_timeout: 0.30
     scan_timeout: 0.40
     use_merger_odom: false
@@ -147,12 +150,16 @@ dream_vehicle_tracker:
     class_label: car
     publish_rate_hz: 10.0
     input_timeout_sec: 0.50
+    future_stamp_tolerance_sec: 0.05
     minimum_cluster_width_m: 0.08
     maximum_cluster_width_m: 0.50
     minimum_cluster_points: 3
     minimum_cluster_range_m: 0.25
     maximum_cluster_range_m: 6.0
     association_distance_m: 0.45
+    association_noise_margin_m: 0.06
+    maximum_vehicle_speed_mps: 0.60
+    maximum_width_change_m: 0.12
     velocity_alpha: 0.45
     position_alpha: 0.70
     coast_timeout_sec: 0.50
@@ -163,6 +170,8 @@ dream_vehicle_tracker:
     motion_exit_speed_mps: 0.04
     motion_min_displacement_m: 0.08
     motion_hold_sec: 0.80
+    minimum_consistent_motion_windows: 2
+    minimum_direction_cosine: 0.50
     nominal_radius_m: 0.18
     radius_padding_m: 0.04
 
@@ -183,6 +192,14 @@ dream_collision_monitor:
     path_timeout: 0.50
     tf_timeout: 0.10
     future_stamp_tolerance: 0.05
+    base_frame: base_link
+    # Reject only sub-5 cm returns whose TF-resolved endpoints lie inside the
+    # 0.22 x 0.22 m LIMO chassis. Exterior returns, including a close obstacle
+    # in front of the bumper, remain collision surfaces. Filtered rays are
+    # removed before the fail-closed minimum_valid_rays check.
+    self_return_filter_enabled: true
+    self_return_max_range: 0.05
+    self_return_footprint_padding: 0.0
     surface_retention_seconds: 0.75
     minimum_valid_rays: 20
     # The shadow is DREAM risk/veto evidence, not a sensed solid surface.

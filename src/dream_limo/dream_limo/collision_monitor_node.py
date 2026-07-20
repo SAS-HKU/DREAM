@@ -26,6 +26,7 @@ from .core.collision import (
     axis_aligned_road_mask,
     CollisionEnvelope,
     CollisionGridSpec,
+    footprint_self_return_mask,
     TrajectoryAssessment,
     transform_points,
 )
@@ -44,6 +45,16 @@ class DreamCollisionMonitorNode(Node):
         self.tf_timeout = self._positive_parameter("tf_timeout")
         self.future_stamp_tolerance = self._nonnegative_parameter(
             "future_stamp_tolerance"
+        )
+        self.base_frame = self._str_parameter("base_frame")
+        self.self_return_filter_enabled = bool(
+            self.get_parameter("self_return_filter_enabled").value
+        )
+        self.self_return_max_range = self._positive_parameter(
+            "self_return_max_range"
+        )
+        self.self_return_footprint_padding = self._nonnegative_parameter(
+            "self_return_footprint_padding"
         )
         self.occlusion_shadow_blocks_trajectory = bool(
             self.get_parameter("occlusion_shadow_blocks_trajectory").value
@@ -136,7 +147,9 @@ class DreamCollisionMonitorNode(Node):
         self.mask_error = "WAITING_FOR_OCCLUSION_MASK"
         self.path_error = "WAITING_FOR_REFERENCE_TRAJECTORY"
         self.tf_error = "WAITING_FOR_SCAN_TRANSFORM"
+        self.raw_valid_ray_count = 0
         self.valid_ray_count = 0
+        self.self_return_rejection_count = 0
         self.transformed_surface_cells = 0
         self.inflation_radius = inflation_radius
         rate = self._positive_parameter("publish_rate")
@@ -156,6 +169,10 @@ class DreamCollisionMonitorNode(Node):
         self.declare_parameter("path_timeout", 0.50)
         self.declare_parameter("tf_timeout", 0.10)
         self.declare_parameter("future_stamp_tolerance", 0.05)
+        self.declare_parameter("base_frame", "base_link")
+        self.declare_parameter("self_return_filter_enabled", True)
+        self.declare_parameter("self_return_max_range", 0.05)
+        self.declare_parameter("self_return_footprint_padding", 0.0)
         self.declare_parameter("surface_retention_seconds", 0.75)
         self.declare_parameter("minimum_valid_rays", 20)
         # Default fail-closed for direct node use.  The reviewed hardware YAML
@@ -210,7 +227,9 @@ class DreamCollisionMonitorNode(Node):
     def _on_scan(self, message: LaserScan) -> None:
         now = self._now()
         self.last_scan_receipt = now
+        self.raw_valid_ray_count = 0
         self.valid_ray_count = 0
+        self.self_return_rejection_count = 0
         self.transformed_surface_cells = 0
         self.scan_ok = False
         if not message.header.frame_id:
@@ -232,8 +251,9 @@ class DreamCollisionMonitorNode(Node):
             & (ranges >= float(message.range_min))
             & (ranges <= float(message.range_max))
         )
-        self.valid_ray_count = int(np.count_nonzero(valid))
-        if self.valid_ray_count < self.envelope.minimum_valid_rays:
+        self.raw_valid_ray_count = int(np.count_nonzero(valid))
+        self.valid_ray_count = self.raw_valid_ray_count
+        if self.raw_valid_ray_count < self.envelope.minimum_valid_rays:
             self.scan_error = "INSUFFICIENT_VALID_RAYS"
             self.tf_ok = False
             self.tf_error = "TRANSFORM_NOT_EVALUATED"
@@ -247,25 +267,63 @@ class DreamCollisionMonitorNode(Node):
             (
                 ranges[valid] * np.cos(angles[valid]),
                 ranges[valid] * np.sin(angles[valid]),
-                np.zeros(self.valid_ray_count, dtype=np.float64),
+                np.zeros(self.raw_valid_ray_count, dtype=np.float64),
             )
         )
+        valid_ranges = ranges[valid]
         try:
             # Exact sensor timestamp is required; Time() / latest-TF lookup is
             # intentionally never used by this physical collision layer.
-            transform = self.tf_buffer.lookup_transform(
+            stamp = Time.from_msg(message.header.stamp)
+            map_transform = self.tf_buffer.lookup_transform(
                 self.map_frame,
                 message.header.frame_id,
-                Time.from_msg(message.header.stamp),
+                stamp,
                 timeout=Duration(seconds=self.tf_timeout),
             )
-            translation = transform.transform.translation
-            rotation = transform.transform.rotation
+            translation = map_transform.transform.translation
+            rotation = map_transform.transform.rotation
             points = transform_points(
                 local_points,
                 translation_xyz=(translation.x, translation.y, translation.z),
                 quaternion_xyzw=(rotation.x, rotation.y, rotation.z, rotation.w),
             )
+            if self.self_return_filter_enabled:
+                base_transform = self.tf_buffer.lookup_transform(
+                    self.base_frame,
+                    message.header.frame_id,
+                    stamp,
+                    timeout=Duration(seconds=self.tf_timeout),
+                )
+                base_translation = base_transform.transform.translation
+                base_rotation = base_transform.transform.rotation
+                points_in_base = transform_points(
+                    local_points,
+                    translation_xyz=(
+                        base_translation.x,
+                        base_translation.y,
+                        base_translation.z,
+                    ),
+                    quaternion_xyzw=(
+                        base_rotation.x,
+                        base_rotation.y,
+                        base_rotation.z,
+                        base_rotation.w,
+                    ),
+                )
+                rejected = footprint_self_return_mask(
+                    points_in_base,
+                    valid_ranges,
+                    maximum_self_return_range=self.self_return_max_range,
+                    footprint_length=self.config.mpc.robot_length,
+                    footprint_width=self.config.mpc.robot_width,
+                    footprint_padding=self.self_return_footprint_padding,
+                )
+                self.self_return_rejection_count = int(
+                    np.count_nonzero(rejected)
+                )
+                points = points[~rejected]
+                self.valid_ray_count = int(points.shape[0])
         except (TransformException, ValueError) as exc:
             self.tf_ok = False
             self.tf_error = f"SCAN_TF_FAILURE:{exc}"
@@ -278,6 +336,14 @@ class DreamCollisionMonitorNode(Node):
         self.last_tf_receipt = now
         self.tf_ok = True
         self.tf_error = "ok"
+        if self.valid_ray_count < self.envelope.minimum_valid_rays:
+            self.scan_error = "INSUFFICIENT_VALID_RAYS_AFTER_SELF_FILTER"
+            self.envelope.record_scan(
+                np.empty((0, 2)),
+                receipt_time=now,
+                valid_ray_count=self.valid_ray_count,
+            )
+            return
         self.transformed_surface_cells = self.envelope.record_scan(
             points,
             receipt_time=now,
@@ -458,8 +524,15 @@ class DreamCollisionMonitorNode(Node):
             "mask_age": self._age(now, self.last_mask_receipt),
             "path_age": self._age(now, self.last_path_receipt),
             "tf_age": self._age(now, self.last_tf_receipt),
+            "raw_valid_rays": self.raw_valid_ray_count,
             "valid_rays": self.valid_ray_count,
             "minimum_valid_rays": self.envelope.minimum_valid_rays,
+            "self_return_filter_enabled": self.self_return_filter_enabled,
+            "self_return_max_range": self.self_return_max_range,
+            "self_return_footprint_padding": (
+                self.self_return_footprint_padding
+            ),
+            "self_return_rejections": self.self_return_rejection_count,
             "surface_cells_from_latest_scan": self.transformed_surface_cells,
             "inflation_radius": self.inflation_radius,
             "retained_surface_cells": (

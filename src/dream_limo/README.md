@@ -737,6 +737,15 @@ startup, allow roughly 11 seconds before first motion: about five seconds of
 DRIFT warm-up, three seconds in the supervisor, and three seconds in the final
 hardware gate. Any changing failure reason resets the applicable countdown.
 
+The physical lane layout is part of that readiness contract. Lane 0
+(`y=+0.45 m`) must remain clear while the tall occluder occupies the adjacent
+middle-lane region. Balanced DREAM may deliberately veto the requested merge
+and continue in lane 0 until visibility/risk improves. If the occluder or any
+other surface crosses lane 0, the planner will correctly keep its lane while
+the independent front bubble stops it, producing a safe but unavoidable
+deadlock. Do not stage the experiment with a surface directly ahead of the
+left-lane start.
+
 Confirm activation before allowing the arena run:
 
 ```bash
@@ -833,6 +842,18 @@ enters planning.
   the physical occluder away from the path; do not reduce collision inflation
   merely to make the robot move. The audited failed staging measured only about
   0.20--0.22 m clearance where the first unsafe trajectory point occurred.
+- **Readiness countdown keeps restarting:** observe
+  `/dream/hardware_gate_status` continuously rather than using unrelated
+  `--once` snapshots. The remaining value must decrease to zero for three
+  uninterrupted seconds. Inspect `/dream/collision_status` fields
+  `self_return_rejections` and `first_unsafe`, and inspect
+  `/dream/world_status.rejected_track_envelope_count`. The hardware profile
+  filters only timestamped sub-5 cm returns inside the known chassis; real
+  exterior surfaces remain hard collision evidence.
+- **Moves and then stops:** check `/dream/safety_status`. A latched front return
+  below `0.25 m` is a real supervisor stop, not a command-topic failure. Stop
+  the launch, clear/re-stage the lane, and relaunch; do not reset the latch into
+  unchanged geometry.
 - **MPC fallback/slack rejection:** inspect `/dream/planner_status` and stop the
   experiment.
 - **MPC over 150 ms p99 or any solve over 200 ms:** reduce load or keep the
