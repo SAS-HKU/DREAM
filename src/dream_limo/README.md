@@ -384,6 +384,10 @@ source "$HOME/agilex_ws/install/setup.bash"
 source "$HOME/limo_lvv_ws/install/setup.bash"
 ```
 
+Every launch command below is a persistent process. Leave Terminal 1 running,
+open a new terminal for Terminal 2, and so on. Pressing `Ctrl-C` to reuse the
+same terminal also stops the base, LiDAR, or camera that DREAM still needs.
+
 ### Terminal 1 — LIMO base and LiDAR
 
 First verify the installed devices:
@@ -411,15 +415,21 @@ source /opt/ros/humble/setup.bash
 source "$HOME/agilex_ws/install/setup.bash"
 source "$HOME/limo_lvv_ws/install/setup.bash"
 
-ros2 launch astra_camera dabai.launch.py \
+ros2 launch orbbec_camera dabai.launch.py \
   enable_point_cloud:=false \
   enable_colored_point_cloud:=false \
   enable_depth:=false \
-  enable_ir:=false
+  enable_ir:=false \
+  enable_color:=true
 ```
 
-Only RGB is needed for driver-view evidence. Disabling unused depth, IR, and
-point-cloud streams leaves substantially more CPU time for DRIFT and MPC.
+The installed `orbbec_camera` launch honors these stream arguments, keeps the
+RGB image and camera TF, and leaves depth, IR, and both point-cloud streams off.
+On this LIMO that reduced camera CPU load from about 97% with the legacy
+`astra_camera` launch to about 4.5%, leaving substantially more CPU time for
+DRIFT and MPC. Do not use the legacy `astra_camera dabai.launch.py` for this
+experiment: its installed launch file accepts no arguments and always loads two
+point-cloud components.
 
 ### Terminal 3 — verify live inputs before DREAM
 
@@ -664,7 +674,8 @@ raising `target_speed` cannot override the collision gate.
 
 Stop the zero-output commissioning launch with `Ctrl-C` and wait for all of
 its child processes to exit before starting the enabled launch below. Confirm
-that the old graph is gone; this check must report no publisher on `/cmd_vel`:
+that the old graph is gone; before DREAM starts, this check must report zero
+publishers and exactly one subscriber (`limo_base_node`) on `/cmd_vel`:
 
 ```bash
 ros2 topic info /cmd_vel --verbose
@@ -672,6 +683,8 @@ ros2 topic info /cmd_vel --verbose
 
 Do not run the commissioning and enabled hardware graphs at the same time.
 Duplicate DREAM nodes or command publishers invalidate the ownership checks.
+Likewise, select exactly one of `auto_forward` or `goal`; they are alternative
+launch modes, not two programs to run concurrently.
 
 Only after those physical checks have actually passed, run the reviewed
 first-motion command. This mode needs neither a joystick nor an RViz click. It
@@ -783,8 +796,9 @@ enters planning.
 - **Wrong or missing topics:** source Humble, `agilex_ws`, then `limo_lvv_ws`
   in that order and check `ROS_DOMAIN_ID` in every terminal.
 - **Preflight missing sensors:** start `limo_bringup` before DREAM.
-- **Camera stale/no image:** start `astra_camera dabai.launch.py`; inspect the
-  source image with Best Effort QoS.
+- **Camera stale/no image:** start
+  `orbbec_camera dabai.launch.py` with the RGB-only arguments above; inspect
+  the source image with Best Effort QoS.
 - **Zero shadow cells:** inspect `/scan`, local-frame alignment, the road-mask
   overlap, and whether the object actually intersects the laser plane. Live
   mode does not consult the SIL truck polygon.
@@ -805,6 +819,11 @@ enters planning.
   explicit rejection/wait reason; the ego must be stopped, the goal must be a
   fresh `map` pose near the middle lane and beyond the conflict exit, and both
   preflight and matching planner status must be fresh. Never force `/dream/arm`.
+- **Duplicate DREAM nodes or no chassis subscriber:** stop every DREAM launch,
+  wait for its child processes to exit, then inspect `/cmd_vel`. Before DREAM it
+  must have zero publishers and one `limo_base_node` subscriber. Start exactly
+  one enabled hardware launch; after startup it must have one publisher and one
+  subscriber.
 - **Auto-forward does not start:** inspect `/dream/deadman_status`,
   `/dream/preflight_status`, `/dream/collision_status`, and
   `/dream/hardware_gate_status`. Auto-forward synthesizes the configured goal
