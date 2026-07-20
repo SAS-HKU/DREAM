@@ -6,6 +6,7 @@ import numpy as np
 from dream_limo.core.risk_field import DREAMRiskField
 from dream_limo.limo_scale import (
     GridConfig,
+    MPCConfig,
     default_deployment_config,
     deployment_config_for_arena,
 )
@@ -19,6 +20,20 @@ def test_formula_correct_similarity_values():
     assert config.scale.speed(10.0) == 0.5
     assert config.scale.acceleration(1.0) == 0.025
     assert config.mpc.minimum_speed == 0.0
+    assert config.mpc.maximum_steer < np.deg2rad(23.4)
+    assert config.safety.collision_inflation_margin == 0.05
+    assert config.mpc.cbf_slack_weight == 2.0e4
+    assert config.arena.mission_goal_x == 5.55
+
+
+def test_mpc_rejects_cruise_speed_that_conflicts_with_limits():
+    for value in (0.02, 0.61):
+        try:
+            MPCConfig(target_speed=value)
+        except ValueError as exc:
+            assert "target_speed" in str(exc)
+        else:
+            raise AssertionError("unsafe target speed was accepted")
 
 
 def test_pde_operator_is_similarity_invariant():
@@ -78,12 +93,15 @@ def test_surveyed_arena_geometry_is_loaded_once(tmp_path):
         "frame_id: map\n"
         "lanes:\n"
         "  width: 0.48\n"
-        "  centers: [0.48, 0.0, -0.48]\n",
+        "  centers: [0.48, 0.0, -0.48]\n"
+        "route:\n"
+        "  mission_goal_x: 5.56\n",
         encoding="utf-8",
     )
     config = deployment_config_for_arena(str(arena))
     assert config.arena.lane_width == 0.48
     assert config.arena.lane_centers == (0.48, 0.0, -0.48)
+    assert config.arena.mission_goal_x == 5.56
     assert config.pde == default_deployment_config().pde
 
 

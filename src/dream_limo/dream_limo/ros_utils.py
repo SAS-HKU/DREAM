@@ -44,6 +44,25 @@ def transform_planar(
     )
 
 
+def child_velocity_to_parent(
+    longitudinal: float,
+    lateral: float,
+    *,
+    child_yaw: float,
+) -> Tuple[float, float]:
+    """Rotate a child-frame planar velocity into its odometry parent frame.
+
+    ROS ``nav_msgs/Odometry`` expresses pose in ``header.frame_id`` but twist
+    in ``child_frame_id``.  Consumers must perform this rotation before applying
+    a transform between odometry parent frames.
+    """
+    ch, sh = cos(child_yaw), sin(child_yaw)
+    return (
+        ch * float(longitudinal) - sh * float(lateral),
+        sh * float(longitudinal) + ch * float(lateral),
+    )
+
+
 def alignment_from_initial_pose(
     source_x: float,
     source_y: float,

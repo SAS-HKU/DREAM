@@ -15,7 +15,13 @@ from std_msgs.msg import Bool, String
 
 from .core.types import EgoState, Vehicle
 from .limo_scale import deployment_config_for_arena
-from .ros_utils import ego_from_odometry, quaternion_to_yaw, transform_planar
+from .ros_utils import (
+    child_velocity_to_parent,
+    ego_from_odometry,
+    quaternion_to_yaw,
+    stamp_to_seconds,
+    transform_planar,
+)
 
 
 class DreamMetricsNode(Node):
@@ -122,12 +128,18 @@ class DreamMetricsNode(Node):
     def _on_merger(self, message: Odometry) -> None:
         position = message.pose.pose.position
         velocity = message.twist.twist.linear
+        source_yaw = quaternion_to_yaw(message.pose.pose.orientation)
+        odom_vx, odom_vy = child_velocity_to_parent(
+            velocity.x,
+            velocity.y,
+            child_yaw=source_yaw,
+        )
         tx, ty, yaw = self.map_alignment
         x, y, vx, vy = transform_planar(
             position.x,
             position.y,
-            velocity.x,
-            velocity.y,
+            odom_vx,
+            odom_vy,
             tx=tx,
             ty=ty,
             yaw=yaw,
@@ -138,10 +150,10 @@ class DreamMetricsNode(Node):
             y,
             vx=vx,
             vy=vy,
-            heading=quaternion_to_yaw(message.pose.pose.orientation) + yaw,
+            heading=source_yaw + yaw,
             length=0.22,
             width=0.22,
-            stamp=self._now(),
+            stamp=stamp_to_seconds(message.header.stamp),
         )
         self._update_pair_metrics()
 

@@ -9,13 +9,30 @@ from dream_limo.limo_scale import default_deployment_config, get_preset
 def test_mpc_is_finite_at_standstill_and_enforces_nonnegative_speed():
     config = default_deployment_config()
     field = DREAMRiskField(config)
-    mpc = RiskAwareMPC(config)
+    mpc = RiskAwareMPC(config, enforce_map_bounds=True)
     ego = EgoState(0.3, 0.45, 0.0, 0.0, lane_index=0)
     result = mpc.solve(ego, 0, [], field, get_preset("balanced"))
     assert not result.used_fallback
     assert np.all(np.isfinite(result.states))
     assert np.min(result.states[2]) >= -1e-4
     assert np.max(result.states[2]) <= config.mpc.maximum_speed + 1e-4
+    radius = np.hypot(
+        0.5 * config.mpc.robot_length,
+        0.5 * config.mpc.robot_width,
+    ) + config.safety.collision_inflation_margin
+    quantization = 0.5 * config.grid.resolution
+    assert np.min(result.states[0, 1:]) >= (
+        config.grid.x_min + radius - quantization - 1e-4
+    )
+    assert np.max(result.states[0, 1:]) <= (
+        config.grid.x_max - radius + quantization + 1e-4
+    )
+    assert np.min(result.states[1, 2:]) >= (
+        config.grid.road_y_min + radius - quantization - 1e-4
+    )
+    assert np.max(result.states[1, 2:]) <= (
+        config.grid.road_y_max - radius + quantization + 1e-4
+    )
 
 
 def test_risk_expands_cbf_and_headway_and_enters_cost():

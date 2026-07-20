@@ -14,6 +14,7 @@ def generate_launch_description():
     live_demo = os.path.join(share, "launch", "dream_live_demo.launch.py")
     preset = LaunchConfiguration("preset")
     rviz = LaunchConfiguration("rviz")
+    use_merger_odom = LaunchConfiguration("use_merger_odom")
 
     return LaunchDescription(
         [
@@ -34,12 +35,16 @@ def generate_launch_description():
                 msg=(
                     "dream_with_sfg_perception.launch.py is deprecated; using "
                     "neutral LiDAR clustering + DREAM vehicle tracking. Prefer "
-                    "dream_live_demo.launch.py model:=<balanced|pure_mpc>."
+                    "dream_live_demo.launch.py model:=balanced (or pure_mpc)."
                 )
             ),
             IncludeLaunchDescription(
                 PythonLaunchDescriptionSource(live_demo),
-                launch_arguments={"model": preset, "rviz": rviz}.items(),
+                launch_arguments={
+                    "model": preset,
+                    "rviz": rviz,
+                    "use_merger_odom": use_merger_odom,
+                }.items(),
             ),
         ]
     )

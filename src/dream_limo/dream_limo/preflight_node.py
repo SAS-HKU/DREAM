@@ -9,20 +9,58 @@ import rclpy
 from rclpy.node import Node
 from std_msgs.msg import String
 
+from .core.hardware_gate import exact_publisher_owner
+
+
+def evaluate_occlusion_requirement(
+    world_status: Dict[str, Any],
+    *,
+    world_status_fresh: bool,
+    required: bool,
+    latch: bool,
+    previously_observed: bool,
+) -> tuple[bool, bool, bool, bool]:
+    """Evaluate initial occlusion evidence while preserving live watchdogs.
+
+    Returns ``(ready, current, observed, world_live_and_aligned)``. A latched
+    observation permits the intended later reveal, but never masks a stale or
+    misaligned world model.
+    """
+
+    live = bool(
+        world_status_fresh
+        and world_status.get("ready", False)
+        and world_status.get("alignment_received", False)
+        and world_status.get("occlusion_source") == "lidar_first_return"
+        and not world_status.get("surveyed_static_geometry_used", True)
+    )
+    current = bool(
+        live
+        and int(world_status.get("shadow_cells", 0)) > 0
+        and int(world_status.get("shadow_route_samples", 0)) > 0
+    )
+    observed = bool(previously_observed or current)
+    ready = bool(not required or current or (latch and observed and live))
+    return ready, current, observed, live
+
 
 class DreamPreflight(Node):
     def __init__(self) -> None:
         super().__init__("dream_preflight")
         self.declare_parameter("expected_sensor_owner", "")
+        self.declare_parameter("expected_cmd_vel_owner", "")
+        self.declare_parameter("expected_arm_owner", "")
         self.declare_parameter("allow_arm_publisher", False)
         self.declare_parameter("require_camera_evidence", False)
         self.declare_parameter("require_perceived_occlusion", False)
+        self.declare_parameter("latch_perceived_occlusion", False)
         self.publisher = self.create_publisher(String, "/dream/preflight_status", 10)
         self.last_payload = None
         self.camera_status: Dict[str, Any] = {}
         self.camera_status_receipt: Optional[float] = None
         self.world_status: Dict[str, Any] = {}
         self.world_status_receipt: Optional[float] = None
+        self.perceived_occlusion_observed = False
         self.create_subscription(
             String,
             "/dream/camera_evidence_status",
@@ -61,6 +99,16 @@ class DreamPreflight(Node):
         required = ("/wheel/odom", "/scan", "/limo_status", "/cmd_vel_test")
         missing = [name for name in required if name not in topics]
         expected_sensor_owner = str(self.get_parameter("expected_sensor_owner").value)
+        expected_cmd_vel_owner = str(
+            self.get_parameter("expected_cmd_vel_owner").value
+        )
+        command_publisher_names = [item.node_name for item in command_publishers]
+        cmd_vel_mode = "hardware_gate" if expected_cmd_vel_owner else "dry_run"
+        cmd_vel_owner_safe = (
+            exact_publisher_owner(command_publisher_names, expected_cmd_vel_owner)
+            if expected_cmd_vel_owner
+            else not command_publisher_names
+        )
         sensor_owner_mismatches = {}
         if expected_sensor_owner:
             for topic in ("/wheel/odom", "/scan", "/limo_status"):
@@ -73,7 +121,14 @@ class DreamPreflight(Node):
             len(test_publishers) == 1
             and test_publishers[0].node_name == "dream_safety_supervisor"
         )
-        arm_source_safe = bool(self.get_parameter("allow_arm_publisher").value) or not arm_publishers
+        arm_publisher_names = [item.node_name for item in arm_publishers]
+        expected_arm_owner = str(self.get_parameter("expected_arm_owner").value)
+        arm_source_safe = (
+            exact_publisher_owner(arm_publisher_names, expected_arm_owner)
+            if expected_arm_owner
+            else bool(self.get_parameter("allow_arm_publisher").value)
+            or not arm_publisher_names
+        )
         camera_required = bool(self.get_parameter("require_camera_evidence").value)
         camera_status_fresh = (
             self.camera_status_receipt is not None
@@ -90,20 +145,23 @@ class DreamPreflight(Node):
             self.world_status_receipt is not None
             and self._now() - self.world_status_receipt < 0.5
         )
-        perceived_occlusion_ready = (
-            not perceived_occlusion_required
-            or (
-                world_status_fresh
-                and bool(self.world_status.get("ready", False))
-                and bool(self.world_status.get("alignment_received", False))
-                and self.world_status.get("occlusion_source") == "lidar_first_return"
-                and not bool(self.world_status.get("surveyed_static_geometry_used", True))
-                and int(self.world_status.get("shadow_cells", 0)) > 0
-                and int(self.world_status.get("shadow_route_samples", 0)) > 0
-            )
+        latch_perceived_occlusion = bool(
+            self.get_parameter("latch_perceived_occlusion").value
+        )
+        (
+            perceived_occlusion_ready,
+            perceived_occlusion_current,
+            self.perceived_occlusion_observed,
+            _world_live_and_aligned,
+        ) = evaluate_occlusion_requirement(
+            self.world_status,
+            world_status_fresh=world_status_fresh,
+            required=perceived_occlusion_required,
+            latch=latch_perceived_occlusion,
+            previously_observed=self.perceived_occlusion_observed,
         )
         passed = (
-            not command_publishers
+            cmd_vel_owner_safe
             and safe_owner
             and not missing
             and not sensor_owner_mismatches
@@ -113,12 +171,16 @@ class DreamPreflight(Node):
         )
         payload = {
             "passed": passed,
-            "cmd_vel_publishers": [item.node_name for item in command_publishers],
+            "cmd_vel_mode": cmd_vel_mode,
+            "expected_cmd_vel_owner": expected_cmd_vel_owner or None,
+            "cmd_vel_owner_safe": cmd_vel_owner_safe,
+            "cmd_vel_publishers": command_publisher_names,
             "cmd_vel_test_publishers": [item.node_name for item in test_publishers],
             "missing_topics": missing,
             "expected_sensor_owner": expected_sensor_owner or None,
             "sensor_owner_mismatches": sensor_owner_mismatches,
-            "arm_publishers": [item.node_name for item in arm_publishers],
+            "expected_arm_owner": expected_arm_owner or None,
+            "arm_publishers": arm_publisher_names,
             "arm_source_allowed": arm_source_safe,
             "camera_required": camera_required,
             "camera_ready": camera_ready,
@@ -126,9 +188,15 @@ class DreamPreflight(Node):
             "camera_status": self.camera_status if camera_required else None,
             "perceived_occlusion_required": perceived_occlusion_required,
             "perceived_occlusion_ready": perceived_occlusion_ready,
+            "perceived_occlusion_current": perceived_occlusion_current,
+            "perceived_occlusion_observed": self.perceived_occlusion_observed,
+            "latch_perceived_occlusion": latch_perceived_occlusion,
             "world_status_fresh": world_status_fresh,
             "world_status": self.world_status if perceived_occlusion_required else None,
-            "note": "Passing dry-run preflight does not authorize physical motion.",
+            "note": (
+                "Passing preflight is only one hardware-gate prerequisite; "
+                "it does not independently authorize physical motion."
+            ),
         }
         message = String()
         message.data = json.dumps(payload, separators=(",", ":"))

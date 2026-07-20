@@ -41,6 +41,34 @@ dream_world_model:
     scan_timeout: 0.40
     use_merger_odom: false
     merger_odom_topic: /merger/wheel/odom
+    merger_adapter_status_topic: /dream/merger_odometry_adapter_status
+    merger_adapter_status_timeout: 0.50
+
+# Optional controlled two-LIMO provider. This converts the second robot's
+# unrelated local odometry into the ego odom frame before the LiDAR
+# line-of-sight gate. It is disabled unless use_merger_odom:=true, and its
+# measured alignment must be explicitly verified.
+dream_merger_odometry_adapter:
+  ros__parameters:
+    input_topic: /merger/raw/wheel/odom
+    output_topic: /merger/wheel/odom
+    status_topic: /dream/merger_odometry_adapter_status
+    expected_source_frame: merger/odom
+    expected_source_child_frame: merger/base_link
+    output_frame: odom
+    output_child_frame: merger/base_link
+    allow_source_output_frame_alias: false
+    alignment_mode: measured_correspondence
+    alignment_verified: false
+    source_reference_x: 0.0
+    source_reference_y: 0.0
+    source_reference_yaw: 0.0
+    target_reference_x: 0.0
+    target_reference_y: 0.0
+    target_reference_yaw: 0.0
+    maximum_input_age: 0.50
+    maximum_future_skew: 0.05
+    status_rate: 10.0
 
 dream_drift_field:
   ros__parameters:
@@ -53,8 +81,14 @@ dream_planner:
     preset: balanced
     update_rate: 5.0
     input_timeout: 0.50
+    # Legacy SIL/dry-run cruise speed. The guarded hardware launch overrides
+    # this through its target_speed argument, whose default is 0.15 m/s.
+    target_speed: 0.50
     route_intent_enabled: true
     maximum_allowed_cbf_slack: 0.05
+    # Dedicated hardware launch overrides this. Legacy surveyed-truck SIL keeps
+    # its historical regression behavior unchanged.
+    enforce_map_bounds: false
 
 dream_command_adapter:
   ros__parameters:
@@ -127,3 +161,83 @@ dream_vehicle_tracker:
     motion_hold_sec: 0.80
     nominal_radius_m: 0.18
     radius_padding_m: 0.04
+
+# P0 collision layer. Existing SIL/live dry-run launches do not start this
+# node. The dedicated hardware launch requires both ready=true and
+# trajectory_clear=true continuously before forwarding motion.
+dream_collision_monitor:
+  ros__parameters:
+    scan_topic: /scan
+    occlusion_mask_topic: /dream/occlusion_mask
+    trajectory_topic: /dream/reference_trajectory
+    collision_grid_topic: /dream/collision_grid
+    collision_status_topic: /dream/collision_status
+    map_frame: map
+    publish_rate: 10.0
+    scan_timeout: 0.40
+    mask_timeout: 0.50
+    path_timeout: 0.50
+    tf_timeout: 0.10
+    future_stamp_tolerance: 0.05
+    surface_retention_seconds: 0.75
+    minimum_valid_rays: 20
+    # Inflation radius = half-diagonal(0.22 x 0.22 m LIMO) + this margin.
+    inflation_margin: 0.05
+    trajectory_interpolation_spacing: 0.0125
+
+# Sole reviewed physical command boundary. Starting the node with these
+# checked-in defaults only publishes zero Twist messages on /cmd_vel.
+dream_hardware_command_gate:
+  ros__parameters:
+    hardware_output_enabled: false
+    staging_pose_verified: false
+    platform_watchdog_verified: false
+    operator_kill_verified: false
+    candidate_topic: /cmd_vel_test
+    odom_topic: /wheel/odom
+    scan_topic: /scan
+    status_topic: /limo_status
+    safety_status_topic: /dream/safety_status
+    preflight_status_topic: /dream/preflight_status
+    collision_status_topic: /dream/collision_status
+    deadman_status_topic: /dream/deadman_status
+    world_status_topic: /dream/world_status
+    drift_status_topic: /dream/drift_status
+    planner_status_topic: /dream/planner_status
+    gate_status_topic: /dream/hardware_gate_status
+    expected_candidate_owner: dream_safety_supervisor
+    expected_deadman_owner: dream_hardware_deadman
+    publish_rate: 20.0
+    # Stage-3 first-motion cap; intentionally below the package-wide 0.6 m/s cap.
+    maximum_speed: 0.15
+    maximum_acceleration: 0.35
+    maximum_ackermann_angular_command: 0.198
+    maximum_ackermann_angular_slew: 0.40
+    candidate_timeout: 0.20
+    odom_timeout: 0.25
+    scan_timeout: 0.40
+    status_timeout: 1.25
+    safety_status_timeout: 0.20
+    preflight_timeout: 2.0
+    collision_timeout: 0.30
+    deadman_timeout: 0.30
+    world_timeout: 0.50
+    drift_timeout: 0.50
+    planner_status_timeout: 0.50
+    required_motion_mode: 1
+
+# A physical, positively identified joystick must publish /joy through the
+# single reviewed joy_node.  The current checked-in state cannot arm.
+dream_hardware_deadman:
+  ros__parameters:
+    enabled: false
+    joy_topic: /joy
+    expected_joy_owner: joy_node
+    arm_topic: /dream/arm
+    external_stop_topic: /dream/external_stop
+    status_topic: /dream/deadman_status
+    hold_button: 4
+    confirm_button: 5
+    stop_button: 1
+    joy_timeout: 0.25
+    publish_rate: 20.0

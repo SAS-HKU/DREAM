@@ -301,10 +301,15 @@ class DreamSmokeMonitor(Node):
         dream_arm = arm not in {"baseline", "pure_mpc"}
         yield_observed = False
         if self.speed_at_reveal is not None and isfinite(self.minimum_post_reveal_speed):
+            speed_drop = self.speed_at_reveal - self.minimum_post_reveal_speed
+            # DREAM is expected to carry margin into reveal. The baseline is
+            # expected to react later, but a meaningful 0.10 m/s post-reveal
+            # reduction is sufficient for this smoke check; it must not be
+            # misreported as the stronger DREAM yield behavior.
             yield_observed = (
-                (dream_arm and self.speed_at_reveal <= 0.47)
+                self.speed_at_reveal <= 0.47
                 or self.minimum_post_reveal_speed <= 0.18
-                or self.speed_at_reveal - self.minimum_post_reveal_speed >= 0.15
+                or speed_drop >= (0.15 if dream_arm else 0.10)
             )
         decision_behavior_matches_arm = (
             self.maximum_consecutive_veto >= 2

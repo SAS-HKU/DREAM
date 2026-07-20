@@ -29,7 +29,75 @@ from .core.risk_field import DREAMRiskField
 from .core.route import anchored_lane_change_y
 from .core.types import EgoState, Vehicle, parse_tracked_agents
 from .limo_scale import default_deployment_config, deployment_config_for_arena
-from .ros_utils import ego_from_odometry, quaternion_to_yaw, transform_planar, vehicle_to_mapping
+from .ros_utils import (
+    child_velocity_to_parent,
+    ego_from_odometry,
+    quaternion_to_yaw,
+    stamp_to_seconds,
+    transform_planar,
+    vehicle_to_mapping,
+)
+
+
+def evaluate_merger_adapter_status(
+    payload,
+    *,
+    expected_output_frame: str,
+    expected_output_child_frame: str,
+) -> Tuple[bool, str]:
+    """Validate the adapter contract without accepting truthy substitutes."""
+    if not isinstance(payload, dict):
+        return False, "INVALID_STATUS_PAYLOAD"
+    required_true_fields = (
+        "ready",
+        "input_fresh",
+        "last_message_valid",
+        "alignment_verified",
+        "alignment_initialized",
+    )
+    for field in required_true_fields:
+        if payload.get(field) is not True:
+            return False, str(payload.get("reason", f"{field.upper()}_FALSE"))
+    if payload.get("output_frame") != expected_output_frame:
+        return False, "OUTPUT_FRAME_MISMATCH"
+    if payload.get("output_child_frame") != expected_output_child_frame:
+        return False, "OUTPUT_CHILD_FRAME_MISMATCH"
+    return True, "READY"
+
+
+def evaluate_dynamic_source_fresh(
+    *,
+    perception_tracks_fresh: bool,
+    merger_odom_required: bool,
+    merger_inputs_ready: bool,
+) -> bool:
+    """Select the freshness contract used by the hardware command gate.
+
+    In measured second-LIMO mode the aligned odometry adapter is the required
+    dynamic source, so an intentionally disabled SFG tracker must not prevent
+    motion.  Conversely, a fresh SFG heartbeat must not hide an adapter fault.
+    """
+    if merger_odom_required:
+        return bool(merger_inputs_ready)
+    return bool(perception_tracks_fresh)
+
+
+def select_perception_tracks(
+    agents: List[Vehicle],
+    *,
+    perception_tracks_fresh: bool,
+    merger_odom_required: bool,
+) -> List[Vehicle]:
+    """Use exactly one dynamic-object provider.
+
+    An aligned second-LIMO stream is scan-gated later in the world-model
+    update.  When that mode is selected, ignore every ``/tracked_agents``
+    message, including one from an unexpectedly running external publisher,
+    so it cannot duplicate or bypass the gated merger track.
+    """
+    if merger_odom_required or not perception_tracks_fresh:
+        return []
+    return list(agents)
 
 
 class DreamWorldModel(Node):
@@ -56,11 +124,26 @@ class DreamWorldModel(Node):
         self.declare_parameter("use_merger_odom", False)
         self.declare_parameter("merger_odom_topic", "/merger/wheel/odom")
         self.declare_parameter("merger_odom_frame", "odom")
+        self.declare_parameter("merger_odom_child_frame", "merger/base_link")
+        self.declare_parameter(
+            "merger_adapter_status_topic",
+            "/dream/merger_odometry_adapter_status",
+        )
+        self.declare_parameter("merger_adapter_status_timeout", 0.30)
         self.declare_parameter("publish_rate", 10.0)
 
         self.config = deployment_config_for_arena(
             str(self.get_parameter("arena_file").value)
         )
+        self.use_merger_odom = bool(self.get_parameter("use_merger_odom").value)
+        self.merger_adapter_status_timeout = float(
+            self.get_parameter("merger_adapter_status_timeout").value
+        )
+        if (
+            not np.isfinite(self.merger_adapter_status_timeout)
+            or self.merger_adapter_status_timeout <= 0.0
+        ):
+            raise RuntimeError("merger_adapter_status_timeout must be positive")
         self.grid_helper = DREAMRiskField(self.config)
 
         surveyed_vehicles, surveyed_obstacles = self._load_arena(
@@ -96,6 +179,11 @@ class DreamWorldModel(Node):
         self.agents_receipt: Optional[float] = None
         self.raw_merger: Optional[Vehicle] = None
         self.raw_merger_receipt: Optional[float] = None
+        self.merger_odom_valid = False
+        self.merger_odom_reason = "WAITING_FOR_ODOMETRY"
+        self.merger_adapter_ready = False
+        self.merger_adapter_reason = "WAITING_FOR_ADAPTER_STATUS"
+        self.merger_adapter_status_receipt: Optional[float] = None
         self.map_alignment = (
             float(self.get_parameter("map_to_odom_x").value),
             float(self.get_parameter("map_to_odom_y").value),
@@ -139,7 +227,13 @@ class DreamWorldModel(Node):
             self._on_tracked_agents,
             reliable,
         )
-        if bool(self.get_parameter("use_merger_odom").value):
+        if self.use_merger_odom:
+            self.create_subscription(
+                String,
+                str(self.get_parameter("merger_adapter_status_topic").value),
+                self._on_merger_adapter_status,
+                alignment_qos,
+            )
             self.create_subscription(
                 Odometry,
                 str(self.get_parameter("merger_odom_topic").value),
@@ -275,25 +369,105 @@ class DreamWorldModel(Node):
         except (ValueError, KeyError, TypeError, json.JSONDecodeError) as exc:
             self.get_logger().warning(f"Rejected tracked_agents payload: {exc}")
 
+    def _on_merger_adapter_status(self, message: String) -> None:
+        now = self._now()
+        try:
+            payload = json.loads(message.data)
+            ready, reason = evaluate_merger_adapter_status(
+                payload,
+                expected_output_frame=str(
+                    self.get_parameter("merger_odom_frame").value
+                ),
+                expected_output_child_frame=str(
+                    self.get_parameter("merger_odom_child_frame").value
+                ),
+            )
+        except (json.JSONDecodeError, TypeError, ValueError):
+            ready, reason = False, "INVALID_STATUS_PAYLOAD"
+        self.merger_adapter_ready = ready
+        self.merger_adapter_reason = reason
+        self.merger_adapter_status_receipt = now
+        if not ready:
+            self._clear_merger_odom(reason)
+
+    def _merger_adapter_is_ready(self, now: float) -> Tuple[bool, bool]:
+        fresh = (
+            self.merger_adapter_status_receipt is not None
+            and now - self.merger_adapter_status_receipt
+            < self.merger_adapter_status_timeout
+        )
+        return self.merger_adapter_ready and fresh, fresh
+
+    def _clear_merger_odom(self, reason: str) -> None:
+        self.raw_merger = None
+        self.raw_merger_receipt = None
+        self.merger_odom_valid = False
+        self.merger_odom_reason = reason
+
     def _on_merger_odom(self, message: Odometry) -> None:
+        now = self._now()
+        adapter_ready, _ = self._merger_adapter_is_ready(now)
+        if not adapter_ready:
+            self._clear_merger_odom("ADAPTER_NOT_READY")
+            return
+        expected_frame = str(self.get_parameter("merger_odom_frame").value)
+        expected_child_frame = str(
+            self.get_parameter("merger_odom_child_frame").value
+        )
+        if message.header.frame_id != expected_frame:
+            self._clear_merger_odom("ODOMETRY_FRAME_MISMATCH")
+            return
+        if message.child_frame_id != expected_child_frame:
+            self._clear_merger_odom("ODOMETRY_CHILD_FRAME_MISMATCH")
+            return
         position = message.pose.pose.position
         velocity = message.twist.twist.linear
-        x, y, vx, vy = self._transform_from_odom(
-            position.x, position.y, velocity.x, velocity.y
+        source_yaw = quaternion_to_yaw(message.pose.pose.orientation)
+        source_stamp = stamp_to_seconds(message.header.stamp)
+        values = (
+            position.x,
+            position.y,
+            source_yaw,
+            velocity.x,
+            velocity.y,
+            source_stamp,
         )
+        if not all(np.isfinite(value) for value in values) or source_stamp <= 0.0:
+            self._clear_merger_odom("INVALID_ODOMETRY")
+            return
+        parent_vx, parent_vy = child_velocity_to_parent(
+            velocity.x,
+            velocity.y,
+            child_yaw=source_yaw,
+        )
+        arena_frame = str(self.get_parameter("arena_frame").value)
+        if expected_frame == arena_frame:
+            x, y = float(position.x), float(position.y)
+            vx, vy = parent_vx, parent_vy
+            map_yaw = source_yaw
+        else:
+            x, y, vx, vy = self._transform_from_odom(
+                position.x,
+                position.y,
+                parent_vx,
+                parent_vy,
+            )
+            map_yaw = self.map_alignment[2] + source_yaw
         self.raw_merger = Vehicle(
             "merger_odom",
             x,
             y,
             vx=vx,
             vy=vy,
-            heading=atan2(vy, vx) if hypot(vx, vy) > 1.0e-6 else quaternion_to_yaw(message.pose.pose.orientation),
+            heading=map_yaw,
             vehicle_class="car",
             length=0.22,
             width=0.22,
-            stamp=self._now(),
+            stamp=source_stamp,
         )
-        self.raw_merger_receipt = self._now()
+        self.raw_merger_receipt = now
+        self.merger_odom_valid = True
+        self.merger_odom_reason = "READY"
 
     def _publish_mask(self, mask: np.ndarray, stamp) -> None:
         message = OccupancyGrid()
@@ -361,11 +535,61 @@ class DreamWorldModel(Node):
         scan_fresh = self.scan is not None and now - self.scan_receipt < float(
             self.get_parameter("scan_timeout").value
         )
-        tracks_fresh = self.agents_receipt is not None and now - self.agents_receipt < float(
-            self.get_parameter("track_timeout").value
+        perception_tracks_fresh = (
+            self.agents_receipt is not None
+            and now - self.agents_receipt
+            < float(self.get_parameter("track_timeout").value)
         )
+        if self.use_merger_odom:
+            merger_adapter_ready, merger_adapter_fresh = (
+                self._merger_adapter_is_ready(now)
+            )
+            merger_odom_fresh = (
+                self.merger_odom_valid
+                and self.raw_merger is not None
+                and self.raw_merger_receipt is not None
+                and now - self.raw_merger_receipt
+                < float(self.get_parameter("track_timeout").value)
+            )
+            if not merger_adapter_fresh:
+                merger_adapter_reason = "STALE_ADAPTER_STATUS"
+                self._clear_merger_odom(merger_adapter_reason)
+                merger_odom_fresh = False
+            else:
+                merger_adapter_reason = self.merger_adapter_reason
+            merger_inputs_ready = merger_adapter_ready and merger_odom_fresh
+        else:
+            merger_adapter_ready = True
+            merger_adapter_fresh = True
+            merger_adapter_reason = "NOT_REQUIRED"
+            merger_odom_fresh = True
+            merger_inputs_ready = True
+        tracks_fresh = evaluate_dynamic_source_fresh(
+            perception_tracks_fresh=perception_tracks_fresh,
+            merger_odom_required=self.use_merger_odom,
+            merger_inputs_ready=merger_inputs_ready,
+        )
+        merger_contract = {
+            "merger_adapter_required": self.use_merger_odom,
+            "merger_adapter_ready": merger_adapter_ready,
+            "merger_adapter_status_fresh": merger_adapter_fresh,
+            "merger_adapter_reason": merger_adapter_reason,
+            "merger_odom_valid": (
+                self.merger_odom_valid if self.use_merger_odom else True
+            ),
+            "merger_odom_fresh": merger_odom_fresh,
+            "merger_odom_reason": (
+                self.merger_odom_reason if self.use_merger_odom else "NOT_REQUIRED"
+            ),
+            "perception_tracks_fresh": perception_tracks_fresh,
+            "dynamic_source_fresh": tracks_fresh,
+        }
         visible_merger = False
-        dynamic = list(self.agents) if tracks_fresh else []
+        dynamic = select_perception_tracks(
+            self.agents,
+            perception_tracks_fresh=perception_tracks_fresh,
+            merger_odom_required=self.use_merger_odom,
+        )
         if self.occlusion_source == "lidar_first_return" and scan_fresh:
             # SFG publishes only perceived tracks, but its tracker may briefly
             # coast a track after it moves behind a surface. Never leak such a
@@ -380,11 +604,10 @@ class DreamWorldModel(Node):
                 )
             ]
         if (
-            bool(self.get_parameter("use_merger_odom").value)
+            self.use_merger_odom
+            and merger_inputs_ready
             and ego_fresh
             and self.raw_merger is not None
-            and self.raw_merger_receipt is not None
-            and now - self.raw_merger_receipt < float(self.get_parameter("track_timeout").value)
         ):
             observer = (
                 (self.scan.sensor_x, self.scan.sensor_y)
@@ -409,7 +632,12 @@ class DreamWorldModel(Node):
         visible_message.data = visible_merger
         self.visibility_publisher.publish(visible_message)
 
-        if not ego_fresh or not scan_fresh or not self.alignment_received:
+        if (
+            not ego_fresh
+            or not scan_fresh
+            or not self.alignment_received
+            or not merger_inputs_ready
+        ):
             status = String()
             status.data = json.dumps(
                 {
@@ -419,6 +647,7 @@ class DreamWorldModel(Node):
                     "tracks_fresh": tracks_fresh,
                     "occlusion_source": self.occlusion_source,
                     "alignment_received": self.alignment_received,
+                    **merger_contract,
                 },
                 separators=(",", ":"),
             )
@@ -439,12 +668,15 @@ class DreamWorldModel(Node):
             {
                 "stamp": now,
                 "frame_id": self.config.grid.frame_id,
-                "vehicles": [vehicle_to_mapping(item) for item in [*self.static_vehicles, *dynamic]],
+                "vehicles": [
+                    vehicle_to_mapping(item)
+                    for item in [*self.static_vehicles, *dynamic]
+                ],
                 "static_vehicle_ids": [item.vehicle_id for item in self.static_vehicles],
                 "merger_visible": visible_merger,
                 "visibility_source": (
                     "merger_odom_gate"
-                    if bool(self.get_parameter("use_merger_odom").value)
+                    if self.use_merger_odom
                     else "perception_only_no_merger_ground_truth"
                 ),
                 "dynamic_track_count": len(dynamic),
@@ -456,6 +688,7 @@ class DreamWorldModel(Node):
                 "surveyed_static_geometry_used": self.occlusion_source
                 == "surveyed_polygon",
                 "alignment_received": self.alignment_received,
+                **merger_contract,
             },
             separators=(",", ":"),
         )
@@ -470,7 +703,7 @@ class DreamWorldModel(Node):
                 "merger_visible": visible_merger,
                 "visibility_source": (
                     "merger_odom_gate"
-                    if bool(self.get_parameter("use_merger_odom").value)
+                    if self.use_merger_odom
                     else "perception_only_no_merger_ground_truth"
                 ),
                 "dynamic_track_count": len(dynamic),
@@ -481,6 +714,7 @@ class DreamWorldModel(Node):
                 "surveyed_static_geometry_used": self.occlusion_source
                 == "surveyed_polygon",
                 "alignment_received": self.alignment_received,
+                **merger_contract,
             },
             separators=(",", ":"),
         )

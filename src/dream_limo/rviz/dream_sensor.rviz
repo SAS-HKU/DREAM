@@ -40,6 +40,18 @@ Visualization Manager:
         Reliability Policy: Reliable
         Value: /dream/occlusion_mask
       Value: true
+    - Alpha: 0.45
+      Class: rviz_default_plugins/Map
+      Color Scheme: costmap
+      Enabled: true
+      Name: Fail-Closed Collision Envelope
+      Topic:
+        Depth: 2
+        Durability Policy: Volatile
+        History Policy: Keep Last
+        Reliability Policy: Reliable
+        Value: /dream/collision_grid
+      Value: true
     - Class: rviz_default_plugins/MarkerArray
       Enabled: true
       Name: Occluded Merge Scenario

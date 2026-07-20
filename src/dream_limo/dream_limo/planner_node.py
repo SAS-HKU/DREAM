@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+from dataclasses import replace
 from math import isfinite
 from typing import List, Optional
 
@@ -16,6 +17,7 @@ from std_msgs.msg import Bool, String
 
 from .core.decision import IDEAMDREAMDecision
 from .core.command_adapter import gate_mpc_output
+from .core.mission import MissionEndGuard
 from .core.mpc import RiskAwareMPC
 from .core.risk_field import DREAMRiskField
 from .core.types import EgoState, Vehicle
@@ -38,9 +40,18 @@ class DreamPlannerNode(Node):
         self.declare_parameter(
             "maximum_allowed_cbf_slack", self.config.mpc.maximum_allowed_cbf_slack
         )
+        self.declare_parameter("enforce_map_bounds", False)
         self.declare_parameter("arena_file", "")
         self.config = deployment_config_for_arena(
             str(self.get_parameter("arena_file").value)
+        )
+        self.declare_parameter("target_speed", self.config.mpc.target_speed)
+        self.config = replace(
+            self.config,
+            mpc=replace(
+                self.config.mpc,
+                target_speed=float(self.get_parameter("target_speed").value),
+            ),
         )
         self.declare_parameter("route_intent_enabled", True)
         self.declare_parameter("route_target_lane", self.config.arena.target_lane)
@@ -51,7 +62,17 @@ class DreamPlannerNode(Node):
             self.config,
             blocker_trigger_distance=float(self.get_parameter("blocker_trigger_distance").value),
         )
-        self.mpc = RiskAwareMPC(self.config)
+        self.mpc = RiskAwareMPC(
+            self.config,
+            enforce_map_bounds=bool(
+                self.get_parameter("enforce_map_bounds").value
+            ),
+        )
+        self.mission = MissionEndGuard(
+            goal_x=self.config.arena.mission_goal_x,
+            position_tolerance=self.config.mpc.mission_position_tolerance,
+            stop_speed_tolerance=self.config.mpc.mission_stop_speed_tolerance,
+        )
         self.ego: Optional[EgoState] = None
         self.ego_receipt: Optional[float] = None
         self.vehicles: List[Vehicle] = []
@@ -149,8 +170,32 @@ class DreamPlannerNode(Node):
             path.poses.append(pose)
         self.path_publisher.publish(path)
 
+    def _publish_mission_complete(self, now: float, remaining_distance: float) -> None:
+        self.mpc.reset()
+        self._publish_stop(
+            "MISSION_COMPLETE",
+            {
+                "stamp": now,
+                "mission_complete": True,
+                "mission_goal_x": self.config.arena.mission_goal_x,
+                "mission_remaining_distance": remaining_distance,
+                "configured_target_speed": self.config.mpc.target_speed,
+                "map_bounds_enforced": self.mpc.enforce_map_bounds,
+            },
+        )
+
     def _plan(self) -> None:
         now = self._now()
+        # Completion is a process-lifetime latch. Keep publishing zero with an
+        # unambiguous status even if perception inputs later become stale.
+        if self.mission.complete:
+            remaining_distance = (
+                self.mission.remaining_distance(self.ego.x)
+                if self.ego is not None
+                else 0.0
+            )
+            self._publish_mission_complete(now, remaining_distance)
+            return
         timeout = float(self.get_parameter("input_timeout").value)
         timestamps = (self.ego_receipt, self.world_receipt, self.risk_receipt, self.ready_receipt)
         if any(value is None or now - value >= timeout for value in timestamps):
@@ -172,6 +217,10 @@ class DreamPlannerNode(Node):
                 stamp=self.ego.stamp,
                 lane_index=lane,
             )
+            remaining_distance = self.mission.remaining_distance(ego.x)
+            if self.mission.update(ego.x, ego.speed):
+                self._publish_mission_complete(now, remaining_distance)
+                return
             route_active = (
                 bool(self.get_parameter("route_intent_enabled").value)
                 and ego.x >= float(self.get_parameter("route_merge_start_x").value)
@@ -267,6 +316,10 @@ class DreamPlannerNode(Node):
                 "vetoed": decision.vetoed,
                 "decision_risk": decision.risk_score,
                 "risk_at_ego": self.field.risk_at(ego.x, ego.y),
+                "mission_complete": False,
+                "mission_goal_x": self.config.arena.mission_goal_x,
+                "mission_remaining_distance": remaining_distance,
+                "configured_target_speed": self.config.mpc.target_speed,
                 "target_speed": result.command.target_speed,
                 "acceleration": result.command.acceleration,
                 "center_steer": result.command.steering,
@@ -276,6 +329,7 @@ class DreamPlannerNode(Node):
                 "mpc_fallback": result.used_fallback,
                 "maximum_cbf_slack": result.maximum_slack,
                 "maximum_allowed_cbf_slack": maximum_allowed_slack,
+                "map_bounds_enforced": self.mpc.enforce_map_bounds,
             },
             separators=(",", ":"),
         )

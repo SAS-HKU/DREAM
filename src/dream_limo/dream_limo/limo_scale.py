@@ -9,7 +9,7 @@ mixes highway and tabletop units.
 from __future__ import annotations
 
 from dataclasses import asdict, dataclass, field, replace
-from math import radians
+from math import isfinite, radians
 from pathlib import Path
 from typing import Any, Dict, Tuple
 
@@ -146,6 +146,9 @@ class ArenaConfig:
     merge_path_x_max: float = 3.80
     conflict_zone_x_min: float = 3.30
     conflict_zone_x_max: float = 5.30
+    # Longitudinal center-position goal after the shared conflict zone.  Both
+    # experiment arms use the same goal and mission-end speed profile.
+    mission_goal_x: float = 5.55
     lidar_shadow_mode: str = "lidar_polygon"
     veto_lookahead: float = 3.0
     veto_samples: int = 10
@@ -163,6 +166,12 @@ class ArenaConfig:
             raise ValueError("conflict-zone limits are reversed")
         if self.merge_path_x_min >= self.merge_path_x_max:
             raise ValueError("merge-path limits are reversed")
+        if not isfinite(self.mission_goal_x):
+            raise ValueError("mission goal must be finite")
+        if self.mission_goal_x <= max(
+            self.merge_path_x_max, self.conflict_zone_x_max
+        ):
+            raise ValueError("mission goal must lie after the merge and conflict zone")
 
 
 @dataclass(frozen=True)
@@ -176,7 +185,10 @@ class MPCConfig:
     minimum_speed: float = 0.0
     maximum_acceleration: float = 0.35
     minimum_acceleration: float = -0.50
-    maximum_steer: float = radians(25.0)
+    # The installed driver forwards Twist.angular.z as the raw firmware
+    # steering field. Its inner-wheel limit corresponds to about 23.4 degrees
+    # at the bicycle center, so keep the MPC model below that saturation.
+    maximum_steer: float = radians(23.0)
     maximum_steer_rate: float = radians(60.0)
     wheelbase: float = 0.20
     robot_length: float = 0.22
@@ -197,6 +209,12 @@ class MPCConfig:
     speed_weight: float = 2.0
     terminal_multiplier: float = 4.0
     solver_timeout: float = 0.15
+    # A kinematic square-root speed profile begins braking early enough to
+    # reach the route goal at zero speed.  Completion then latches in the ROS
+    # planner until that process is deliberately restarted.
+    mission_braking_deceleration: float = 0.10
+    mission_position_tolerance: float = 0.04
+    mission_stop_speed_tolerance: float = 0.03
 
     def __post_init__(self) -> None:
         if self.horizon < 2 or self.dt <= 0.0:
@@ -205,6 +223,24 @@ class MPCConfig:
             raise ValueError("physical DREAM deployment must permit a full stop")
         if self.maximum_speed > 0.60:
             raise ValueError("maximum_speed exceeds the Stage 3 hard cap")
+        mission_values = (
+            self.target_speed,
+            self.mission_braking_deceleration,
+            self.mission_position_tolerance,
+            self.mission_stop_speed_tolerance,
+        )
+        if not all(isfinite(value) for value in mission_values):
+            raise ValueError("mission MPC parameters must be finite")
+        if not 0.0 <= self.mission_stop_speed_tolerance < self.target_speed <= self.maximum_speed:
+            raise ValueError(
+                "target_speed must exceed the stop tolerance and not exceed maximum_speed"
+            )
+        if not 0.0 < self.mission_braking_deceleration <= abs(
+            self.minimum_acceleration
+        ):
+            raise ValueError("mission braking must be achievable by the MPC")
+        if self.mission_position_tolerance < 0.0:
+            raise ValueError("mission position tolerance must be non-negative")
         if self.wheelbase <= 0.0:
             raise ValueError("wheelbase must be positive")
 
@@ -223,6 +259,7 @@ class SafetyConfig:
     maximum_acceleration: float = 0.35
     front_stop_distance: float = 0.25
     front_sector_half_angle: float = radians(28.0)
+    collision_inflation_margin: float = 0.05
     planner_timeout: float = 0.50
     odom_timeout: float = 0.25
     scan_timeout: float = 0.40
@@ -289,6 +326,15 @@ def default_deployment_config() -> DeploymentConfig:
         raise AssertionError("D_occ is inconsistent with alpha^2/beta scaling")
     if abs(config.pde.source_scale - 1.0 / config.scale.beta) > 1.0e-12:
         raise AssertionError("Q scaling is inconsistent with beta")
+    footprint_radius = (
+        (0.5 * config.mpc.robot_length) ** 2
+        + (0.5 * config.mpc.robot_width) ** 2
+    ) ** 0.5 + config.safety.collision_inflation_margin
+    if (
+        config.arena.mission_goal_x + config.mpc.mission_position_tolerance
+        > config.grid.x_max - footprint_radius + 0.5 * config.grid.resolution
+    ):
+        raise AssertionError("mission goal does not leave room for the safety footprint")
     return config
 
 
@@ -341,6 +387,9 @@ def deployment_config_for_arena(path_text: str) -> DeploymentConfig:
         merge_path_x_max=merge_limits[1],
         conflict_zone_x_min=conflict_limits[0],
         conflict_zone_x_max=conflict_limits[1],
+        mission_goal_x=float(
+            route.get("mission_goal_x", config.arena.mission_goal_x)
+        ),
     )
     if any(
         center <= config.grid.road_y_min or center >= config.grid.road_y_max
@@ -352,6 +401,15 @@ def deployment_config_for_arena(path_text: str) -> DeploymentConfig:
         for left, right in zip(arena.lane_centers, arena.lane_centers[1:])
     ):
         raise ValueError("lane centers must be ordered left-to-right with decreasing y")
+    footprint_radius = (
+        (0.5 * config.mpc.robot_length) ** 2
+        + (0.5 * config.mpc.robot_width) ** 2
+    ) ** 0.5 + config.safety.collision_inflation_margin
+    if (
+        arena.mission_goal_x + config.mpc.mission_position_tolerance
+        > config.grid.x_max - footprint_radius + 0.5 * config.grid.resolution
+    ):
+        raise ValueError("surveyed mission goal does not leave room for the safety footprint")
     return replace(config, arena=arena)
 
 

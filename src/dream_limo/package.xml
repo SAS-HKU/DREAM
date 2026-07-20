@@ -11,6 +11,7 @@
 
   <exec_depend>ament_index_python</exec_depend>
   <exec_depend>geometry_msgs</exec_depend>
+  <exec_depend>joy</exec_depend>
   <exec_depend>cv_bridge</exec_depend>
   <exec_depend>limo_msgs</exec_depend>
   <exec_depend>nav_msgs</exec_depend>
@@ -25,8 +26,9 @@
   <exec_depend>tf2_ros</exec_depend>
   <exec_depend>visualization_msgs</exec_depend>
 
-  <!-- sfg_nav is an optional runtime provider of /tracked_agents. It is not a
-       build/import dependency and is intentionally not required here. -->
+  <!-- sfg_nav optionally provides neutral /sfg/lidar_clusters at runtime;
+       DREAM's sibling tracker publishes /tracked_agents. SFG remains neither
+       a build nor an import dependency and is intentionally not required. -->
 
   <test_depend>ament_copyright</test_depend>
   <test_depend>ament_flake8</test_depend>
