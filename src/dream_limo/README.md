@@ -366,10 +366,9 @@ esac
 
 To reproduce the previous moving RViz result, run the isolated SIL launch
 first using `preset:="$MODEL"`. Stop it completely before returning to domain
-0 for the live-sensor procedure below. SIL is the only current closed-loop ego
-motion demonstration. The live procedure shows the real camera/scan, perceived
-shadow, merger track, decision, target control and MPC trajectory, but the
-physical ego remains stationary.
+0 for the stationary live-sensor procedure below. Physical motion is a separate
+guarded procedure in “Physical motion commissioning”; do not run its hardware
+graph alongside this stationary smoke graph.
 
 ## Run 3: stationary real-sensor occluder smoke
 
@@ -696,6 +695,7 @@ ROS_DOMAIN_ID=0 ros2 launch dream_limo dream_hardware_motion.launch.py \
   model:=balanced \
   activation_mode:=auto_forward \
   target_speed:=0.05 \
+  rviz:=true \
   staging_pose_verified:=true \
   platform_watchdog_verified:=true \
   operator_kill_verified:=true \
