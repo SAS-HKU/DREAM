@@ -61,6 +61,7 @@ def validate_swept_trajectory(
     footprint_padding: float,
     inflation_radius: float,
     interpolation_spacing: float | None = None,
+    allow_initial_inflated_center_prefix: bool = False,
 ) -> InflatedCostmapCheck:
     """Require a solved trajectory to remain in known, footprint-safe space.
 
@@ -71,6 +72,17 @@ def validate_swept_trajectory(
     putting a corner into unobserved/occluded space.  Poses are interpolated
     between MPC knots so a corner cannot pass through an obstacle between two
     otherwise valid discrete states.
+
+    ``allow_initial_inflated_center_prefix`` is a narrowly scoped recovery
+    policy for a robot whose initial centre is already in soft Nav2 inflation.
+    When explicitly enabled, soft centre costs from 1 through 98 are allowed
+    only before the first zero-cost centre sample, and successive positive
+    samples may hold or decrease but never increase.  A finite horizon is not
+    required to reach zero.  Once a zero-cost sample has been reached, any
+    positive centre-cost re-entry fails closed.  Cost 99 (Nav2's inscribed
+    value), unknown or occupied centre cells, and unknown or occupied
+    padded-footprint samples are never permitted.  The default remains the
+    strict zero-centre policy.
     """
 
     values = (
@@ -147,6 +159,8 @@ def validate_swept_trajectory(
             pose[2] = start[2] + fraction * yaw_delta
             swept.append(pose)
 
+    reached_zero_cost_center = False
+    previous_positive_center_cost: int | None = None
     for sample_index, pose in enumerate(swept):
         x, y, yaw = (float(value) for value in pose)
         cell_x, cell_y, value = _cell(costmap, x, y)
@@ -159,15 +173,55 @@ def validate_swept_trajectory(
                 cell_y,
                 value,
             )
-        if value != 0:
-            reason = (
-                "TRAJECTORY_CENTER_UNKNOWN"
-                if value < 0
-                else "TRAJECTORY_CENTER_NOT_FREE"
-            )
+        if value < 0:
             return InflatedCostmapCheck(
-                False, reason, sample_index, cell_x, cell_y, value
+                False,
+                "TRAJECTORY_CENTER_UNKNOWN",
+                sample_index,
+                cell_x,
+                cell_y,
+                value,
             )
+        # nav_msgs/OccupancyGrid represents Nav2's inscribed-inflated cost as
+        # 99 and lethal occupancy as 100.  Neither belongs to the narrowly
+        # permitted soft-inflation recovery range.
+        if value >= 99:
+            return InflatedCostmapCheck(
+                False,
+                "TRAJECTORY_CENTER_NOT_FREE",
+                sample_index,
+                cell_x,
+                cell_y,
+                value,
+            )
+        if value == 0:
+            reached_zero_cost_center = True
+        else:
+            if not (
+                allow_initial_inflated_center_prefix
+                and not reached_zero_cost_center
+            ):
+                return InflatedCostmapCheck(
+                    False,
+                    "TRAJECTORY_CENTER_NOT_FREE",
+                    sample_index,
+                    cell_x,
+                    cell_y,
+                    value,
+                )
+            if (
+                previous_positive_center_cost is not None
+                and value > previous_positive_center_cost
+            ):
+                return InflatedCostmapCheck(
+                    False,
+                    "TRAJECTORY_CENTER_INFLATION_INCREASE",
+                    sample_index,
+                    cell_x,
+                    cell_y,
+                    value,
+                )
+            previous_positive_center_cost = value
 
         rotation = np.asarray(
             [[cos(yaw), -sin(yaw)], [sin(yaw), cos(yaw)]],

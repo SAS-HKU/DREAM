@@ -92,6 +92,70 @@ def validate_forward_pose_alignment(
         raise PathValidationError("path has no forward-oriented segment")
 
 
+def anchor_local_path_start(
+    path_points: Sequence[Sequence[float]] | Array,
+    *,
+    ego_xy: Sequence[float] | Array,
+    ego_yaw: float,
+    maximum_start_gap: float,
+    duplicate_tolerance: float = 1.0e-6,
+    minimum_forward_cosine: float = 0.0,
+) -> tuple[Array, bool]:
+    """Build a geometric candidate for a Nav2 path with an omitted start pose.
+
+    Some Nav2 planners publish the first reachable lattice pose rather than the
+    exact planning start.  When that first pose is close, forward of the ego,
+    and continues in the direction of the first path segment, prepend the
+    measured ego position.  The separate ``maximum_start_gap`` is intentionally
+    local to the first pose: paths outside it are returned unchanged and remain
+    subject to the ordinary cross-track limit in :func:`build_path_reference`.
+
+    The boolean result reports whether a segment was inserted.  This helper
+    validates geometry only; a ROS caller must collision-check that new segment
+    against its current costmap before accepting it.
+    """
+
+    scalar_values = (
+        ego_yaw,
+        maximum_start_gap,
+        duplicate_tolerance,
+        minimum_forward_cosine,
+    )
+    if not all(isfinite(float(value)) for value in scalar_values):
+        raise PathValidationError("path-start anchor parameters must be finite")
+    if maximum_start_gap <= 0.0:
+        raise PathValidationError("maximum path-start gap must be positive")
+    if duplicate_tolerance < 0.0:
+        raise PathValidationError("duplicate tolerance must be non-negative")
+    if not -1.0 < minimum_forward_cosine < 1.0:
+        raise PathValidationError("anchor forward cosine must lie in (-1, 1)")
+
+    ego = np.asarray(ego_xy, dtype=np.float64)
+    if ego.shape != (2,) or not np.all(np.isfinite(ego)):
+        raise PathValidationError("ego position must be a finite two-vector")
+    points = validate_path_points(
+        path_points,
+        duplicate_tolerance=float(duplicate_tolerance),
+    )
+    start_delta = points[0] - ego
+    start_gap = float(np.linalg.norm(start_delta))
+    if start_gap <= duplicate_tolerance or start_gap > maximum_start_gap:
+        return points, False
+
+    anchor_direction = start_delta / start_gap
+    ego_direction = np.asarray([cos(float(ego_yaw)), np.sin(float(ego_yaw))])
+    if float(ego_direction @ anchor_direction) <= minimum_forward_cosine:
+        raise PathValidationError("path-start anchor is not forward of the ego")
+
+    first_delta = points[1] - points[0]
+    first_direction = first_delta / float(np.linalg.norm(first_delta))
+    if float(anchor_direction @ first_direction) <= minimum_forward_cosine:
+        raise PathValidationError(
+            "path-start anchor does not continue into the first path segment"
+        )
+    return np.vstack((ego, points)), True
+
+
 def _closest_projection(points: Array, ego_xy: Array) -> Tuple[int, Array, float]:
     """Return the closest segment index and the projection onto that segment."""
 

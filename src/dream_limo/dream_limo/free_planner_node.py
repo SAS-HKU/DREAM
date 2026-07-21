@@ -26,6 +26,7 @@ from .core.mpc import RiskAwareMPC
 from .core.nav2_route import goal_identity_matches
 from .core.path_tracking import (
     PathValidationError,
+    anchor_local_path_start,
     validate_forward_pose_alignment,
     validate_path_points,
 )
@@ -64,6 +65,11 @@ class DreamFreePlannerNode(Node):
         self.declare_parameter("route_status_timeout", 1.50)
         self.declare_parameter("path_goal_tolerance", 0.10)
         self.declare_parameter("path_goal_yaw_tolerance", 0.30)
+        # SMAC can omit the exact planning start and begin at its first
+        # reachable lattice pose.  This separate local bound lets us certify
+        # that short start segment without weakening the ordinary 0.10 m
+        # off-route/cross-track rejection used by DREAM and the MPC.
+        self.declare_parameter("path_start_anchor_tolerance", 0.20)
         self.declare_parameter("goal_match_tolerance", 1.0e-3)
         self.declare_parameter("path_stamp_tolerance", 1.0e-6)
         self.declare_parameter("goal_position_tolerance", 0.12)
@@ -110,6 +116,7 @@ class DreamFreePlannerNode(Node):
         self.path_points: Optional[np.ndarray] = None
         self.path_receipt: Optional[float] = None
         self.path_source_stamp: Optional[float] = None
+        self.path_rejection_reason: Optional[str] = None
         self.route_status: dict = {}
         self.route_status_receipt: Optional[float] = None
         self.costmap: Optional[CostmapSnapshot] = None
@@ -325,6 +332,7 @@ class DreamFreePlannerNode(Node):
         self.path_points = None
         self.path_receipt = None
         self.path_source_stamp = None
+        self.path_rejection_reason = None
         self.route_status = {}
         self.route_status_receipt = None
         self.last_goal_key = None
@@ -354,6 +362,7 @@ class DreamFreePlannerNode(Node):
         self.path_points = None
         self.path_receipt = None
         self.path_source_stamp = None
+        self.path_rejection_reason = None
         if self.goal is None or message.header.frame_id != self.config.grid.frame_id:
             return
         if not message.poses:
@@ -376,12 +385,24 @@ class DreamFreePlannerNode(Node):
             points = validate_path_points(
                 raw_points
             )
+            inserted_start = False
+            if self.ego is not None:
+                points, inserted_start = anchor_local_path_start(
+                    points,
+                    ego_xy=(self.ego.x, self.ego.y),
+                    ego_yaw=self.ego.yaw,
+                    maximum_start_gap=float(
+                        self.get_parameter("path_start_anchor_tolerance").value
+                    ),
+                )
         except PathValidationError as exc:
+            self.path_rejection_reason = f"PATH_REJECTED:{exc}"
             self.get_logger().warning(f"Rejected geometric path: {exc}")
             return
         goal = self.goal.pose.position
         endpoint_error = hypot(points[-1, 0] - goal.x, points[-1, 1] - goal.y)
         if endpoint_error > float(self.get_parameter("path_goal_tolerance").value):
+            self.path_rejection_reason = "PATH_GOAL_MISMATCH"
             self.get_logger().warning(
                 f"Rejected path for a different goal (error={endpoint_error:.3f} m)"
             )
@@ -391,11 +412,51 @@ class DreamFreePlannerNode(Node):
         if final_yaw_error > float(
             self.get_parameter("path_goal_yaw_tolerance").value
         ):
+            self.path_rejection_reason = "PATH_GOAL_YAW_MISMATCH"
             self.get_logger().warning(
                 "Rejected path with a different terminal orientation "
                 f"(error={final_yaw_error:.3f} rad)"
             )
             return
+        if inserted_start:
+            # The added segment was not explicitly present in Nav2's message.
+            # Require its complete padded footprint to be known and unoccupied
+            # in the same live inflated costmap used for trajectory gating.
+            if self.costmap is None or self.ego is None:
+                self.path_rejection_reason = "PATH_START_CONTEXT_UNAVAILABLE"
+                self.get_logger().warning(
+                    "Rejected path-start anchor without a live costmap and ego"
+                )
+                return
+            anchor_states = np.asarray(
+                [
+                    [self.ego.x, points[1, 0]],
+                    [self.ego.y, points[1, 1]],
+                    [self.ego.speed, self.ego.speed],
+                    [self.ego.yaw, path_yaws[0]],
+                ],
+                dtype=np.float64,
+            )
+            anchor_check = validate_swept_trajectory(
+                anchor_states,
+                self.costmap,
+                expected_frame=self.config.grid.frame_id,
+                robot_length=self.config.mpc.robot_length,
+                robot_width=self.config.mpc.robot_width,
+                footprint_padding=self.config.mpc.navigation_footprint_padding,
+                inflation_radius=self.config.mpc.navigation_inflation_radius,
+                interpolation_spacing=0.5 * self.costmap.resolution,
+                allow_initial_inflated_center_prefix=True,
+            )
+            if not anchor_check.safe:
+                self.path_rejection_reason = (
+                    f"PATH_START_{anchor_check.reason}"
+                )
+                self.get_logger().warning(
+                    "Rejected unsafe path-start anchor: "
+                    f"{anchor_check.reason}"
+                )
+                return
         self.path_points = points
         self.path_receipt = self._now()
         self.path_source_stamp = stamp_to_seconds(message.header.stamp)
@@ -444,14 +505,28 @@ class DreamFreePlannerNode(Node):
             route_path_stamp = float(self.route_status["path_source_stamp"])
         except (KeyError, TypeError, ValueError):
             return False
+        # The Path and route-status messages use separate DDS topics.  During
+        # a normal replan the provider publishes the new Path before its next
+        # status update, so demanding exact source-stamp equality creates a
+        # false stop at every handoff and prevents the hardware readiness
+        # countdown from ever completing.
+        # Identity remains fail-closed through the provider's goal generation,
+        # the status goal revision above, endpoint/yaw checks in _on_path,
+        # independent freshness checks, and the provider's explicit empty-Path
+        # invalidation on every failure.  Both stamps must still be valid, and
+        # a status claiming a path newer than the locally received Path is
+        # rejected until that newer Path callback arrives.
         stamp_tolerance = float(
             self.get_parameter("path_stamp_tolerance").value
         )
         return bool(
             self.path_source_stamp is not None
+            and isfinite(float(self.path_source_stamp))
+            and float(self.path_source_stamp) > 0.0
             and isfinite(route_path_stamp)
-            and abs(route_path_stamp - self.path_source_stamp)
-            <= stamp_tolerance
+            and route_path_stamp > 0.0
+            and route_path_stamp
+            <= float(self.path_source_stamp) + stamp_tolerance
         )
 
     def _goal_status(self) -> dict:
@@ -574,7 +649,9 @@ class DreamFreePlannerNode(Node):
             return False, "STALE_COSTMAP_SOURCE"
         path_timeout = float(self.get_parameter("path_timeout").value)
         if self.path_points is None or self.path_receipt is None:
-            return False, "WAITING_FOR_GEOMETRIC_PATH"
+            return False, (
+                self.path_rejection_reason or "WAITING_FOR_GEOMETRIC_PATH"
+            )
         if now - self.path_receipt >= path_timeout:
             return False, "STALE_GEOMETRIC_PATH"
         route_timeout = float(self.get_parameter("route_status_timeout").value)
@@ -683,6 +760,7 @@ class DreamFreePlannerNode(Node):
             footprint_padding=self.config.mpc.navigation_footprint_padding,
             inflation_radius=self.config.mpc.navigation_inflation_radius,
             interpolation_spacing=0.5 * self.costmap.resolution,
+            allow_initial_inflated_center_prefix=True,
         )
         if not trajectory_check.safe:
             self.mpc.reset()
