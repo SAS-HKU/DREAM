@@ -3,6 +3,7 @@ import pytest
 
 from dream_limo.core.path_tracking import (
     PathValidationError,
+    anchor_local_path_start,
     build_path_reference,
     validate_forward_pose_alignment,
     validate_path_points,
@@ -119,6 +120,91 @@ def test_reverse_pose_alignment_and_large_cross_track_error_fail_closed():
             cruise_speed=0.15,
             braking_deceleration=0.1,
             maximum_cross_track_error=0.10,
+        )
+
+
+def test_local_nav2_start_gap_can_be_anchored_without_relaxing_cross_track_limit():
+    # A real short SMAC route observed on the LIMO starts at the first lattice
+    # pose instead of (0, 0), leaving a 0.133 m start gap.  Its normal 0.10 m
+    # cross-track limit must remain unchanged.
+    nav2_path = np.array(
+        [
+            [0.12779502868652415, 0.03843421936035174],
+            [0.22500000000000053, 0.07500000000000018],
+        ]
+    )
+    with pytest.raises(PathValidationError, match="cross-track"):
+        build_path_reference(
+            nav2_path,
+            ego_xy=[0.0, 0.0],
+            ego_yaw=0.0,
+            horizon=6,
+            dt=0.2,
+            cruise_speed=0.15,
+            braking_deceleration=0.1,
+            maximum_cross_track_error=0.10,
+        )
+
+    anchored, inserted = anchor_local_path_start(
+        nav2_path,
+        ego_xy=[0.0, 0.0],
+        ego_yaw=0.0,
+        maximum_start_gap=0.20,
+    )
+    assert inserted
+    np.testing.assert_allclose(anchored[0], [0.0, 0.0])
+    np.testing.assert_allclose(anchored[1:], nav2_path)
+
+    reference = build_path_reference(
+        anchored,
+        ego_xy=[0.0, 0.0],
+        ego_yaw=0.0,
+        horizon=6,
+        dt=0.2,
+        cruise_speed=0.15,
+        braking_deceleration=0.1,
+        maximum_cross_track_error=0.10,
+    )
+    np.testing.assert_allclose(reference[0:2, 0], [0.0, 0.0])
+
+
+def test_path_start_anchor_does_not_convert_nonlocal_path_into_recovery():
+    nonlocal_path = np.array([[0.25, 0.0], [0.50, 0.0]])
+    unchanged, inserted = anchor_local_path_start(
+        nonlocal_path,
+        ego_xy=[0.0, 0.0],
+        ego_yaw=0.0,
+        maximum_start_gap=0.20,
+    )
+    assert not inserted
+    np.testing.assert_allclose(unchanged, nonlocal_path)
+    with pytest.raises(PathValidationError, match="cross-track"):
+        build_path_reference(
+            unchanged,
+            ego_xy=[0.0, 0.0],
+            ego_yaw=0.0,
+            horizon=6,
+            dt=0.2,
+            cruise_speed=0.15,
+            braking_deceleration=0.1,
+            maximum_cross_track_error=0.10,
+        )
+
+
+@pytest.mark.parametrize(
+    "path",
+    (
+        [[-0.13, 0.0], [0.20, 0.0]],
+        [[0.13, 0.0], [0.0, 0.0]],
+    ),
+)
+def test_path_start_anchor_rejects_reverse_or_discontinuous_inserted_segment(path):
+    with pytest.raises(PathValidationError, match="path-start anchor"):
+        anchor_local_path_start(
+            path,
+            ego_xy=[0.0, 0.0],
+            ego_yaw=0.0,
+            maximum_start_gap=0.20,
         )
 
 

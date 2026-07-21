@@ -20,7 +20,12 @@ def _map(data=None):
     )
 
 
-def _check(states, costmap=None):
+def _check(
+    states,
+    costmap=None,
+    *,
+    allow_initial_inflated_center_prefix=False,
+):
     return validate_swept_trajectory(
         states,
         _map() if costmap is None else costmap,
@@ -29,6 +34,9 @@ def _check(states, costmap=None):
         robot_width=0.22,
         footprint_padding=0.05,
         inflation_radius=0.30,
+        allow_initial_inflated_center_prefix=(
+            allow_initial_inflated_center_prefix
+        ),
     )
 
 
@@ -61,6 +69,141 @@ def test_positive_center_cost_and_unknown_footprint_fail_closed():
     result = _check(states, _map(occupied))
     assert not result.safe
     assert result.reason == "TRAJECTORY_FOOTPRINT_OCCUPIED"
+
+
+def test_initial_soft_inflation_prefix_can_be_explicitly_allowed():
+    states = np.asarray(
+        [[-0.30, 0.30], [0.0, 0.0], [0.1, 0.1], [0.0, 0.0]]
+    )
+    data = [0] * 1600
+    # Interpolated centres begin in soft inflation, then enter zero cost.
+    for cell_x in range(13, 19):
+        data[20 * 40 + cell_x] = 50
+
+    strict = _check(states, _map(data))
+    assert not strict.safe
+    assert strict.reason == "TRAJECTORY_CENTER_NOT_FREE"
+
+    escape = _check(
+        states,
+        _map(data),
+        allow_initial_inflated_center_prefix=True,
+    )
+    assert escape.safe
+    assert escape.reason == "TRAJECTORY_COSTMAP_CLEAR"
+
+
+def test_constant_or_decreasing_soft_prefix_need_not_reach_zero():
+    states = np.asarray(
+        [[-0.30, 0.30], [0.0, 0.0], [0.1, 0.1], [0.0, 0.0]]
+    )
+    data = [50] * 1600
+    # The centre crosses into a lower-cost region but remains in soft
+    # inflation through the end of this finite horizon.
+    for cell_y in range(40):
+        for cell_x in range(20, 40):
+            data[cell_y * 40 + cell_x] = 20
+
+    result = _check(
+        states,
+        _map(data),
+        allow_initial_inflated_center_prefix=True,
+    )
+    assert result.safe
+    assert result.reason == "TRAJECTORY_COSTMAP_CLEAR"
+
+
+def test_soft_inflation_increase_before_zero_fails_closed():
+    states = np.asarray(
+        [[-0.30, 0.30], [0.0, 0.0], [0.1, 0.1], [0.0, 0.0]]
+    )
+    data = [0] * 1600
+    for cell_x in range(13, 16):
+        data[20 * 40 + cell_x] = 20
+    for cell_x in range(16, 19):
+        data[20 * 40 + cell_x] = 80
+
+    result = _check(
+        states,
+        _map(data),
+        allow_initial_inflated_center_prefix=True,
+    )
+    assert not result.safe
+    assert result.reason == "TRAJECTORY_CENTER_INFLATION_INCREASE"
+    assert result.cell_value == 80
+
+
+def test_inscribed_cost_99_is_never_a_soft_recovery_cell():
+    states = np.asarray([[0.0], [0.0], [0.0], [0.0]])
+    data = [0] * 1600
+    data[20 * 40 + 20] = 99
+
+    result = _check(
+        states,
+        _map(data),
+        allow_initial_inflated_center_prefix=True,
+    )
+    assert not result.safe
+    assert result.reason == "TRAJECTORY_CENTER_NOT_FREE"
+    assert result.cell_value == 99
+
+
+def test_soft_inflation_reentry_after_zero_cost_fails_closed():
+    states = np.asarray(
+        [[-0.30, 0.30], [0.0, 0.0], [0.1, 0.1], [0.0, 0.0]]
+    )
+    data = [0] * 1600
+    for cell_x in range(13, 16):
+        data[20 * 40 + cell_x] = 50
+    for cell_x in range(24, 27):
+        data[20 * 40 + cell_x] = 50
+
+    result = _check(
+        states,
+        _map(data),
+        allow_initial_inflated_center_prefix=True,
+    )
+    assert not result.safe
+    assert result.reason == "TRAJECTORY_CENTER_NOT_FREE"
+    assert result.cell_value == 50
+
+
+def test_initial_prefix_option_never_allows_unknown_or_occupied_cells():
+    states = np.asarray([[0.0], [0.0], [0.0], [0.0]])
+    for value, expected_reason in (
+        (-1, "TRAJECTORY_CENTER_UNKNOWN"),
+        (100, "TRAJECTORY_CENTER_NOT_FREE"),
+    ):
+        data = [0] * 1600
+        data[20 * 40 + 20] = value
+        result = _check(
+            states,
+            _map(data),
+            allow_initial_inflated_center_prefix=True,
+        )
+        assert not result.safe
+        assert result.reason == expected_reason
+        assert result.cell_value == value
+
+
+def test_initial_prefix_option_keeps_padded_footprint_fail_closed():
+    states = np.asarray([[0.0], [0.0], [0.0], [0.0]])
+    for value, expected_reason in (
+        (-1, "TRAJECTORY_FOOTPRINT_UNKNOWN"),
+        (100, "TRAJECTORY_FOOTPRINT_OCCUPIED"),
+    ):
+        data = [0] * 1600
+        data[20 * 40 + 20] = 50
+        # Inside the padded front of the footprint, away from the centre.
+        data[20 * 40 + 24] = value
+        result = _check(
+            states,
+            _map(data),
+            allow_initial_inflated_center_prefix=True,
+        )
+        assert not result.safe
+        assert result.reason == expected_reason
+        assert result.cell_value == value
 
 
 def test_interpolation_catches_obstacle_between_mpc_knots():

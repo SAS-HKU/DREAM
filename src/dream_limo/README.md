@@ -325,6 +325,21 @@ inflated costmap. Unknown cells fail closed at those route/control gates. A
 goal may therefore be visible in the camera but remain unreachable when LiDAR
 has not observed a complete drivable corridor around the occluder.
 
+The LIMO is Ackermann-steered and this deployment uses a forward-only Dubins
+route model. A goal behind the robot can require a large forward loop; it is
+not equivalent to a holonomic pivot or reverse maneuver. For the first motion
+check, click in the direction shown by the robot arrow in RViz. This still
+requires no coordinate or mission-distance entry.
+
+The core swept-trajectory validator is strict by default: every centre sample
+must have zero cost. It also exposes an explicit startup-recovery option for a
+robot already inside soft inflation. That option permits only an initial
+contiguous prefix of costs 1 through 98, and each successive positive centre
+cost must hold or decrease. The finite horizon need not reach zero, but after
+the first zero-cost centre, positive-cost re-entry is rejected. Cost 99
+(Nav2's inscribed value), unknown or occupied centre cells, and any unknown or
+occupied padded-footprint sample remain hard failures in both modes.
+
 ## Record an A/B run
 
 ```bash
@@ -386,6 +401,14 @@ They are not the physical free-navigation workflow.
 - **Planner is ready but no motion:** inspect
   `/dream/hardware_gate_status.reason`; a non-ready safety condition always
   overrides target speed.
+- **`PATH_START_TRAJECTORY_CENTER_INFLATION_INCREASE`:** the robot is already
+  inside soft obstacle inflation and the proposed first segment moves closer
+  to the return. Stage it with more clearance or select a route that initially
+  moves away; do not raise a tolerance to force motion.
+- **`DECISION_RISK_VETO`:** the balanced DREAM arm is intentionally yielding
+  to route risk. This is controller behavior, not a lost RViz goal. Record it
+  as a veto activation; the matched `pure_mpc` arm disables this DREAM veto but
+  retains all collision and footprint gates.
 - **No LiDAR free space:** check `/scan`, TF, and
   `/global_costmap/costmap`. The scan observation source must cover the LiDAR's
   physical height, and ray clearing must be active.
