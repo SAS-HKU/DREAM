@@ -1,0 +1,32 @@
+frame_id: map
+
+# World-fixed local experiment field.  It is centred automatically on the
+# robot's first odometry pose by the free-navigation launch; operators never
+# enter a route distance or surveyed goal coordinate.  RViz exposes only the
+# live, scan-cleared part of the matching Nav2 costmap as selectable free space.
+grid:
+  x_min: -6.0
+  x_max: 6.0
+  y_min: -6.0
+  y_max: 6.0
+  resolution: 0.05
+  road_y_min: -6.0
+  road_y_max: 6.0
+  road_taper: 0.05
+
+# These legacy fields keep the scaled configuration structurally compatible
+# with the original three-lane replay.  They are not consulted by the
+# free-space goal, Nav2 path-provider, route veto, or arbitrary-path MPC.
+lanes:
+  width: 0.45
+  centers: [0.45, 0.0, -0.45]
+
+route:
+  target_lane: 1
+  merge_request_x: 0.35
+  merge_path_x: [2.80, 3.80]
+  conflict_zone_x: [3.30, 5.30]
+  mission_goal_x: 5.55
+
+# Live geometry comes only from LiDAR and visible DREAM vehicle tracks.
+obstacles: []

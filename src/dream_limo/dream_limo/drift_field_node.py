@@ -14,14 +14,17 @@ from std_msgs.msg import Bool, String
 
 from .core.risk_field import DREAMRiskField, NumericalStabilityError
 from .core.types import EgoState, Vehicle
-from .limo_scale import default_deployment_config
+from .limo_scale import deployment_config_for_arena
 from .ros_utils import ego_from_odometry, vehicle_from_mapping
 
 
 class DriftFieldNode(Node):
     def __init__(self) -> None:
         super().__init__("dream_drift_field")
-        self.config = default_deployment_config()
+        self.declare_parameter("arena_file", "")
+        self.config = deployment_config_for_arena(
+            str(self.get_parameter("arena_file").value)
+        )
         self.field = DREAMRiskField(self.config)
         self.declare_parameter("ego_topic", "/dream/ego_state")
         self.declare_parameter("world_topic", "/dream/world_model")
