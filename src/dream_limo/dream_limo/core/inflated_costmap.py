@@ -75,14 +75,15 @@ def validate_swept_trajectory(
 
     ``allow_initial_inflated_center_prefix`` is a narrowly scoped recovery
     policy for a robot whose initial centre is already in soft Nav2 inflation.
-    When explicitly enabled, soft centre costs from 1 through 98 are allowed
-    only before the first zero-cost centre sample, and successive positive
-    samples may hold or decrease but never increase.  A finite horizon is not
-    required to reach zero.  Once a zero-cost sample has been reached, any
-    positive centre-cost re-entry fails closed.  Cost 99 (Nav2's inscribed
-    value), unknown or occupied centre cells, and unknown or occupied
-    padded-footprint samples are never permitted.  The default remains the
-    strict zero-centre policy.
+    When explicitly enabled *and the first centre sample is soft* (cost 1
+    through 98), later positive samples may hold or decrease but never exceed
+    the preceding positive sample.  Zero-cost cells between those samples do
+    not end recovery: a discretized inflation band can contain zero-valued
+    gaps.  A subsequent control horizon beginning at zero cannot activate the
+    exception, so entry into soft inflation from known-free space still fails
+    closed.  Cost 99 (Nav2's inscribed value), unknown or occupied centre
+    cells, and unknown or occupied padded-footprint samples are never
+    permitted.  The default remains the strict zero-centre policy.
     """
 
     values = (
@@ -159,7 +160,7 @@ def validate_swept_trajectory(
             pose[2] = start[2] + fraction * yaw_delta
             swept.append(pose)
 
-    reached_zero_cost_center = False
+    initial_soft_recovery = False
     previous_positive_center_cost: int | None = None
     for sample_index, pose in enumerate(swept):
         x, y, yaw = (float(value) for value in pose)
@@ -194,13 +195,10 @@ def validate_swept_trajectory(
                 cell_y,
                 value,
             )
-        if value == 0:
-            reached_zero_cost_center = True
-        else:
-            if not (
-                allow_initial_inflated_center_prefix
-                and not reached_zero_cost_center
-            ):
+        if value > 0:
+            if sample_index == 0 and allow_initial_inflated_center_prefix:
+                initial_soft_recovery = True
+            if not initial_soft_recovery:
                 return InflatedCostmapCheck(
                     False,
                     "TRAJECTORY_CENTER_NOT_FREE",

@@ -334,11 +334,12 @@ requires no coordinate or mission-distance entry.
 The core swept-trajectory validator is strict by default: every centre sample
 must have zero cost. It also exposes an explicit startup-recovery option for a
 robot already inside soft inflation. That option permits only an initial
-contiguous prefix of costs 1 through 98, and each successive positive centre
-cost must hold or decrease. The finite horizon need not reach zero, but after
-the first zero-cost centre, positive-cost re-entry is rejected. Cost 99
-(Nav2's inscribed value), unknown or occupied centre cells, and any unknown or
-occupied padded-footprint sample remain hard failures in both modes.
+recovery beginning at cost 1 through 98, and each successive positive centre
+cost must hold or decrease. Zero-valued grid gaps may occur inside a discretized
+inflation band and do not reset that bound. Once a later control horizon starts
+at zero cost, it cannot enter positive cost. Cost 99 (Nav2's inscribed value),
+unknown or occupied centre cells, and any unknown or occupied padded-footprint
+sample remain hard failures in both modes.
 
 ## Record an A/B run
 
@@ -401,9 +402,10 @@ They are not the physical free-navigation workflow.
 - **Planner is ready but no motion:** inspect
   `/dream/hardware_gate_status.reason`; a non-ready safety condition always
   overrides target speed.
-- **`PATH_START_TRAJECTORY_CENTER_INFLATION_INCREASE`:** the robot is already
-  inside soft obstacle inflation and the proposed first segment moves closer
-  to the return. Stage it with more clearance or select a route that initially
+- **`PATH_START_TRAJECTORY_CENTER_INFLATION_INCREASE` or
+  `TRAJECTORY_CENTER_INFLATION_INCREASE`:** the robot is already inside soft
+  obstacle inflation and the proposed start or MPC trajectory moves closer to
+  the return. Stage it with more clearance or select a route that initially
   moves away; do not raise a tolerance to force motion.
 - **`DECISION_RISK_VETO`:** the balanced DREAM arm is intentionally yielding
   to route risk. This is controller behavior, not a lost RViz goal. Record it

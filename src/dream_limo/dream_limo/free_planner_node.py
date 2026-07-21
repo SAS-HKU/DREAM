@@ -124,6 +124,7 @@ class DreamFreePlannerNode(Node):
         self.costmap_source_stamp: Optional[float] = None
         self.goal_complete = False
         self.last_goal_key: Optional[tuple[float, float, float, float]] = None
+        self.reference_active = False
 
         reliable = QoSProfile(
             history=HistoryPolicy.KEEP_LAST,
@@ -550,6 +551,15 @@ class DreamFreePlannerNode(Node):
         }
 
     def _publish_stop(self, reason: str, details: Optional[dict] = None) -> None:
+        if self.reference_active:
+            # Do not leave a previously accepted MPC path visible or usable
+            # after the current planning cycle has failed closed.  This also
+            # invalidates collision-monitor trajectory evidence immediately.
+            empty_reference = Path()
+            empty_reference.header.stamp = self.get_clock().now().to_msg()
+            empty_reference.header.frame_id = self.config.grid.frame_id
+            self.path_publisher.publish(empty_reference)
+            self.reference_active = False
         control = TwistStamped()
         control.header.stamp = self.get_clock().now().to_msg()
         control.header.frame_id = "base_link"
@@ -596,6 +606,7 @@ class DreamFreePlannerNode(Node):
             pose.pose.orientation.w = qw
             path.poses.append(pose)
         self.path_publisher.publish(path)
+        self.reference_active = True
 
     @staticmethod
     def _angle_error(first: float, second: float) -> float:

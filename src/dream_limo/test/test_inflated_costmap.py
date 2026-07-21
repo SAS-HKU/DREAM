@@ -148,7 +148,7 @@ def test_inscribed_cost_99_is_never_a_soft_recovery_cell():
     assert result.cell_value == 99
 
 
-def test_soft_inflation_reentry_after_zero_cost_fails_closed():
+def test_zero_grid_gap_does_not_end_bounded_initial_recovery():
     states = np.asarray(
         [[-0.30, 0.30], [0.0, 0.0], [0.1, 0.1], [0.0, 0.0]]
     )
@@ -156,7 +156,24 @@ def test_soft_inflation_reentry_after_zero_cost_fails_closed():
     for cell_x in range(13, 16):
         data[20 * 40 + cell_x] = 50
     for cell_x in range(24, 27):
-        data[20 * 40 + cell_x] = 50
+        data[20 * 40 + cell_x] = 20
+
+    result = _check(
+        states,
+        _map(data),
+        allow_initial_inflated_center_prefix=True,
+    )
+    assert result.safe
+    assert result.reason == "TRAJECTORY_COSTMAP_CLEAR"
+
+
+def test_horizon_starting_at_zero_cannot_enter_soft_inflation():
+    states = np.asarray(
+        [[-0.30, 0.30], [0.0, 0.0], [0.1, 0.1], [0.0, 0.0]]
+    )
+    data = [0] * 1600
+    for cell_x in range(24, 27):
+        data[20 * 40 + cell_x] = 20
 
     result = _check(
         states,
@@ -165,7 +182,7 @@ def test_soft_inflation_reentry_after_zero_cost_fails_closed():
     )
     assert not result.safe
     assert result.reason == "TRAJECTORY_CENTER_NOT_FREE"
-    assert result.cell_value == 50
+    assert result.cell_value == 20
 
 
 def test_initial_prefix_option_never_allows_unknown_or_occupied_cells():
