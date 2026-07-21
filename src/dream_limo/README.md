@@ -1,10 +1,7 @@
 # dream_limo
 
 ROS 2 Humble deployment of the DREAM occlusion-aware planning framework on an
-AgileX LIMO. This package is a sibling of `sfg_nav`: it does not import, copy,
-or modify SFG source code. Integration is through SFG's public neutral
-`/sfg/lidar_clusters` output, DREAM's `/tracked_agents` convention, and standard
-ROS messages.
+AgileX LIMO. 
 
 The implementation is pinned to DREAM commit
 `0d298cd6de11c268224173a4d75770e934fd0861`. See
