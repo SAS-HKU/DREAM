@@ -2,10 +2,11 @@ import math
 
 import pytest
 
-from dream_limo.core.types import parse_tracked_agents
+from dream_limo.core.types import Vehicle, parse_tracked_agents
 from dream_limo.world_model_node import (
     evaluate_dynamic_source_fresh,
     evaluate_merger_adapter_status,
+    filter_live_track_envelope,
     select_perception_tracks,
 )
 
@@ -122,3 +123,53 @@ def test_aligned_merger_mode_ignores_all_perception_tracks():
         perception_tracks_fresh=True,
         merger_odom_required=False,
     ) == agents
+
+
+def test_live_track_envelope_keeps_three_lanes_and_rejects_wall_fragments():
+    lanes = [
+        Vehicle(f"lane_{index}", 2.0, y, vx=0.4, length=0.22, width=0.22)
+        for index, y in enumerate((0.45, 0.0, -0.45))
+    ]
+    wall_fragments = [
+        Vehicle("above_road", 2.5, 1.16, vx=0.2, length=0.22, width=0.22),
+        Vehicle("below_road", 2.0, -1.2, vx=0.2, length=0.22, width=0.22),
+        Vehicle("implausibly_fast", 2.0, 0.0, vx=6.0, length=0.22, width=0.22),
+    ]
+
+    accepted, rejected = filter_live_track_envelope(
+        [*lanes, *wall_fragments],
+        grid_x_min=0.0,
+        grid_x_max=6.0,
+        road_y_min=-0.70,
+        road_y_max=0.70,
+        maximum_speed=1.0,
+    )
+
+    assert [vehicle.vehicle_id for vehicle in accepted] == [
+        "lane_0",
+        "lane_1",
+        "lane_2",
+    ]
+    assert rejected == 3
+
+
+def test_live_track_envelope_requires_complete_rotated_footprint_inside():
+    rotated_edge = Vehicle(
+        "rotated_edge",
+        2.0,
+        0.55,
+        vx=0.1,
+        heading=math.pi / 4.0,
+        length=0.40,
+        width=0.20,
+    )
+    accepted, rejected = filter_live_track_envelope(
+        [rotated_edge],
+        grid_x_min=0.0,
+        grid_x_max=6.0,
+        road_y_min=-0.70,
+        road_y_max=0.70,
+        maximum_speed=1.0,
+    )
+    assert accepted == []
+    assert rejected == 1

@@ -53,7 +53,10 @@ def generate_launch_description():
                 executable="lidar_cluster_buffer",
                 name="lidar_cluster_buffer_node",
                 output="screen",
-                parameters=[perception_params],
+                # Use the scan timestamp for odom projection.  The upstream
+                # SFG default uses the latest TF, which makes static cluster
+                # centroids appear to move while the ego is moving.
+                parameters=[perception_params, {"use_latest_tf": False}],
                 condition=UnlessCondition(use_merger_odom),
             ),
             Node(

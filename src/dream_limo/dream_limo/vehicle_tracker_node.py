@@ -18,6 +18,7 @@ from .core.vehicle_tracker import (
     VehicleTrack,
     parse_cluster_payload,
     track_to_agent_payload,
+    validate_cluster_source_stamp,
 )
 
 
@@ -30,6 +31,9 @@ class DreamVehicleTrackerNode(Node):
         self._load_parameters()
         self.tracker = MergerVehicleTracker(
             association_distance_m=self.association_distance_m,
+            association_noise_margin_m=self.association_noise_margin_m,
+            maximum_vehicle_speed_mps=self.maximum_vehicle_speed_mps,
+            maximum_width_change_m=self.maximum_width_change_m,
             velocity_alpha=self.velocity_alpha,
             position_alpha=self.position_alpha,
             coast_timeout_sec=self.coast_timeout_sec,
@@ -40,8 +44,13 @@ class DreamVehicleTrackerNode(Node):
             motion_min_displacement_m=self.motion_min_displacement_m,
             motion_hold_sec=self.motion_hold_sec,
             minimum_track_hits=self.minimum_track_hits,
+            minimum_consistent_motion_windows=(
+                self.minimum_consistent_motion_windows
+            ),
+            minimum_direction_cosine=self.minimum_direction_cosine,
         )
         self.last_valid_input_sec: float | None = None
+        self.last_source_stamp: float | None = None
         self.last_error = "waiting_for_clusters"
         self.raw_cluster_count = 0
         self.size_candidate_count = 0
@@ -83,12 +92,16 @@ class DreamVehicleTrackerNode(Node):
         self.declare_parameter("class_label", "car")
         self.declare_parameter("publish_rate_hz", 10.0)
         self.declare_parameter("input_timeout_sec", 0.50)
+        self.declare_parameter("future_stamp_tolerance_sec", 0.05)
         self.declare_parameter("minimum_cluster_width_m", 0.08)
         self.declare_parameter("maximum_cluster_width_m", 0.50)
         self.declare_parameter("minimum_cluster_points", 3)
         self.declare_parameter("minimum_cluster_range_m", 0.25)
         self.declare_parameter("maximum_cluster_range_m", 6.0)
         self.declare_parameter("association_distance_m", 0.45)
+        self.declare_parameter("association_noise_margin_m", 0.06)
+        self.declare_parameter("maximum_vehicle_speed_mps", 0.60)
+        self.declare_parameter("maximum_width_change_m", 0.12)
         self.declare_parameter("velocity_alpha", 0.45)
         self.declare_parameter("position_alpha", 0.70)
         self.declare_parameter("coast_timeout_sec", 0.50)
@@ -99,6 +112,8 @@ class DreamVehicleTrackerNode(Node):
         self.declare_parameter("motion_exit_speed_mps", 0.04)
         self.declare_parameter("motion_min_displacement_m", 0.08)
         self.declare_parameter("motion_hold_sec", 0.80)
+        self.declare_parameter("minimum_consistent_motion_windows", 2)
+        self.declare_parameter("minimum_direction_cosine", 0.50)
         self.declare_parameter("nominal_radius_m", 0.18)
         self.declare_parameter("radius_padding_m", 0.04)
 
@@ -113,6 +128,9 @@ class DreamVehicleTrackerNode(Node):
             1.0, self._float_parameter("publish_rate_hz")
         )
         self.input_timeout_sec = self._float_parameter("input_timeout_sec")
+        self.future_stamp_tolerance_sec = self._float_parameter(
+            "future_stamp_tolerance_sec"
+        )
         self.minimum_cluster_width_m = self._float_parameter(
             "minimum_cluster_width_m"
         )
@@ -131,6 +149,15 @@ class DreamVehicleTrackerNode(Node):
         self.association_distance_m = self._float_parameter(
             "association_distance_m"
         )
+        self.association_noise_margin_m = self._float_parameter(
+            "association_noise_margin_m"
+        )
+        self.maximum_vehicle_speed_mps = self._float_parameter(
+            "maximum_vehicle_speed_mps"
+        )
+        self.maximum_width_change_m = self._float_parameter(
+            "maximum_width_change_m"
+        )
         self.velocity_alpha = self._float_parameter("velocity_alpha")
         self.position_alpha = self._float_parameter("position_alpha")
         self.coast_timeout_sec = self._float_parameter("coast_timeout_sec")
@@ -147,10 +174,18 @@ class DreamVehicleTrackerNode(Node):
             "motion_min_displacement_m"
         )
         self.motion_hold_sec = self._float_parameter("motion_hold_sec")
+        self.minimum_consistent_motion_windows = self._int_parameter(
+            "minimum_consistent_motion_windows"
+        )
+        self.minimum_direction_cosine = self._float_parameter(
+            "minimum_direction_cosine"
+        )
         self.nominal_radius_m = self._float_parameter("nominal_radius_m")
         self.radius_padding_m = self._float_parameter("radius_padding_m")
         if self.input_timeout_sec <= 0.0:
             raise ValueError("input_timeout_sec must be positive")
+        if self.future_stamp_tolerance_sec < 0.0:
+            raise ValueError("future_stamp_tolerance_sec cannot be negative")
         if not self.class_label:
             raise ValueError("class_label cannot be empty")
 
@@ -179,6 +214,13 @@ class DreamVehicleTrackerNode(Node):
                 minimum_range_m=self.minimum_cluster_range_m,
                 maximum_range_m=self.maximum_cluster_range_m,
             )
+            validate_cluster_source_stamp(
+                frame.stamp,
+                receipt_stamp=now,
+                previous_source_stamp=self.last_source_stamp,
+                maximum_age=self.input_timeout_sec,
+                future_tolerance=self.future_stamp_tolerance_sec,
+            )
         except (json.JSONDecodeError, TypeError, ValueError) as exc:
             self.last_error = f"invalid_cluster_payload:{exc}"
             self.get_logger().warning(
@@ -187,8 +229,9 @@ class DreamVehicleTrackerNode(Node):
             )
             return
 
-        self.tracker.update(frame.clusters, now)
+        self.tracker.update(frame.clusters, frame.stamp)
         self.last_valid_input_sec = now
+        self.last_source_stamp = frame.stamp
         self.last_error = "ok"
         self.raw_cluster_count = frame.raw_count
         self.size_candidate_count = len(frame.clusters)
@@ -226,6 +269,12 @@ class DreamVehicleTrackerNode(Node):
             "ready": input_fresh,
             "input_fresh": input_fresh,
             "input_age": None if math.isinf(input_age) else input_age,
+            "source_stamp": self.last_source_stamp,
+            "source_age": (
+                None
+                if self.last_source_stamp is None
+                else max(0.0, now - self.last_source_stamp)
+            ),
             "input_topic": self.clusters_topic,
             "output_topic": self.tracked_agents_topic,
             "class_label": self.class_label,

@@ -40,6 +40,7 @@ def test_live_demo_has_one_class_neutral_track_pipeline():
     assert 'DeclareLaunchArgument("use_merger_odom", default_value="false")' in launch
     assert '"use_merger_odom": use_merger_odom' in launch
     assert "UnlessCondition(use_merger_odom)" in launch
+    assert 'parameters=[perception_params, {"use_latest_tf": False}]' in launch
     assert "/cmd_vel" not in launch
 
     compatibility = (
