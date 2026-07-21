@@ -238,7 +238,7 @@ def test_ros_node_uses_scan_stamp_and_has_no_command_interface():
     assert "self_return_filter_enabled: true" in hardware_config
     assert "self_return_max_range: 0.05" in hardware_config
 
-    # Only the dedicated, disabled-by-default hardware boundary may include it;
+    # Only dedicated, disabled-by-default hardware boundaries may include it;
     # existing SIL/live dry-run behavior remains unchanged.
     launch_sources = {
         path.name: path.read_text() for path in (root / "launch").glob("*.launch.py")
@@ -246,8 +246,12 @@ def test_ros_node_uses_scan_stamp_and_has_no_command_interface():
     assert "dream_collision_monitor" in launch_sources[
         "dream_hardware_motion.launch.py"
     ]
+    hardware_launches = {
+        "dream_hardware_motion.launch.py",
+        "dream_free_navigation.launch.py",
+    }
     for name, content in launch_sources.items():
-        if name != "dream_hardware_motion.launch.py":
+        if name not in hardware_launches:
             assert "dream_collision_monitor" not in content
 
 

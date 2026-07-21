@@ -9,7 +9,7 @@ mixes highway and tabletop units.
 from __future__ import annotations
 
 from dataclasses import asdict, dataclass, field, replace
-from math import isfinite, radians
+from math import hypot, isfinite, radians
 from pathlib import Path
 from typing import Any, Dict, Tuple
 
@@ -195,8 +195,15 @@ class MPCConfig:
     maximum_steer: float = radians(23.0)
     maximum_steer_rate: float = radians(60.0)
     wheelbase: float = 0.20
-    robot_length: float = 0.22
+    # Installed LIMO costmaps use the measured base_link footprint
+    # x=+/-0.16 m, y=+/-0.11 m (0.32 x 0.22 m overall).
+    robot_length: float = 0.32
     robot_width: float = 0.22
+    # Must match global_costmap.footprint_padding in nav2_dream_planner.yaml.
+    navigation_footprint_padding: float = 0.05
+    # Must match global_costmap.inflation_layer.inflation_radius. The value
+    # covers the padded circumscribed radius plus half a grid-cell diagonal.
+    navigation_inflation_radius: float = 0.30
     base_cbf_longitudinal: float = 0.34
     base_cbf_lateral: float = 0.24
     base_headway: float = 0.60
@@ -213,6 +220,15 @@ class MPCConfig:
     speed_weight: float = 2.0
     terminal_multiplier: float = 4.0
     solver_timeout: float = 0.15
+    # Free-space MPC is constrained to a narrow tube around the footprint-
+    # checked Nav2 route.  This prevents the quadratic tracker from cutting a
+    # collision-free corner merely to reduce control effort.
+    path_corridor_half_width: float = 0.04
+    # Timing mismatch (for example braking from an already higher measured
+    # speed) may move a prediction ahead of its same-index reference, but the
+    # deviation is still finite and the swept costmap check remains decisive.
+    path_longitudinal_half_width: float = 0.30
+    maximum_path_cross_track_error: float = 0.10
     # A kinematic square-root speed profile begins braking early enough to
     # reach the route goal at zero speed.  Completion then latches in the ROS
     # planner until that process is deliberately restarted.
@@ -232,6 +248,8 @@ class MPCConfig:
             self.mission_braking_deceleration,
             self.mission_position_tolerance,
             self.mission_stop_speed_tolerance,
+            self.navigation_footprint_padding,
+            self.navigation_inflation_radius,
         )
         if not all(isfinite(value) for value in mission_values):
             raise ValueError("mission MPC parameters must be finite")
@@ -247,6 +265,20 @@ class MPCConfig:
             raise ValueError("mission position tolerance must be non-negative")
         if self.wheelbase <= 0.0:
             raise ValueError("wheelbase must be positive")
+        if self.navigation_footprint_padding < 0.0:
+            raise ValueError("navigation footprint padding must be non-negative")
+        padded_radius = hypot(
+            0.5 * self.robot_length + self.navigation_footprint_padding,
+            0.5 * self.robot_width + self.navigation_footprint_padding,
+        )
+        if self.navigation_inflation_radius <= padded_radius:
+            raise ValueError("navigation inflation does not cover the footprint")
+        if not 0.0 < self.path_corridor_half_width <= 0.05:
+            raise ValueError("path corridor must preserve the Nav2 safety padding")
+        if not 0.0 < self.path_longitudinal_half_width <= 0.30:
+            raise ValueError("path longitudinal corridor is invalid")
+        if self.maximum_path_cross_track_error < self.path_corridor_half_width:
+            raise ValueError("maximum path error must contain the MPC corridor")
 
 
 @dataclass(frozen=True)
@@ -343,10 +375,15 @@ def default_deployment_config() -> DeploymentConfig:
 
 
 def deployment_config_for_arena(path_text: str) -> DeploymentConfig:
-    """Apply surveyed lane geometry while preserving scaled dynamics.
+    """Apply deployment geometry while preserving scaled DREAM dynamics.
 
-    ``limo_scale.py`` remains authoritative for derived physical parameters;
-    the arena YAML is authoritative only for surveyed frame/lane geometry.
+    The original merge experiment uses only the ``lanes`` and ``route`` keys.
+    A free-navigation deployment may additionally declare a world-fixed
+    ``grid``.  This keeps all ROS nodes on one immutable PDE/collision-grid
+    contract without turning DRIFT into an ego-centred rolling field.
+
+    ``limo_scale.py`` remains authoritative for every dimensional model and
+    controller parameter; YAML is authoritative only for deployment geometry.
     """
     config = default_deployment_config()
     if not path_text:
@@ -359,6 +396,32 @@ def deployment_config_for_arena(path_text: str) -> DeploymentConfig:
         raise ValueError(
             f"arena frame {frame_id!r} does not match risk-grid frame {config.grid.frame_id!r}"
         )
+    grid_payload = payload.get("grid", {})
+    if not isinstance(grid_payload, dict):
+        raise ValueError("grid must be a mapping when provided")
+    grid = replace(
+        config.grid,
+        x_min=float(grid_payload.get("x_min", config.grid.x_min)),
+        x_max=float(grid_payload.get("x_max", config.grid.x_max)),
+        y_min=float(grid_payload.get("y_min", config.grid.y_min)),
+        y_max=float(grid_payload.get("y_max", config.grid.y_max)),
+        resolution=float(
+            grid_payload.get("resolution", config.grid.resolution)
+        ),
+        frame_id=frame_id,
+        road_y_min=float(
+            grid_payload.get("road_y_min", config.grid.road_y_min)
+        ),
+        road_y_max=float(
+            grid_payload.get("road_y_max", config.grid.road_y_max)
+        ),
+        road_taper=float(
+            grid_payload.get("road_taper", config.grid.road_taper)
+        ),
+    )
+    if grid.road_y_min < grid.y_min or grid.road_y_max > grid.y_max:
+        raise ValueError("road bounds must lie inside the numerical grid")
+    config = replace(config, grid=grid)
     lanes = payload.get("lanes", {})
     centers = tuple(float(value) for value in lanes.get("centers", config.arena.lane_centers))
     width = float(lanes.get("width", config.arena.lane_width))

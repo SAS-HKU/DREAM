@@ -105,6 +105,50 @@ def test_surveyed_arena_geometry_is_loaded_once(tmp_path):
     assert config.pde == default_deployment_config().pde
 
 
+def test_free_navigation_geometry_can_expand_the_world_fixed_grid(tmp_path):
+    arena = tmp_path / "free_navigation.yaml"
+    arena.write_text(
+        "frame_id: map\n"
+        "grid:\n"
+        "  x_min: -6.0\n"
+        "  x_max: 6.0\n"
+        "  y_min: -6.0\n"
+        "  y_max: 6.0\n"
+        "  resolution: 0.05\n"
+        "  road_y_min: -6.0\n"
+        "  road_y_max: 6.0\n"
+        "  road_taper: 0.05\n",
+        encoding="utf-8",
+    )
+    config = deployment_config_for_arena(str(arena))
+    assert config.grid.x_min == -6.0
+    assert config.grid.x_max == 6.0
+    assert config.grid.y_min == -6.0
+    assert config.grid.y_max == 6.0
+    assert config.grid.resolution == 0.05
+    assert config.grid.nx == 241
+    assert config.grid.ny == 241
+    assert config.pde == default_deployment_config().pde
+
+
+def test_deployment_grid_rejects_road_bounds_outside_numerical_grid(tmp_path):
+    arena = tmp_path / "invalid_grid.yaml"
+    arena.write_text(
+        "grid:\n"
+        "  y_min: -2.0\n"
+        "  y_max: 2.0\n"
+        "  road_y_min: -3.0\n"
+        "  road_y_max: 2.0\n",
+        encoding="utf-8",
+    )
+    try:
+        deployment_config_for_arena(str(arena))
+    except ValueError as exc:
+        assert "road bounds" in str(exc)
+    else:
+        raise AssertionError("road bounds outside the grid were accepted")
+
+
 def test_surveyed_arena_rejects_wrong_frame(tmp_path):
     arena = tmp_path / "arena.yaml"
     arena.write_text("frame_id: odom\n", encoding="utf-8")

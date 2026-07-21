@@ -30,13 +30,16 @@ from .core.collision import (
     TrajectoryAssessment,
     transform_points,
 )
-from .limo_scale import default_deployment_config
+from .limo_scale import deployment_config_for_arena
 
 
 class DreamCollisionMonitorNode(Node):
     def __init__(self) -> None:
         super().__init__("dream_collision_monitor")
-        self.config = default_deployment_config()
+        self.declare_parameter("arena_file", "")
+        self.config = deployment_config_for_arena(
+            str(self.get_parameter("arena_file").value)
+        )
         self._declare_parameters()
         self.map_frame = self._str_parameter("map_frame")
         self.scan_timeout = self._positive_parameter("scan_timeout")

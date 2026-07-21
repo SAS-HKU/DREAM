@@ -3,6 +3,13 @@ DREAM is an occlusion-aware, safety-critical planning framework that couples dyn
 
 Preliminary risk field modeling is based on [DRIFT](https://github.com/SAS-HKU/DRIFT.git): Dynamic Risk Inference via Field Transmission for Human-like Autonomous Driving.
 
+## ROS 2 LIMO deployment
+
+The standalone ROS 2 Humble package for arbitrary RViz-goal navigation,
+LiDAR-derived occlusion risk, sudden-merger tracking, and DREAM-versus-pure-MPC
+physical A/B tests is in [`src/dream_limo`](src/dream_limo/README.md). It is a
+sibling of `sfg_nav` and does not modify or run the SFG controller.
+
 
 ### proposed framework:
 

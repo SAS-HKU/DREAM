@@ -21,6 +21,7 @@ import numpy as np
 from dream_limo.limo_scale import DeploymentConfig, IntegrationPreset
 
 from .mission import stopping_speed_limit
+from .path_tracking import build_path_reference
 from .risk_field import DREAMRiskField
 from .route import anchored_lane_change_y
 from .types import ControlCommand, EgoState, Vehicle
@@ -156,6 +157,73 @@ class RiskAwareMPC:
             controls[:, step] = (desired_acceleration, 0.0)
             states[:, step + 1] = self.model.step(states[:, step], controls[:, step])
         return states, controls
+
+    def _reference_warm_start(
+        self, initial: Array, reference: Array
+    ) -> Tuple[Array, Array]:
+        """Warm-start an arbitrary path, including its nominal curvature."""
+
+        horizon = self.config.horizon
+        if (
+            self.last_states is not None
+            and self.last_controls is not None
+            and self.last_states.shape == (4, horizon + 1)
+            and self.last_controls.shape == (2, horizon)
+            and np.max(
+                np.linalg.norm(
+                    self.last_states[0:2, 1:] - reference[0:2, :-1], axis=0
+                )
+            )
+            <= 0.75
+        ):
+            states = np.column_stack((self.last_states[:, 1:], self.last_states[:, -1]))
+            controls = np.column_stack(
+                (self.last_controls[:, 1:], self.last_controls[:, -1])
+            )
+            states[:, 0] = initial
+            return states, controls
+
+        states = reference.copy()
+        states[:, 0] = initial
+        controls = np.zeros((2, horizon), dtype=np.float64)
+        for step in range(horizon):
+            acceleration = np.clip(
+                (reference[2, step + 1] - states[2, step]) / self.config.dt,
+                self.config.minimum_acceleration,
+                self.config.maximum_acceleration,
+            )
+            yaw_delta = float(reference[3, step + 1] - reference[3, step])
+            nominal_speed = max(float(reference[2, step]), 1.0e-2)
+            steering = np.arctan(
+                self.config.wheelbase
+                * yaw_delta
+                / (self.config.dt * nominal_speed)
+            )
+            steering = np.clip(
+                steering, -self.config.maximum_steer, self.config.maximum_steer
+            )
+            controls[:, step] = (acceleration, steering)
+            states[:, step + 1] = self.model.step(
+                states[:, step], controls[:, step]
+            )
+        return states, controls
+
+    def _footprint_center_bounds(self) -> Tuple[float, float, float, float]:
+        """Center bounds that keep the complete safety footprint on-road."""
+
+        footprint_radius = hypot(
+            0.5 * self.config.robot_length,
+            0.5 * self.config.robot_width,
+        ) + self.deployment.safety.collision_inflation_margin
+        grid = self.deployment.grid
+        quantization = 0.5 * grid.resolution
+        center_x_min = grid.x_min + footprint_radius - quantization
+        center_x_max = grid.x_max - footprint_radius + quantization
+        center_y_min = max(grid.y_min, grid.road_y_min) + footprint_radius - quantization
+        center_y_max = min(grid.y_max, grid.road_y_max) - footprint_radius + quantization
+        if center_x_min >= center_x_max or center_y_min >= center_y_max:
+            raise ValueError("collision footprint leaves no drivable MPC corridor")
+        return center_x_min, center_x_max, center_y_min, center_y_max
 
     @staticmethod
     def _predicted_vehicle(vehicle: Vehicle, step: int, dt: float) -> Tuple[float, float]:
@@ -414,7 +482,7 @@ class RiskAwareMPC:
             )
         except Exception as exc:  # CVXPY normalizes many backend failures as Exception.
             return self._fallback(ego, f"MPC exception: {exc}", started)
-        if problem.status not in {cp.OPTIMAL, cp.OPTIMAL_INACCURATE}:
+        if problem.status != cp.OPTIMAL:
             return self._fallback(ego, f"MPC status {problem.status}", started)
         states = np.asarray(state.value, dtype=np.float64)
         controls = np.asarray(control.value, dtype=np.float64)
@@ -429,6 +497,312 @@ class RiskAwareMPC:
         )
         steering = float(
             np.clip(controls[1, 0], -self.config.maximum_steer, self.config.maximum_steer)
+        )
+        speed = float(
+            np.clip(
+                ego.speed + self.config.dt * acceleration,
+                self.config.minimum_speed,
+                self.config.maximum_speed,
+            )
+        )
+        self.last_states = states
+        self.last_controls = controls
+        self.last_applied_control = np.asarray([acceleration, steering])
+        maximum_slack = (
+            0.0
+            if obstacle_slack is None or obstacle_slack.value is None
+            else float(np.max(obstacle_slack.value))
+        )
+        command = ControlCommand(
+            target_speed=speed,
+            acceleration=acceleration,
+            steering=steering,
+            stamp=ego.stamp,
+            valid=True,
+            reason=str(problem.status),
+        )
+        return MPCResult(
+            command=command,
+            states=states,
+            controls=controls,
+            status=str(problem.status),
+            solve_seconds=perf_counter() - started,
+            objective=float(problem.value),
+            maximum_slack=maximum_slack,
+            risk_profile=risk_profile,
+            used_fallback=False,
+        )
+
+    def solve_reference(
+        self,
+        ego: EgoState,
+        path_points: Sequence[Sequence[float]] | Array,
+        vehicles: Sequence[Vehicle],
+        risk_field: DREAMRiskField,
+        preset: IntegrationPreset,
+        *,
+        terminal_yaw: Optional[float] = None,
+    ) -> MPCResult:
+        """Track an arbitrary Cartesian path with DREAM risk and CBF behavior.
+
+        Unlike :meth:`solve`, this entry point has no lane or one-way mission
+        assumption.  It constructs an arc-length horizon from the current ego
+        pose, tracks ``x`` and ``y`` isotropically, and keeps the complete robot
+        footprint inside the risk grid's road corridor.
+        """
+
+        started = perf_counter()
+        initial = self._initial_state(ego)
+        reference = build_path_reference(
+            path_points,
+            ego_xy=initial[0:2],
+            ego_yaw=float(initial[3]),
+            horizon=self.config.horizon,
+            dt=self.config.dt,
+            cruise_speed=self.config.target_speed,
+            braking_deceleration=self.config.mission_braking_deceleration,
+            maximum_cross_track_error=(
+                self.config.maximum_path_cross_track_error
+            ),
+            terminal_yaw=terminal_yaw,
+        )
+        linearization_states, linearization_controls = self._reference_warm_start(
+            initial, reference
+        )
+        horizon = self.config.horizon
+        state = cp.Variable((4, horizon + 1), name="reference_state")
+        control = cp.Variable((2, horizon), name="reference_control")
+        obstacle_slack = (
+            cp.Variable(
+                (len(vehicles), horizon + 1),
+                nonneg=True,
+                name="reference_cbf_slack",
+            )
+            if vehicles
+            else None
+        )
+
+        constraints = [state[:, 0] == initial]
+        constraints.extend(
+            (
+                state[2, :] >= self.config.minimum_speed,
+                state[2, :] <= self.config.maximum_speed,
+                control[0, :] >= self.config.minimum_acceleration,
+                control[0, :] <= self.config.maximum_acceleration,
+                control[1, :] >= -self.config.maximum_steer,
+                control[1, :] <= self.config.maximum_steer,
+            )
+        )
+        # Preserve the footprint-checked Nav2 geometry as a hard local tube.
+        # Both normal and tangent displacement are bounded at every prediction
+        # step; a later live-costmap swept-footprint check verifies the solved
+        # trajectory continuously before it may be reported ready.
+        corridor = self.config.path_corridor_half_width
+        longitudinal_corridor = self.config.path_longitudinal_half_width
+        for step in range(horizon + 1):
+            yaw = float(reference[3, step])
+            tangent = np.asarray([np.cos(yaw), np.sin(yaw)])
+            normal = np.asarray([-np.sin(yaw), np.cos(yaw)])
+            position_error = (
+                state[0:2, step] - reference[0:2, step]
+            )
+            along_track = tangent @ position_error
+            cross_track = normal @ position_error
+            constraints.extend(
+                (
+                    along_track >= -longitudinal_corridor,
+                    along_track <= longitudinal_corridor,
+                    cross_track >= -corridor,
+                    cross_track <= corridor,
+                )
+            )
+        center_x_min, center_x_max, center_y_min, center_y_max = (
+            self._footprint_center_bounds()
+        )
+        constraints.extend(
+            (
+                state[0, :] >= center_x_min,
+                state[0, :] <= center_x_max,
+                state[1, :] >= center_y_min,
+                state[1, :] <= center_y_max,
+            )
+        )
+
+        steer_delta_limit = self.config.maximum_steer_rate * self.config.dt
+        constraints.extend(
+            (
+                control[1, 0] - self.last_applied_control[1] <= steer_delta_limit,
+                control[1, 0] - self.last_applied_control[1] >= -steer_delta_limit,
+            )
+        )
+        if horizon > 1:
+            constraints.extend(
+                (
+                    control[1, 1:] - control[1, :-1] <= steer_delta_limit,
+                    control[1, 1:] - control[1, :-1] >= -steer_delta_limit,
+                )
+            )
+
+        objective = 0.0
+        risk_profile = np.asarray(
+            [
+                risk_field.risk_at(
+                    float(linearization_states[0, index]),
+                    float(linearization_states[1, index]),
+                )
+                for index in range(horizon + 1)
+            ],
+            dtype=np.float64,
+        )
+
+        for step in range(horizon):
+            A, B, offset = self.model.linearize(
+                linearization_states[:, step], linearization_controls[:, step]
+            )
+            constraints.append(
+                state[:, step + 1]
+                == A @ state[:, step] + B @ control[:, step] + offset
+            )
+            objective += self.config.position_weight * cp.sum_squares(
+                state[0:2, step] - reference[0:2, step]
+            )
+            objective += self.config.heading_weight * cp.square(
+                state[3, step] - reference[3, step]
+            )
+            objective += self.config.speed_weight * cp.square(
+                state[2, step] - reference[2, step]
+            )
+            objective += self.config.control_weight_acceleration * cp.square(
+                control[0, step]
+            )
+            objective += self.config.control_weight_steer * cp.square(control[1, step])
+            if step == 0:
+                objective += self.config.delta_control_weight * cp.sum_squares(
+                    control[:, step] - self.last_applied_control
+                )
+            else:
+                objective += self.config.delta_control_weight * cp.sum_squares(
+                    control[:, step] - control[:, step - 1]
+                )
+            if preset.mpc_risk_cost and risk_profile[step] > 0.05:
+                objective += (
+                    preset.risk_weight
+                    * 0.1
+                    * float(risk_profile[step])
+                    * cp.square(state[2, step])
+                )
+
+        terminal = self.config.terminal_multiplier
+        objective += terminal * self.config.position_weight * cp.sum_squares(
+            state[0:2, horizon] - reference[0:2, horizon]
+        )
+        objective += terminal * self.config.heading_weight * cp.square(
+            state[3, horizon] - reference[3, horizon]
+        )
+        objective += terminal * self.config.speed_weight * cp.square(
+            state[2, horizon] - reference[2, horizon]
+        )
+        if preset.mpc_risk_cost and risk_profile[-1] > 0.05:
+            objective += (
+                preset.risk_weight
+                * 0.1
+                * float(risk_profile[-1])
+                * cp.square(state[2, horizon])
+            )
+
+        for vehicle_index, vehicle in enumerate(vehicles):
+            for step in range(horizon + 1):
+                center = self._predicted_vehicle(vehicle, step, self.config.dt)
+                ref_point = (
+                    float(linearization_states[0, step]),
+                    float(linearization_states[1, step]),
+                )
+                scale = risk_field.cbf_scale(ref_point[0], ref_point[1], preset)
+                axes = (
+                    scale
+                    * (self.config.base_cbf_longitudinal + 0.5 * vehicle.length),
+                    scale * (self.config.base_cbf_lateral + 0.5 * vehicle.width),
+                )
+                normal_x, normal_y, right_hand = self._ellipse_tangent(
+                    center, axes, ref_point
+                )
+                slack = obstacle_slack[vehicle_index, step]
+                constraints.append(
+                    normal_x * state[0, step]
+                    + normal_y * state[1, step]
+                    + slack
+                    >= right_hand
+                )
+
+                tangent = np.asarray(
+                    [
+                        np.cos(reference[3, step]),
+                        np.sin(reference[3, step]),
+                    ],
+                    dtype=np.float64,
+                )
+                normal = np.asarray([-tangent[1], tangent[0]], dtype=np.float64)
+                relative = np.asarray(center, dtype=np.float64) - np.asarray(
+                    ref_point, dtype=np.float64
+                )
+                longitudinal = float(tangent @ relative)
+                lateral = float(normal @ relative)
+                leader_half_width = (
+                    0.5 * (self.config.robot_width + vehicle.width)
+                    + self.config.path_corridor_half_width
+                )
+                if longitudinal > 0.0 and abs(lateral) < leader_half_width:
+                    headway_scale = risk_field.headway_scale(
+                        ref_point[0], ref_point[1], preset
+                    )
+                    constraints.append(
+                        tangent[0] * state[0, step]
+                        + tangent[1] * state[1, step]
+                        + headway_scale * self.config.base_minimum_distance
+                        + headway_scale * self.config.base_headway * state[2, step]
+                        <= tangent[0] * center[0]
+                        + tangent[1] * center[1]
+                        + slack
+                    )
+            objective += self.config.cbf_slack_weight * cp.sum_squares(
+                obstacle_slack[vehicle_index, :]
+            )
+
+        problem = cp.Problem(cp.Minimize(objective), constraints)
+        state.value = linearization_states
+        control.value = linearization_controls
+        try:
+            problem.solve(
+                solver=cp.OSQP,
+                warm_start=True,
+                verbose=False,
+                eps_abs=1.0e-3,
+                eps_rel=1.0e-3,
+                max_iter=20_000,
+                time_limit=self.config.solver_timeout,
+                polishing=False,
+            )
+        except Exception as exc:  # CVXPY normalizes many backend failures as Exception.
+            return self._fallback(ego, f"MPC exception: {exc}", started)
+        if problem.status != cp.OPTIMAL:
+            return self._fallback(ego, f"MPC status {problem.status}", started)
+        states = np.asarray(state.value, dtype=np.float64)
+        controls = np.asarray(control.value, dtype=np.float64)
+        if not np.all(np.isfinite(states)) or not np.all(np.isfinite(controls)):
+            return self._fallback(ego, "MPC returned non-finite values", started)
+        acceleration = float(
+            np.clip(
+                controls[0, 0],
+                self.config.minimum_acceleration,
+                self.config.maximum_acceleration,
+            )
+        )
+        steering = float(
+            np.clip(
+                controls[1, 0],
+                -self.config.maximum_steer,
+                self.config.maximum_steer,
+            )
         )
         speed = float(
             np.clip(
