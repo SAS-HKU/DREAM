@@ -3,14 +3,6 @@ DREAM is an occlusion-aware, safety-critical planning framework that couples dyn
 
 Preliminary risk field modeling is based on [DRIFT](https://github.com/SAS-HKU/DRIFT.git): Dynamic Risk Inference via Field Transmission for Human-like Autonomous Driving.
 
-## ROS 2 LIMO deployment
-
-The standalone ROS 2 Humble package for arbitrary RViz-goal navigation,
-LiDAR-derived occlusion risk, sudden-merger tracking, and DREAM-versus-pure-MPC
-physical A/B tests is in [`src/dream_limo`](src/dream_limo/README.md). It is a
-sibling of `sfg_nav` and does not modify or run the SFG controller.
-
-
 ### proposed framework:
 
 ![Methodology graph](assests/methodology.jpg)
@@ -231,6 +223,12 @@ The baseline planner forced the ego to perform very aggressive and dangerous ove
 
 We compare the trajectories of (1): the ground truth ego trajectories from BEV datasets; (2): the baseline planner trajectories; (3): the DREAM planner trajectories.
 The results show that baseline planner is over aggressive as near collision with the truck rear, and our planner is more conservative but sacrifice the progress. (The selected scenario include the occlusion-aware planning from the truck-trailer that may block the visibility of the ego)
+
+## ROS 2 LIMO deployment
+
+The standalone ROS 2 Humble package for arbitrary RViz-goal navigation,
+LiDAR-derived occlusion risk, sudden-merger tracking, and DREAM-versus-pure-MPC
+physical A/B tests is in [`src/dream_limo`](src/dream_limo/README.md). 
 
 ## Acknowledgement:
 #### The BEV dataset visualizations:
