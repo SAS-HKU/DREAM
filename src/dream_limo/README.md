@@ -18,16 +18,12 @@ The primary launch is `dream_free_navigation.launch.py`:
 1. `/scan` is converted to a world-fixed observed-free/occupied costmap. A
    planner-only Nav2 SMAC Hybrid node computes Ackermann-feasible geometry.
    No Nav2 controller, behavior tree, navigator, or velocity publisher runs.
-2. SFG's neutral `/sfg/lidar_clusters` are classified over time by
-   `dream_vehicle_tracker`. Only motion-confirmed, vehicle-sized tracks are
-   forwarded on `/tracked_agents`; the SFG pedestrian detector and SFG planner
-   are not started.
-3. `dream_world_model` derives visibility and occlusion shadow directly from
+2. `dream_world_model` derives visibility and occlusion shadow directly from
    LiDAR first returns. A hidden merger does not leak into `Q_veh`; its unseen
    region contributes through DREAM's `Q_occ`.
-4. `dream_drift_field` evolves the scaled PDE field in `map` and warms it for
+3. `dream_drift_field` evolves the scaled PDE field in `map` and warms it for
    about five model seconds.
-5. `dream_free_planner` tracks the arbitrary geometric path with DREAM's local
+4. `dream_free_planner` tracks the arbitrary geometric path with DREAM's local
    bicycle MPC inside a hard route tube. Every solved footprint and the swept
    motion between MPC knots are rechecked against the fresh inflated costmap.
    In `balanced`, route-level risk veto,
@@ -35,9 +31,9 @@ The primary launch is `dream_free_navigation.launch.py`:
    stops/yields because no unplanned substitute corridor is certified. In
    `pure_mpc`, those three risk channels are disabled while path, perception,
    dynamics, nominal CBF, and safety remain identical.
-6. Independent collision, front-bubble, watchdog, drive-mode, ownership, and
+5. Independent collision, front-bubble, watchdog, drive-mode, ownership, and
    hardware gates are the only route to `/cmd_vel`.
-7. The front camera is shown and recordable as occlusion evidence. Camera
+6. The front camera is shown and recordable as occlusion evidence. Camera
    pixels do not enter the planner.
 
 ## Verified platform and solver
