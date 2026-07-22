@@ -18,16 +18,21 @@ from launch_ros.actions import Node
 from launch_ros.parameter_descriptions import ParameterValue
 
 
-def _validate_arguments(context):
+def _validated_target_speed(value):
     try:
-        speed = float(LaunchConfiguration("target_speed").perform(context))
+        speed = float(value)
     except (TypeError, ValueError) as exc:
         raise RuntimeError("target_speed must be a finite number") from exc
-    if not isfinite(speed) or not 0.03 < speed <= 0.15:
+    if not isfinite(speed) or not 0.03 < speed <= 0.20:
         raise RuntimeError(
-            "target_speed must lie in (0.03, 0.15] m/s for the reviewed "
+            "target_speed must lie in (0.03, 0.20] m/s for the reviewed "
             "physical hardware gate"
         )
+    return speed
+
+
+def _validate_arguments(context):
+    _validated_target_speed(LaunchConfiguration("target_speed").perform(context))
     return []
 
 

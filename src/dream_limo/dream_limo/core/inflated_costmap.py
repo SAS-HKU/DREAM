@@ -62,6 +62,7 @@ def validate_swept_trajectory(
     inflation_radius: float,
     interpolation_spacing: float | None = None,
     allow_initial_inflated_center_prefix: bool = False,
+    allow_known_soft_center: bool = False,
     verified_start_clearance_center: Sequence[float] | None = None,
     verified_start_clearance_radius: float | None = None,
 ) -> InflatedCostmapCheck:
@@ -86,6 +87,14 @@ def validate_swept_trajectory(
     closed.  Cost 99 (Nav2's inscribed value), unknown or occupied centre
     cells, and unknown or occupied padded-footprint samples are never
     permitted.  The default remains the strict zero-centre policy.
+
+    ``allow_known_soft_center`` aligns the check with Nav2's footprint-aware
+    planner: known soft-inflation centre costs 1 through 98 may be traversed,
+    but the complete padded footprint is still densely checked below and must
+    remain known and free of lethal occupancy.  Cost 99 (inscribed), cost 100
+    (lethal), unknown cells, and cells outside the costmap remain hard stops.
+    The option is explicit and disabled by default for callers that rely on a
+    zero-centre clearance certificate.
 
     A front-limited lidar cannot observe a rear padded-footprint corner during
     a small initial turn, even when the complete footprint at rest is known
@@ -260,30 +269,31 @@ def validate_swept_trajectory(
                 value,
             )
         if value > 0:
-            if sample_index == 0 and allow_initial_inflated_center_prefix:
-                initial_soft_recovery = True
-            if not initial_soft_recovery:
-                return InflatedCostmapCheck(
-                    False,
-                    "TRAJECTORY_CENTER_NOT_FREE",
-                    sample_index,
-                    cell_x,
-                    cell_y,
-                    value,
-                )
-            if (
-                previous_positive_center_cost is not None
-                and value > previous_positive_center_cost
-            ):
-                return InflatedCostmapCheck(
-                    False,
-                    "TRAJECTORY_CENTER_INFLATION_INCREASE",
-                    sample_index,
-                    cell_x,
-                    cell_y,
-                    value,
-                )
-            previous_positive_center_cost = value
+            if not allow_known_soft_center:
+                if sample_index == 0 and allow_initial_inflated_center_prefix:
+                    initial_soft_recovery = True
+                if not initial_soft_recovery:
+                    return InflatedCostmapCheck(
+                        False,
+                        "TRAJECTORY_CENTER_NOT_FREE",
+                        sample_index,
+                        cell_x,
+                        cell_y,
+                        value,
+                    )
+                if (
+                    previous_positive_center_cost is not None
+                    and value > previous_positive_center_cost
+                ):
+                    return InflatedCostmapCheck(
+                        False,
+                        "TRAJECTORY_CENTER_INFLATION_INCREASE",
+                        sample_index,
+                        cell_x,
+                        cell_y,
+                        value,
+                    )
+                previous_positive_center_cost = value
 
         rotation = np.asarray(
             [[cos(yaw), -sin(yaw)], [sin(yaw), cos(yaw)]],

@@ -43,6 +43,13 @@ class DreamCollisionMonitorNode(Node):
         self._declare_parameters()
         self.map_frame = self._str_parameter("map_frame")
         self.scan_timeout = self._positive_parameter("scan_timeout")
+        self.scan_rejection_grace = self._positive_parameter(
+            "scan_rejection_grace"
+        )
+        if self.scan_rejection_grace > min(self.scan_timeout, 0.20):
+            raise ValueError(
+                "scan_rejection_grace must not exceed scan_timeout or 0.20 s"
+            )
         self.mask_timeout = self._positive_parameter("mask_timeout")
         self.path_timeout = self._positive_parameter("path_timeout")
         self.tf_timeout = self._positive_parameter("tf_timeout")
@@ -154,6 +161,10 @@ class DreamCollisionMonitorNode(Node):
         self.valid_ray_count = 0
         self.self_return_rejection_count = 0
         self.transformed_surface_cells = 0
+        self.latest_scan_rejection: Optional[str] = None
+        self.latest_scan_rejection_receipt: Optional[float] = None
+        self.scan_rejection_count = 0
+        self.consecutive_scan_rejections = 0
         self.inflation_radius = inflation_radius
         rate = self._positive_parameter("publish_rate")
         self.create_timer(1.0 / rate, self._publish)
@@ -168,6 +179,7 @@ class DreamCollisionMonitorNode(Node):
         self.declare_parameter("map_frame", grid.frame_id)
         self.declare_parameter("publish_rate", 10.0)
         self.declare_parameter("scan_timeout", 0.40)
+        self.declare_parameter("scan_rejection_grace", 0.20)
         self.declare_parameter("mask_timeout", 0.50)
         self.declare_parameter("path_timeout", 0.50)
         self.declare_parameter("tf_timeout", 0.10)
@@ -229,21 +241,19 @@ class DreamCollisionMonitorNode(Node):
 
     def _on_scan(self, message: LaserScan) -> None:
         now = self._now()
-        self.last_scan_receipt = now
         self.raw_valid_ray_count = 0
         self.valid_ray_count = 0
         self.self_return_rejection_count = 0
         self.transformed_surface_cells = 0
-        self.scan_ok = False
         if not message.header.frame_id:
-            self.scan_error = "SCAN_FRAME_EMPTY"
-            self.tf_ok = False
-            self.tf_error = "SCAN_FRAME_EMPTY"
+            self._reject_scan(now, "SCAN_FRAME_EMPTY", "SCAN_FRAME_EMPTY")
             return
         if not self._source_stamp_fresh(message.header.stamp, now, self.scan_timeout):
-            self.scan_error = "SCAN_SOURCE_STAMP_STALE"
-            self.tf_ok = False
-            self.tf_error = "SCAN_SOURCE_STAMP_STALE"
+            self._reject_scan(
+                now,
+                "SCAN_SOURCE_STAMP_STALE",
+                "SCAN_SOURCE_STAMP_STALE",
+            )
             return
         ranges = np.asarray(message.ranges, dtype=np.float64)
         angles = float(message.angle_min) + np.arange(len(ranges)) * float(
@@ -257,13 +267,15 @@ class DreamCollisionMonitorNode(Node):
         self.raw_valid_ray_count = int(np.count_nonzero(valid))
         self.valid_ray_count = self.raw_valid_ray_count
         if self.raw_valid_ray_count < self.envelope.minimum_valid_rays:
-            self.scan_error = "INSUFFICIENT_VALID_RAYS"
-            self.tf_ok = False
-            self.tf_error = "TRANSFORM_NOT_EVALUATED"
             self.envelope.record_scan(
                 np.empty((0, 2)),
                 receipt_time=now,
                 valid_ray_count=self.valid_ray_count,
+            )
+            self._reject_scan(
+                now,
+                "INSUFFICIENT_VALID_RAYS",
+                "TRANSFORM_NOT_EVALUATED",
             )
             return
         local_points = np.column_stack(
@@ -328,9 +340,11 @@ class DreamCollisionMonitorNode(Node):
                 points = points[~rejected]
                 self.valid_ray_count = int(points.shape[0])
         except (TransformException, ValueError) as exc:
-            self.tf_ok = False
-            self.tf_error = f"SCAN_TF_FAILURE:{exc}"
-            self.scan_error = "SCAN_TF_FAILURE"
+            self._reject_scan(
+                now,
+                "SCAN_TF_FAILURE",
+                f"SCAN_TF_FAILURE:{exc}",
+            )
             self.get_logger().warning(
                 f"Collision monitor rejected scan transform: {exc}",
                 throttle_duration_sec=2.0,
@@ -340,11 +354,13 @@ class DreamCollisionMonitorNode(Node):
         self.tf_ok = True
         self.tf_error = "ok"
         if self.valid_ray_count < self.envelope.minimum_valid_rays:
-            self.scan_error = "INSUFFICIENT_VALID_RAYS_AFTER_SELF_FILTER"
             self.envelope.record_scan(
                 np.empty((0, 2)),
                 receipt_time=now,
                 valid_ray_count=self.valid_ray_count,
+            )
+            self._reject_scan(
+                now, "INSUFFICIENT_VALID_RAYS_AFTER_SELF_FILTER"
             )
             return
         self.transformed_surface_cells = self.envelope.record_scan(
@@ -354,6 +370,42 @@ class DreamCollisionMonitorNode(Node):
         )
         self.scan_ok = self.envelope.last_scan_accepted
         self.scan_error = "ok" if self.scan_ok else "INSUFFICIENT_VALID_RAYS"
+        if self.scan_ok:
+            self.last_scan_receipt = now
+            self.consecutive_scan_rejections = 0
+
+    def _reject_scan(
+        self,
+        now: float,
+        scan_error: str,
+        tf_error: Optional[str] = None,
+    ) -> None:
+        """Retain one recent exact-TF scan through a brief bad sample.
+
+        The final hardware gate independently watches raw ``/scan`` freshness.
+        This latch therefore covers only collision-node scheduling or one
+        exact-time TF miss; it cannot keep motion authorized after the raw
+        sensor itself exceeds that independent timeout.
+        """
+
+        self.latest_scan_rejection = str(scan_error)
+        self.latest_scan_rejection_receipt = float(now)
+        self.scan_rejection_count += 1
+        self.consecutive_scan_rejections += 1
+        retain_last_good = (
+            self.consecutive_scan_rejections == 1
+            and self._fresh(
+                now,
+                self.last_scan_receipt,
+                self.scan_rejection_grace,
+            )
+        )
+        if not retain_last_good:
+            self.scan_ok = False
+            self.scan_error = str(scan_error)
+        if tf_error is not None and not retain_last_good:
+            self.tf_ok = False
+            self.tf_error = str(tf_error)
 
     def _grid_metadata_valid(self, message: OccupancyGrid) -> bool:
         info = message.info
@@ -423,14 +475,22 @@ class DreamCollisionMonitorNode(Node):
     def _fresh(self, now: float, receipt: Optional[float], timeout: float) -> bool:
         return receipt is not None and 0.0 <= now - receipt < timeout
 
+    def _scan_evidence_timeout(self) -> float:
+        """Use the short last-good limit after any rejected scan callback."""
+
+        if self.consecutive_scan_rejections > 0:
+            return self.scan_rejection_grace
+        return self.scan_timeout
+
     def _readiness_reason(self, now: float) -> tuple[bool, str]:
+        scan_evidence_timeout = self._scan_evidence_timeout()
         if not self.scan_ok:
             return False, self.scan_error
-        if not self._fresh(now, self.last_scan_receipt, self.scan_timeout):
+        if not self._fresh(now, self.last_scan_receipt, scan_evidence_timeout):
             return False, "SCAN_STALE"
         if not self.tf_ok:
             return False, self.tf_error
-        if not self._fresh(now, self.last_tf_receipt, self.scan_timeout):
+        if not self._fresh(now, self.last_tf_receipt, scan_evidence_timeout):
             return False, "SCAN_TF_STALE"
         if not self.mask_ok or self.shadow_unknown is None:
             return False, self.mask_error
@@ -458,14 +518,15 @@ class DreamCollisionMonitorNode(Node):
     def _publish(self) -> None:
         now = self._now()
         ready, reason = self._readiness_reason(now)
+        scan_evidence_timeout = self._scan_evidence_timeout()
         # A stale/missing perception input makes the full grid unknown.  The
         # retained surface grid remains useful diagnostically but can never be
         # mistaken for a complete collision map.
         perception_ready = (
             self.scan_ok
             and self.tf_ok
-            and self._fresh(now, self.last_scan_receipt, self.scan_timeout)
-            and self._fresh(now, self.last_tf_receipt, self.scan_timeout)
+            and self._fresh(now, self.last_scan_receipt, scan_evidence_timeout)
+            and self._fresh(now, self.last_tf_receipt, scan_evidence_timeout)
             and self.mask_ok
             and self._fresh(now, self.last_mask_receipt, self.mask_timeout)
             and self.shadow_unknown is not None
@@ -515,14 +576,25 @@ class DreamCollisionMonitorNode(Node):
             "occlusion_shadow_blocks_trajectory": (
                 self.occlusion_shadow_blocks_trajectory
             ),
-            "scan_fresh": self._fresh(now, self.last_scan_receipt, self.scan_timeout),
+            "scan_fresh": self._fresh(
+                now, self.last_scan_receipt, scan_evidence_timeout
+            ),
             "mask_fresh": self._fresh(now, self.last_mask_receipt, self.mask_timeout),
             "path_fresh": self._fresh(now, self.last_path_receipt, self.path_timeout),
-            "tf_fresh": self._fresh(now, self.last_tf_receipt, self.scan_timeout),
+            "tf_fresh": self._fresh(
+                now, self.last_tf_receipt, scan_evidence_timeout
+            ),
             "scan_error": self.scan_error,
             "mask_error": self.mask_error,
             "path_error": self.path_error,
             "tf_error": self.tf_error,
+            "latest_scan_rejection": self.latest_scan_rejection,
+            "latest_scan_rejection_age": self._age(
+                now, self.latest_scan_rejection_receipt
+            ),
+            "scan_rejection_count": self.scan_rejection_count,
+            "consecutive_scan_rejections": self.consecutive_scan_rejections,
+            "scan_rejection_grace": self.scan_rejection_grace,
             "scan_age": self._age(now, self.last_scan_receipt),
             "mask_age": self._age(now, self.last_mask_receipt),
             "path_age": self._age(now, self.last_path_receipt),

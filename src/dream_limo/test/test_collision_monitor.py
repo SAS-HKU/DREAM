@@ -3,7 +3,9 @@ from pathlib import Path
 
 import numpy as np
 import pytest
+import yaml
 
+from dream_limo.collision_monitor_node import DreamCollisionMonitorNode
 from dream_limo.core.collision import (
     axis_aligned_road_mask,
     CollisionEnvelope,
@@ -221,6 +223,79 @@ def test_polyline_interpolation_spacing_is_bounded():
     assert points[-1, 0] == pytest.approx(0.31)
 
 
+def test_scan_rejection_retains_only_fresh_last_good_exact_tf_evidence():
+    node = DreamCollisionMonitorNode.__new__(DreamCollisionMonitorNode)
+    node.scan_timeout = 0.60
+    node.scan_rejection_grace = 0.20
+    node.last_scan_receipt = 10.0
+    node.last_tf_receipt = 10.0
+    node.scan_ok = True
+    node.tf_ok = True
+    node.scan_error = "ok"
+    node.tf_error = "ok"
+    node.latest_scan_rejection = None
+    node.latest_scan_rejection_receipt = None
+    node.scan_rejection_count = 0
+    node.consecutive_scan_rejections = 0
+
+    node._reject_scan(10.19, "SCAN_TF_FAILURE", "future extrapolation")
+    assert node.scan_ok
+    assert node.tf_ok
+    assert node.scan_error == "ok"
+    assert node.tf_error == "ok"
+    assert node.latest_scan_rejection == "SCAN_TF_FAILURE"
+
+    # A second consecutive rejected callback fails closed even while the
+    # last-good scan is still inside the grace interval.
+    node._reject_scan(10.195, "SCAN_TF_FAILURE", "future extrapolation")
+    assert not node.scan_ok
+    assert not node.tf_ok
+    assert node.scan_error == "SCAN_TF_FAILURE"
+    assert node.tf_error == "future extrapolation"
+    assert node.scan_rejection_count == 2
+    assert node.consecutive_scan_rejections == 2
+
+
+def test_valid_scan_resets_consecutive_rejection_latch_contract():
+    source = (
+        Path(__file__).resolve().parents[1]
+        / "dream_limo"
+        / "collision_monitor_node.py"
+    ).read_text(encoding="utf-8")
+    assert "self.consecutive_scan_rejections = 0" in source
+    assert "self.consecutive_scan_rejections == 1" in source
+
+
+def test_one_rejection_expires_at_short_last_good_scan_grace():
+    node = DreamCollisionMonitorNode.__new__(DreamCollisionMonitorNode)
+    node.scan_timeout = 0.40
+    node.scan_rejection_grace = 0.20
+    node.last_scan_receipt = 10.0
+    node.last_tf_receipt = 10.0
+    node.last_mask_receipt = 10.0
+    node.last_path_receipt = 10.0
+    node.scan_ok = True
+    node.tf_ok = True
+    node.mask_ok = True
+    node.path_ok = True
+    node.scan_error = "ok"
+    node.tf_error = "ok"
+    node.mask_error = "ok"
+    node.path_error = "ok"
+    node.shadow_unknown = np.zeros((1, 1), dtype=bool)
+    node.path_points = np.zeros((2, 2), dtype=np.float64)
+    node.mask_timeout = 0.50
+    node.path_timeout = 0.50
+    node.latest_scan_rejection = None
+    node.latest_scan_rejection_receipt = None
+    node.scan_rejection_count = 0
+    node.consecutive_scan_rejections = 0
+
+    node._reject_scan(10.19, "SCAN_TF_FAILURE", "future extrapolation")
+    assert node._readiness_reason(10.199) == (True, "INPUTS_READY")
+    assert node._readiness_reason(10.201) == (False, "SCAN_STALE")
+
+
 def test_ros_node_uses_scan_stamp_and_has_no_command_interface():
     root = Path(__file__).resolve().parents[1]
     source = (root / "dream_limo" / "collision_monitor_node.py").read_text()
@@ -232,11 +307,19 @@ def test_ros_node_uses_scan_stamp_and_has_no_command_interface():
     assert '"shadow_policy"' in source
     assert '"trajectory_shadow_overlap_samples"' in source
     assert '"self_return_rejections"' in source
+    assert "def _reject_scan(" in source
+    assert '"latest_scan_rejection"' in source
+    assert "self.last_scan_receipt = now" in source
 
-    hardware_config = (root / "config" / "dream_limo.yaml").read_text()
+    config_path = root / "config" / "dream_limo.yaml"
+    hardware_config = config_path.read_text()
     assert "occlusion_shadow_blocks_trajectory: false" in hardware_config
     assert "self_return_filter_enabled: true" in hardware_config
     assert "self_return_max_range: 0.05" in hardware_config
+    config = yaml.safe_load(hardware_config)
+    collision_parameters = config["dream_collision_monitor"]["ros__parameters"]
+    assert collision_parameters["scan_timeout"] == pytest.approx(0.40)
+    assert collision_parameters["scan_rejection_grace"] == pytest.approx(0.20)
 
     # Only dedicated, disabled-by-default hardware boundaries may include it;
     # existing SIL/live dry-run behavior remains unchanged.

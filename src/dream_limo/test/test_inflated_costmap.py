@@ -25,6 +25,7 @@ def _check(
     costmap=None,
     *,
     allow_initial_inflated_center_prefix=False,
+    allow_known_soft_center=False,
     verified_start_clearance_center=None,
     verified_start_clearance_radius=None,
 ):
@@ -39,6 +40,7 @@ def _check(
         allow_initial_inflated_center_prefix=(
             allow_initial_inflated_center_prefix
         ),
+        allow_known_soft_center=allow_known_soft_center,
         verified_start_clearance_center=verified_start_clearance_center,
         verified_start_clearance_radius=verified_start_clearance_radius,
     )
@@ -187,6 +189,66 @@ def test_horizon_starting_at_zero_cannot_enter_soft_inflation():
     assert not result.safe
     assert result.reason == "TRAJECTORY_CENTER_NOT_FREE"
     assert result.cell_value == 20
+
+
+def test_known_soft_center_is_allowed_only_with_complete_footprint_check():
+    states = np.asarray(
+        [[-0.30, 0.30], [0.0, 0.0], [0.1, 0.1], [0.0, 0.0]]
+    )
+    data = [0] * 1600
+    # The path enters a known Nav2 soft-inflation band from cost zero.
+    for cell_x in range(20, 27):
+        data[20 * 40 + cell_x] = 98
+
+    strict = _check(states, _map(data))
+    assert not strict.safe
+    assert strict.reason == "TRAJECTORY_CENTER_NOT_FREE"
+
+    footprint_checked = _check(
+        states,
+        _map(data),
+        allow_known_soft_center=True,
+    )
+    assert footprint_checked.safe
+    assert footprint_checked.reason == "TRAJECTORY_COSTMAP_CLEAR"
+
+
+def test_known_soft_center_option_keeps_hard_cells_fail_closed():
+    states = np.asarray([[0.0], [0.0], [0.0], [0.0]])
+    for value, expected_reason in (
+        (-1, "TRAJECTORY_CENTER_UNKNOWN"),
+        (99, "TRAJECTORY_CENTER_NOT_FREE"),
+        (100, "TRAJECTORY_CENTER_NOT_FREE"),
+    ):
+        data = [0] * 1600
+        data[20 * 40 + 20] = value
+        result = _check(
+            states,
+            _map(data),
+            allow_known_soft_center=True,
+        )
+        assert not result.safe
+        assert result.reason == expected_reason
+        assert result.cell_value == value
+
+
+def test_known_soft_center_option_never_allows_bad_padded_footprint():
+    states = np.asarray([[0.0], [0.0], [0.0], [0.0]])
+    for value, expected_reason in (
+        (-1, "TRAJECTORY_FOOTPRINT_UNKNOWN"),
+        (100, "TRAJECTORY_FOOTPRINT_OCCUPIED"),
+    ):
+        data = [0] * 1600
+        data[20 * 40 + 20] = 98
+        data[20 * 40 + 24] = value
+        result = _check(
+            states,
+            _map(data),
+            allow_known_soft_center=True,
+        )
+        assert not result.safe
+        assert result.reason == expected_reason
+        assert result.cell_value == value
 
 
 def test_initial_prefix_option_never_allows_unknown_or_occupied_cells():

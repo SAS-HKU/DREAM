@@ -139,6 +139,7 @@ class DreamFreePlannerNode(Node):
         self.path_receipt: Optional[float] = None
         self.path_source_stamp: Optional[float] = None
         self.path_rejection_reason: Optional[str] = None
+        self.path_rejection_details: dict = {}
         self.route_status: dict = {}
         self.route_status_receipt: Optional[float] = None
         self.costmap: Optional[CostmapSnapshot] = None
@@ -393,6 +394,7 @@ class DreamFreePlannerNode(Node):
         self.path_receipt = None
         self.path_source_stamp = None
         self.path_rejection_reason = None
+        self.path_rejection_details = {}
         self.route_status = {}
         self.route_status_receipt = None
         self.last_goal_key = None
@@ -423,6 +425,7 @@ class DreamFreePlannerNode(Node):
         self.path_receipt = None
         self.path_source_stamp = None
         self.path_rejection_reason = None
+        self.path_rejection_details = {}
         if self.goal is None or message.header.frame_id != self.config.grid.frame_id:
             return
         if not message.poses:
@@ -515,6 +518,7 @@ class DreamFreePlannerNode(Node):
                 inflation_radius=self.config.mpc.navigation_inflation_radius,
                 interpolation_spacing=0.5 * self.costmap.resolution,
                 allow_initial_inflated_center_prefix=True,
+                allow_known_soft_center=True,
                 verified_start_clearance_center=start_center,
                 verified_start_clearance_radius=start_radius,
             )
@@ -522,9 +526,18 @@ class DreamFreePlannerNode(Node):
                 self.path_rejection_reason = (
                     f"PATH_START_{anchor_check.reason}"
                 )
+                self.path_rejection_details = {
+                    "path_start_costmap_sample": anchor_check.sample_index,
+                    "path_start_costmap_cell_x": anchor_check.cell_x,
+                    "path_start_costmap_cell_y": anchor_check.cell_y,
+                    "path_start_costmap_value": anchor_check.cell_value,
+                }
                 self.get_logger().warning(
                     "Rejected unsafe path-start anchor: "
-                    f"{anchor_check.reason}"
+                    f"{anchor_check.reason} "
+                    f"sample={anchor_check.sample_index} "
+                    f"cell=({anchor_check.cell_x},{anchor_check.cell_y}) "
+                    f"value={anchor_check.cell_value}"
                 )
                 return
         self.path_points = points
@@ -758,7 +771,7 @@ class DreamFreePlannerNode(Node):
         ready, reason = self._inputs_ready(now)
         if not ready:
             self.mpc.reset()
-            self._publish_stop(reason)
+            self._publish_stop(reason, self.path_rejection_details)
             return
         assert self.ego is not None
         assert self.goal is not None
@@ -850,6 +863,7 @@ class DreamFreePlannerNode(Node):
             inflation_radius=self.config.mpc.navigation_inflation_radius,
             interpolation_spacing=0.5 * self.costmap.resolution,
             allow_initial_inflated_center_prefix=True,
+            allow_known_soft_center=True,
             verified_start_clearance_center=start_center,
             verified_start_clearance_radius=start_radius,
         )
