@@ -68,8 +68,8 @@ class HardwareGateConfig:
         )
         if not all(isfinite(value) and value > 0.0 for value in positive):
             raise ValueError("hardware-gate limits and timeouts must be positive and finite")
-        if self.maximum_speed > 0.15:
-            raise ValueError("initial hardware speed cap must not exceed 0.15 m/s")
+        if self.maximum_speed > 0.20:
+            raise ValueError("reviewed hardware speed cap must not exceed 0.20 m/s")
         if self.maximum_acceleration > 0.35:
             raise ValueError("hardware acceleration cap must not exceed 0.35 m/s^2")
         if self.maximum_ackermann_angular_command > 0.198:

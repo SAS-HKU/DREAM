@@ -18,16 +18,21 @@ from launch_ros.actions import Node
 from launch_ros.parameter_descriptions import ParameterValue
 
 
-def _validate_arguments(context):
+def _validated_target_speed(value):
     try:
-        speed = float(LaunchConfiguration("target_speed").perform(context))
+        speed = float(value)
     except (TypeError, ValueError) as exc:
         raise RuntimeError("target_speed must be a finite number") from exc
-    if not isfinite(speed) or not 0.03 < speed <= 0.15:
+    if not isfinite(speed) or not 0.03 < speed <= 0.20:
         raise RuntimeError(
-            "target_speed must lie in (0.03, 0.15] m/s for the reviewed "
+            "target_speed must lie in (0.03, 0.20] m/s for the reviewed "
             "physical hardware gate"
         )
+    return speed
+
+
+def _validate_arguments(context):
+    _validated_target_speed(LaunchConfiguration("target_speed").perform(context))
     return []
 
 
@@ -179,6 +184,14 @@ def generate_launch_description():
                             target_speed, value_type=float
                         ),
                         "enforce_map_bounds": True,
+                        # The lidar is currently cropped to a forward 220 deg
+                        # field of view.  When the operator has verified the
+                        # staging clearance, let only the fixed launch-area
+                        # blind corner bootstrap into fully observed space.
+                        "verified_start_clearance_enabled": ParameterValue(
+                            staging_pose_verified, value_type=bool
+                        ),
+                        "verified_start_clearance_radius": 0.30,
                     },
                 ],
             ),

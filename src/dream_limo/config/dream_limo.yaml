@@ -188,6 +188,12 @@ dream_collision_monitor:
     map_frame: map
     publish_rate: 10.0
     scan_timeout: 0.40
+    # The installed lidar publishes at ~6.1 Hz. Retain one last-good,
+    # exact-time transformed scan through at most one rejected callback and
+    # until that accepted scan is 0.20 s old. A second consecutive rejection
+    # fails closed.
+    # The final gate independently watches raw /scan with a 0.40 s timeout.
+    scan_rejection_grace: 0.20
     mask_timeout: 0.50
     path_timeout: 0.50
     tf_timeout: 0.10

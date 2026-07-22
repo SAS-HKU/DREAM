@@ -1,10 +1,21 @@
+import importlib.util
 from pathlib import Path
 
+import pytest
 import yaml
 
 
 def _package_root() -> Path:
     return Path(__file__).resolve().parents[1]
+
+
+def _free_navigation_launch_module():
+    path = _package_root() / "launch" / "dream_free_navigation.launch.py"
+    spec = importlib.util.spec_from_file_location("dream_free_navigation", path)
+    module = importlib.util.module_from_spec(spec)
+    assert spec.loader is not None
+    spec.loader.exec_module(module)
+    return module
 
 
 def test_free_navigation_launch_has_one_controller_chain_and_safe_default():
@@ -21,9 +32,27 @@ def test_free_navigation_launch_has_one_controller_chain_and_safe_default():
     assert 'executable="velocity_smoother"' not in source
     assert 'executable="sfg_planner"' not in source
     assert 'executable="lidar_pedestrian_detector"' not in source
-    assert "0.03 < speed <= 0.15" in source
+    assert "0.03 < speed <= 0.20" in source
     assert '"use_latest_tf": True' in source
     assert '"footprint_clearance": 0.0' in source
+    assert '"verified_start_clearance_enabled": ParameterValue(' in source
+    assert 'staging_pose_verified, value_type=bool' in source
+    assert '"verified_start_clearance_radius": 0.30' in source
+
+
+@pytest.mark.parametrize("value", ["0.030001", "0.15", "0.20"])
+def test_free_navigation_accepts_reviewed_speed_range(value):
+    assert _free_navigation_launch_module()._validated_target_speed(value) == float(
+        value
+    )
+
+
+@pytest.mark.parametrize(
+    "value", ["0.03", "0", "-0.1", "0.200001", "nan", "inf", "fast"]
+)
+def test_free_navigation_rejects_speed_outside_reviewed_range(value):
+    with pytest.raises(RuntimeError, match="target_speed"):
+        _free_navigation_launch_module()._validated_target_speed(value)
 
 
 def test_nav2_costmap_and_drift_use_the_same_fixed_world_bounds():
@@ -96,3 +125,11 @@ def test_free_navigation_never_imports_or_edits_sfg_planning_code():
     assert "/cmd_vel" not in (
         root / "nav2_path_provider_node.py"
     ).read_text(encoding="utf-8")
+
+
+def test_free_planner_allows_only_known_soft_centers_with_footprint_checks():
+    source = (
+        _package_root() / "dream_limo" / "free_planner_node.py"
+    ).read_text(encoding="utf-8")
+    assert source.count("allow_known_soft_center=True") == 2
+    assert source.count("validate_swept_trajectory(") == 2

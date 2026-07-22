@@ -80,6 +80,8 @@ class DreamFreePlannerNode(Node):
         self.declare_parameter("risk_samples", 10)
         self.declare_parameter("maximum_allowed_cbf_slack", 0.05)
         self.declare_parameter("enforce_map_bounds", True)
+        self.declare_parameter("verified_start_clearance_enabled", False)
+        self.declare_parameter("verified_start_clearance_radius", 0.30)
 
         self.config = deployment_config_for_arena(
             str(self.get_parameter("arena_file").value)
@@ -99,6 +101,26 @@ class DreamFreePlannerNode(Node):
                 self.get_parameter("enforce_map_bounds").value
             ),
         )
+        self.verified_start_clearance_enabled = bool(
+            self.get_parameter("verified_start_clearance_enabled").value
+        )
+        self.verified_start_clearance_radius = float(
+            self.get_parameter("verified_start_clearance_radius").value
+        )
+        padded_radius = hypot(
+            0.5 * self.config.mpc.robot_length
+            + self.config.mpc.navigation_footprint_padding,
+            0.5 * self.config.mpc.robot_width
+            + self.config.mpc.navigation_footprint_padding,
+        )
+        if (
+            not isfinite(self.verified_start_clearance_radius)
+            or self.verified_start_clearance_radius < padded_radius
+        ):
+            raise ValueError(
+                "verified start-clearance radius must cover the complete "
+                "padded robot footprint"
+            )
 
         self.ego: Optional[EgoState] = None
         self.ego_receipt: Optional[float] = None
@@ -117,6 +139,7 @@ class DreamFreePlannerNode(Node):
         self.path_receipt: Optional[float] = None
         self.path_source_stamp: Optional[float] = None
         self.path_rejection_reason: Optional[str] = None
+        self.path_rejection_details: dict = {}
         self.route_status: dict = {}
         self.route_status_receipt: Optional[float] = None
         self.costmap: Optional[CostmapSnapshot] = None
@@ -124,6 +147,13 @@ class DreamFreePlannerNode(Node):
         self.costmap_source_stamp: Optional[float] = None
         self.goal_complete = False
         self.last_goal_key: Optional[tuple[float, float, float, float]] = None
+        self.reference_active = False
+        self.verified_start_clearance_center: Optional[
+            tuple[float, float]
+        ] = None
+        self.verified_start_clearance_available = (
+            self.verified_start_clearance_enabled
+        )
 
         reliable = QoSProfile(
             history=HistoryPolicy.KEEP_LAST,
@@ -215,6 +245,37 @@ class DreamFreePlannerNode(Node):
         self.ego = ego_from_odometry(message)
         self.ego_receipt = self._now()
         self.ego_source_stamp = stamp_to_seconds(message.header.stamp)
+        if not self.verified_start_clearance_enabled:
+            return
+        if self.verified_start_clearance_center is None:
+            self.verified_start_clearance_center = (self.ego.x, self.ego.y)
+            return
+        if self.verified_start_clearance_available:
+            displacement = hypot(
+                self.ego.x - self.verified_start_clearance_center[0],
+                self.ego.y - self.verified_start_clearance_center[1],
+            )
+            if displacement > self.verified_start_clearance_radius:
+                # This is a one-way transition.  Returning to the launch pose
+                # later cannot reuse an old operator clearance attestation.
+                self.verified_start_clearance_available = False
+                self.get_logger().info(
+                    "Exited the verified start-clearance disc; all future "
+                    "footprint samples now require live costmap observation"
+                )
+
+    def _start_clearance_contract(
+        self,
+    ) -> tuple[Optional[tuple[float, float]], Optional[float]]:
+        if (
+            not self.verified_start_clearance_available
+            or self.verified_start_clearance_center is None
+        ):
+            return None, None
+        return (
+            self.verified_start_clearance_center,
+            self.verified_start_clearance_radius,
+        )
 
     def _on_world(self, message: String) -> None:
         try:
@@ -333,6 +394,7 @@ class DreamFreePlannerNode(Node):
         self.path_receipt = None
         self.path_source_stamp = None
         self.path_rejection_reason = None
+        self.path_rejection_details = {}
         self.route_status = {}
         self.route_status_receipt = None
         self.last_goal_key = None
@@ -363,6 +425,7 @@ class DreamFreePlannerNode(Node):
         self.path_receipt = None
         self.path_source_stamp = None
         self.path_rejection_reason = None
+        self.path_rejection_details = {}
         if self.goal is None or message.header.frame_id != self.config.grid.frame_id:
             return
         if not message.poses:
@@ -428,15 +491,23 @@ class DreamFreePlannerNode(Node):
                     "Rejected path-start anchor without a live costmap and ego"
                 )
                 return
+            # Include the next Nav2 pose as well as the omitted first pose.
+            # A verified blind-corner bootstrap is accepted only if the
+            # complete padded footprint becomes live-costmap-known again by
+            # the end of this short prefix.
+            anchor_pose_count = min(3, points.shape[0])
+            anchor_yaws = [self.ego.yaw]
+            anchor_yaws.extend(path_yaws[: anchor_pose_count - 1])
             anchor_states = np.asarray(
                 [
-                    [self.ego.x, points[1, 0]],
-                    [self.ego.y, points[1, 1]],
-                    [self.ego.speed, self.ego.speed],
-                    [self.ego.yaw, path_yaws[0]],
+                    points[:anchor_pose_count, 0],
+                    points[:anchor_pose_count, 1],
+                    [self.ego.speed] * anchor_pose_count,
+                    anchor_yaws,
                 ],
                 dtype=np.float64,
             )
+            start_center, start_radius = self._start_clearance_contract()
             anchor_check = validate_swept_trajectory(
                 anchor_states,
                 self.costmap,
@@ -447,14 +518,26 @@ class DreamFreePlannerNode(Node):
                 inflation_radius=self.config.mpc.navigation_inflation_radius,
                 interpolation_spacing=0.5 * self.costmap.resolution,
                 allow_initial_inflated_center_prefix=True,
+                allow_known_soft_center=True,
+                verified_start_clearance_center=start_center,
+                verified_start_clearance_radius=start_radius,
             )
             if not anchor_check.safe:
                 self.path_rejection_reason = (
                     f"PATH_START_{anchor_check.reason}"
                 )
+                self.path_rejection_details = {
+                    "path_start_costmap_sample": anchor_check.sample_index,
+                    "path_start_costmap_cell_x": anchor_check.cell_x,
+                    "path_start_costmap_cell_y": anchor_check.cell_y,
+                    "path_start_costmap_value": anchor_check.cell_value,
+                }
                 self.get_logger().warning(
                     "Rejected unsafe path-start anchor: "
-                    f"{anchor_check.reason}"
+                    f"{anchor_check.reason} "
+                    f"sample={anchor_check.sample_index} "
+                    f"cell=({anchor_check.cell_x},{anchor_check.cell_y}) "
+                    f"value={anchor_check.cell_value}"
                 )
                 return
         self.path_points = points
@@ -550,6 +633,15 @@ class DreamFreePlannerNode(Node):
         }
 
     def _publish_stop(self, reason: str, details: Optional[dict] = None) -> None:
+        if self.reference_active:
+            # Do not leave a previously accepted MPC path visible or usable
+            # after the current planning cycle has failed closed.  This also
+            # invalidates collision-monitor trajectory evidence immediately.
+            empty_reference = Path()
+            empty_reference.header.stamp = self.get_clock().now().to_msg()
+            empty_reference.header.frame_id = self.config.grid.frame_id
+            self.path_publisher.publish(empty_reference)
+            self.reference_active = False
         control = TwistStamped()
         control.header.stamp = self.get_clock().now().to_msg()
         control.header.frame_id = "base_link"
@@ -570,6 +662,14 @@ class DreamFreePlannerNode(Node):
                 self.get_parameter("maximum_allowed_cbf_slack").value
             ),
             "map_bounds_enforced": self.mpc.enforce_map_bounds,
+            "verified_start_clearance_active": (
+                self.verified_start_clearance_available
+            ),
+            "verified_start_clearance_radius": (
+                self.verified_start_clearance_radius
+                if self.verified_start_clearance_enabled
+                else None
+            ),
             **self._goal_status(),
         }
         if details:
@@ -596,6 +696,7 @@ class DreamFreePlannerNode(Node):
             pose.pose.orientation.w = qw
             path.poses.append(pose)
         self.path_publisher.publish(path)
+        self.reference_active = True
 
     @staticmethod
     def _angle_error(first: float, second: float) -> float:
@@ -670,7 +771,7 @@ class DreamFreePlannerNode(Node):
         ready, reason = self._inputs_ready(now)
         if not ready:
             self.mpc.reset()
-            self._publish_stop(reason)
+            self._publish_stop(reason, self.path_rejection_details)
             return
         assert self.ego is not None
         assert self.goal is not None
@@ -751,6 +852,7 @@ class DreamFreePlannerNode(Node):
             return
 
         assert self.costmap is not None
+        start_center, start_radius = self._start_clearance_contract()
         trajectory_check = validate_swept_trajectory(
             result.states,
             self.costmap,
@@ -761,6 +863,9 @@ class DreamFreePlannerNode(Node):
             inflation_radius=self.config.mpc.navigation_inflation_radius,
             interpolation_spacing=0.5 * self.costmap.resolution,
             allow_initial_inflated_center_prefix=True,
+            allow_known_soft_center=True,
+            verified_start_clearance_center=start_center,
+            verified_start_clearance_radius=start_radius,
         )
         if not trajectory_check.safe:
             self.mpc.reset()
@@ -854,6 +959,14 @@ class DreamFreePlannerNode(Node):
                         "maximum_cbf_slack": result.maximum_slack,
                         "maximum_allowed_cbf_slack": maximum_allowed_slack,
                         "map_bounds_enforced": self.mpc.enforce_map_bounds,
+                        "verified_start_clearance_active": (
+                            self.verified_start_clearance_available
+                        ),
+                        "verified_start_clearance_radius": (
+                            self.verified_start_clearance_radius
+                            if self.verified_start_clearance_enabled
+                            else None
+                        ),
                         **self._goal_status(),
                     },
                     separators=(",", ":"),

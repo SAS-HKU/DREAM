@@ -78,6 +78,19 @@ Expected sibling layout:
 └── sfg_nav/
 ```
 
+Keep one canonical `dream_limo` source tree. For a fresh checkout, link the
+package from this repository into the ROS workspace instead of maintaining a
+second copied version that can silently overwrite newer installed code:
+
+```bash
+mkdir -p "$HOME/limo_lvv_ws/src"
+ln -s "$HOME/DREAM/src/dream_limo" "$HOME/limo_lvv_ws/src/dream_limo"
+```
+
+If `~/limo_lvv_ws/src/dream_limo` already exists, first verify whether it is
+the current repository package; do not overwrite an existing directory with
+the command above.
+
 ```bash
 cd "$HOME/limo_lvv_ws"
 source /opt/ros/humble/setup.bash
@@ -194,6 +207,17 @@ Physical output requires explicit per-run safety attestations. They are not
 environment geometry parameters; they assert that the chassis watchdog,
 staging, and independent operator stop were actually checked.
 
+For this launch, `staging_pose_verified:=true` also attests that the fixed
+0.30 m-radius disc around the robot's launch pose has been physically inspected
+and is clear, and that people and movable objects will be kept out of it until
+the robot exits that disc. This is needed because the installed LiDAR is
+currently cropped to a forward 220-degree field of view: a padded rear corner
+can become unobservable during the first small steering motion. The exception
+is limited to that fixed start disc, requires the footprint at rest to be fully
+known/free, requires the trajectory to recover into fully observed space, and
+never permits an occupied cell. It cannot be reused after the robot leaves the
+disc.
+
 For the first motion use 0.10–0.15 m/s:
 
 ```bash
@@ -217,8 +241,11 @@ point. The robot remains stopped until the goal, route, DRIFT warm-up, collision
 motion mode, ownership checks, and readiness countdown all pass. No joystick
 is required. `target_speed` is a cap/nominal cruise value, not a forced speed;
 DREAM may slow or stop for risk and obstacles. The reviewed physical gate
-accepts `0.03 < target_speed <= 0.15` m/s. A higher command-line value is
-rejected rather than silently clipped.
+accepts `0.03 < target_speed <= 0.20` m/s. Use at most 0.15 m/s for the first
+straight-line commissioning run, then 0.20 m/s for the next step. Values above
+0.20 m/s are rejected rather than silently clipped. The 0.20 m/s step retains
+the 0.35 m/s² acceleration cap; 0.25–0.30 m/s has not passed the current
+onboard solver/stopping-margin review.
 
 Stop the mission immediately through ROS with:
 
@@ -334,11 +361,12 @@ requires no coordinate or mission-distance entry.
 The core swept-trajectory validator is strict by default: every centre sample
 must have zero cost. It also exposes an explicit startup-recovery option for a
 robot already inside soft inflation. That option permits only an initial
-contiguous prefix of costs 1 through 98, and each successive positive centre
-cost must hold or decrease. The finite horizon need not reach zero, but after
-the first zero-cost centre, positive-cost re-entry is rejected. Cost 99
-(Nav2's inscribed value), unknown or occupied centre cells, and any unknown or
-occupied padded-footprint sample remain hard failures in both modes.
+recovery beginning at cost 1 through 98, and each successive positive centre
+cost must hold or decrease. Zero-valued grid gaps may occur inside a discretized
+inflation band and do not reset that bound. Once a later control horizon starts
+at zero cost, it cannot enter positive cost. Cost 99 (Nav2's inscribed value),
+unknown or occupied centre cells, and any unknown or occupied padded-footprint
+sample remain hard failures in both modes.
 
 ## Record an A/B run
 
@@ -401,10 +429,21 @@ They are not the physical free-navigation workflow.
 - **Planner is ready but no motion:** inspect
   `/dream/hardware_gate_status.reason`; a non-ready safety condition always
   overrides target speed.
-- **`PATH_START_TRAJECTORY_CENTER_INFLATION_INCREASE`:** the robot is already
-  inside soft obstacle inflation and the proposed first segment moves closer
-  to the return. Stage it with more clearance or select a route that initially
-  moves away; do not raise a tolerance to force motion.
+- **`PATH_START_TRAJECTORY_FOOTPRINT_UNKNOWN`:** the path-start footprint has
+  not met the bounded launch-clearance contract. Confirm that the complete
+  0.30 m start disc is physically clear, that `staging_pose_verified:=true`
+  reached the planner, and that the proposed short prefix becomes fully known.
+  Unknown footprint cells outside the fixed start disc remain rejected.
+- **`PATH_START_TRAJECTORY_CENTER_NOT_FREE` or
+  `TRAJECTORY_CENTER_NOT_FREE`:** the centre reached Nav2's inscribed/lethal
+  range (cost 99–100), not ordinary soft inflation. Choose a route with more
+  clearance; do not raise the hard-cell threshold.
+- **The robot moves briefly and stops:** do not keep clicking replacement
+  goals; every new goal intentionally disarms the old mission and restarts the
+  readiness countdown. Inspect the planner reason. Known Nav2 soft-inflation
+  costs 1–98 are accepted only when the complete swept padded footprint is
+  known and contains no lethal cell. Unknown, inscribed cost 99, lethal cost
+  100, and the independent LiDAR collision envelope remain hard stops.
 - **`DECISION_RISK_VETO`:** the balanced DREAM arm is intentionally yielding
   to route risk. This is controller behavior, not a lost RViz goal. Record it
   as a veto activation; the matched `pure_mpc` arm disables this DREAM veto but
@@ -422,6 +461,10 @@ They are not the physical free-navigation workflow.
   inspect `/dream/planner_status`; the hardware gate rejects it.
 - **Repeated countdown:** observe `/dream/hardware_gate_status` continuously.
   Any stale or changing prerequisite restarts the three-second countdown.
+  The collision monitor may retain one last-good exact-TF scan through one
+  rejected callback, but only until that accepted scan is 0.20 s old. A second
+  consecutive rejection fails closed, while the final hardware gate
+  independently enforces its 0.40 s raw-scan watchdog.
 - **Duplicate owners:** stop all DREAM/SFG launches, wait for child processes,
   then start exactly one primary launch.
 

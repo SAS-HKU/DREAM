@@ -342,8 +342,9 @@ def test_repeated_countdown_cycles_preserve_start_and_report_remaining_time():
 
 
 def test_hardware_config_rejects_weakened_caps_and_timeouts():
+    assert HardwareGateConfig(maximum_speed=0.20).maximum_speed == 0.20
     with pytest.raises(ValueError):
-        HardwareGateConfig(maximum_speed=0.151)
+        HardwareGateConfig(maximum_speed=0.200001)
     with pytest.raises(ValueError):
         HardwareGateConfig(maximum_acceleration=0.351)
     with pytest.raises(ValueError):
