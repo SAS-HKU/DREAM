@@ -62,6 +62,8 @@ def validate_swept_trajectory(
     inflation_radius: float,
     interpolation_spacing: float | None = None,
     allow_initial_inflated_center_prefix: bool = False,
+    verified_start_clearance_center: Sequence[float] | None = None,
+    verified_start_clearance_radius: float | None = None,
 ) -> InflatedCostmapCheck:
     """Require a solved trajectory to remain in known, footprint-safe space.
 
@@ -84,6 +86,17 @@ def validate_swept_trajectory(
     closed.  Cost 99 (Nav2's inscribed value), unknown or occupied centre
     cells, and unknown or occupied padded-footprint samples are never
     permitted.  The default remains the strict zero-centre policy.
+
+    A front-limited lidar cannot observe a rear padded-footprint corner during
+    a small initial turn, even when the complete footprint at rest is known
+    free.  ``verified_start_clearance_center`` and
+    ``verified_start_clearance_radius`` provide a separate, opt-in bootstrap
+    contract for that exact case.  The *first* footprint must still be fully
+    known and free.  Later unknown footprint samples are permitted only inside
+    the fixed, operator-verified start-clearance disc, must recover to a fully
+    known footprint before the trajectory ends, and may not re-enter unknown
+    space.  Unknown centre cells, occupied cells, and unknown footprint cells
+    anywhere outside that disc always fail closed.
     """
 
     values = (
@@ -103,6 +116,38 @@ def validate_swept_trajectory(
         return InflatedCostmapCheck(False, "TRAJECTORY_FOOTPRINT_CONFIG_INVALID")
     if not _metadata_valid(costmap, expected_frame):
         return InflatedCostmapCheck(False, "TRAJECTORY_COSTMAP_INVALID")
+
+    start_clearance: np.ndarray | None = None
+    start_clearance_radius: float | None = None
+    if (
+        verified_start_clearance_center is None
+        and verified_start_clearance_radius is not None
+    ) or (
+        verified_start_clearance_center is not None
+        and verified_start_clearance_radius is None
+    ):
+        return InflatedCostmapCheck(
+            False, "TRAJECTORY_START_CLEARANCE_CONFIG_INVALID"
+        )
+    if verified_start_clearance_center is not None:
+        try:
+            start_clearance = np.asarray(
+                verified_start_clearance_center, dtype=np.float64
+            )
+            start_clearance_radius = float(verified_start_clearance_radius)
+        except (TypeError, ValueError):
+            return InflatedCostmapCheck(
+                False, "TRAJECTORY_START_CLEARANCE_CONFIG_INVALID"
+            )
+        if (
+            start_clearance.shape != (2,)
+            or not np.all(np.isfinite(start_clearance))
+            or not isfinite(start_clearance_radius)
+            or start_clearance_radius <= 0.0
+        ):
+            return InflatedCostmapCheck(
+                False, "TRAJECTORY_START_CLEARANCE_CONFIG_INVALID"
+            )
 
     spacing = (
         0.5 * costmap.resolution
@@ -148,6 +193,23 @@ def validate_swept_trajectory(
         return InflatedCostmapCheck(
             False, "TRAJECTORY_INFLATION_CONTRACT_INVALID"
         )
+    if (
+        start_clearance_radius is not None
+        and start_clearance_radius + 1.0e-12 < required_inflation
+    ):
+        return InflatedCostmapCheck(
+            False, "TRAJECTORY_START_CLEARANCE_CONFIG_INVALID"
+        )
+
+    start_clearance_active = bool(
+        start_clearance is not None
+        and start_clearance_radius is not None
+        and hypot(
+            float(poses[0, 0] - start_clearance[0]),
+            float(poses[0, 1] - start_clearance[1]),
+        )
+        <= start_clearance_radius + 1.0e-12
+    )
 
     swept: list[np.ndarray] = [poses[0]]
     for start, end in zip(poses[:-1], poses[1:]):
@@ -162,6 +224,8 @@ def validate_swept_trajectory(
 
     initial_soft_recovery = False
     previous_positive_center_cost: int | None = None
+    start_unknown_seen = False
+    start_unknown_recovered = False
     for sample_index, pose in enumerate(swept):
         x, y, yaw = (float(value) for value in pose)
         cell_x, cell_y, value = _cell(costmap, x, y)
@@ -226,6 +290,7 @@ def validate_swept_trajectory(
             dtype=np.float64,
         )
         world_samples = footprint_samples @ rotation.T + np.asarray([x, y])
+        sample_has_allowed_unknown = False
         for point in world_samples:
             foot_x, foot_y, foot_value = _cell(costmap, point[0], point[1])
             if foot_value is None:
@@ -238,14 +303,28 @@ def validate_swept_trajectory(
                     foot_value,
                 )
             if foot_value < 0:
-                return InflatedCostmapCheck(
-                    False,
-                    "TRAJECTORY_FOOTPRINT_UNKNOWN",
-                    sample_index,
-                    foot_x,
-                    foot_y,
-                    foot_value,
+                point_in_verified_start = bool(
+                    start_clearance_active
+                    and sample_index > 0
+                    and not start_unknown_recovered
+                    and start_clearance is not None
+                    and start_clearance_radius is not None
+                    and hypot(
+                        float(point[0] - start_clearance[0]),
+                        float(point[1] - start_clearance[1]),
+                    )
+                    <= start_clearance_radius + 1.0e-12
                 )
+                if not point_in_verified_start:
+                    return InflatedCostmapCheck(
+                        False,
+                        "TRAJECTORY_FOOTPRINT_UNKNOWN",
+                        sample_index,
+                        foot_x,
+                        foot_y,
+                        foot_value,
+                    )
+                sample_has_allowed_unknown = True
             if foot_value >= 100:
                 return InflatedCostmapCheck(
                     False,
@@ -255,4 +334,12 @@ def validate_swept_trajectory(
                     foot_y,
                     foot_value,
                 )
+        if sample_has_allowed_unknown:
+            start_unknown_seen = True
+        elif start_unknown_seen:
+            start_unknown_recovered = True
+    if start_unknown_seen and not start_unknown_recovered:
+        return InflatedCostmapCheck(
+            False, "TRAJECTORY_START_CLEARANCE_NOT_RECOVERED"
+        )
     return InflatedCostmapCheck(True, "TRAJECTORY_COSTMAP_CLEAR")

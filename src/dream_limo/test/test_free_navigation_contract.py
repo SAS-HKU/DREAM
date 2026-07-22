@@ -24,6 +24,9 @@ def test_free_navigation_launch_has_one_controller_chain_and_safe_default():
     assert "0.03 < speed <= 0.15" in source
     assert '"use_latest_tf": True' in source
     assert '"footprint_clearance": 0.0' in source
+    assert '"verified_start_clearance_enabled": ParameterValue(' in source
+    assert 'staging_pose_verified, value_type=bool' in source
+    assert '"verified_start_clearance_radius": 0.30' in source
 
 
 def test_nav2_costmap_and_drift_use_the_same_fixed_world_bounds():

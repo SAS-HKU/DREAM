@@ -179,6 +179,14 @@ def generate_launch_description():
                             target_speed, value_type=float
                         ),
                         "enforce_map_bounds": True,
+                        # The lidar is currently cropped to a forward 220 deg
+                        # field of view.  When the operator has verified the
+                        # staging clearance, let only the fixed launch-area
+                        # blind corner bootstrap into fully observed space.
+                        "verified_start_clearance_enabled": ParameterValue(
+                            staging_pose_verified, value_type=bool
+                        ),
+                        "verified_start_clearance_radius": 0.30,
                     },
                 ],
             ),
