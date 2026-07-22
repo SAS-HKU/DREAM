@@ -10,10 +10,6 @@ There is no mission distance, lane coordinate, occluder pose, or terminal goal
 to configure. The clicked pose is validated against the live LiDAR costmap.
 Unknown/occluded cells and occupied/inflated cells are rejected.
 
-The package is a sibling of `sfg_nav`. It does not modify or run the SFG
-planner. It reuses only SFG's public, class-neutral LiDAR clustering executable
-and message convention; DREAM owns tracking, risk, decision-making, MPC, and
-all command output.
 
 ## What runs
 
