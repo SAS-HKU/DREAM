@@ -224,11 +224,11 @@ The baseline planner forced the ego to perform very aggressive and dangerous ove
 We compare the trajectories of (1): the ground truth ego trajectories from BEV datasets; (2): the baseline planner trajectories; (3): the DREAM planner trajectories.
 The results show that baseline planner is over aggressive as near collision with the truck rear, and our planner is more conservative but sacrifice the progress. (The selected scenario include the occlusion-aware planning from the truck-trailer that may block the visibility of the ego)
 
-## ROS 2 LIMO deployment
+## ROS2 deployment
 
 The standalone ROS 2 Humble package for arbitrary RViz-goal navigation,
 LiDAR-derived occlusion risk, sudden-merger tracking, and DREAM-versus-pure-MPC
-physical A/B tests is in [`src/dream_limo`](src/dream_limo/README.md). 
+physical A/B tests is in [`src/dream_limo`](src/dream_limo/README.md). The platform is open-sourced from [agilexrobotics](https://github.com/agilexrobotics/limo_ros2_doc/blob/master/LIMO-ROS2-humble(EN).md)
 
 ![platform validation result](assests/platform_result.jpg)
 
