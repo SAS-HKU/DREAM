@@ -259,16 +259,3 @@ Physical OACP-VB motion is launch-gated when the calibration acknowledgement is
 false. Uncalibrated physical logging is explicitly non-comparison work and is
 capped at 0.15 m/s. `v_occ_max` is the shared commanded cruise speed and
 `v_occ_min` defaults to 55% of that speed.
-
-## Claims boundary
-
-This repository may claim only that it evaluates an independently implemented
-phantom-reachability risk and dynamic velocity boundary inside the shared LIMO
-controller. It may not claim reproduction of “OACP,” equivalence to the
-published planner, transfer of its proof, or attribution of measured LIMO
-performance to Zheng et al.
-
-Published traversal-time, safety, comfort, and solver-time results are context,
-not expected results for this arm. Any local result must be reported as an
-OACP-VB result with its controller fingerprint, calibration record, slack
-activations, solve timings for both branches, and the deviations above.
