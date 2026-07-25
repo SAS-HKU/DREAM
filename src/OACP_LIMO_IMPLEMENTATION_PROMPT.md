@@ -1,389 +1,371 @@
-# Implementation Prompt: Occlusion-Aware Contingency Planning on LIMO ROS 2 Humble
-
-Use the following prompt as the complete task specification for the LIMO implementation agent.
-
----
-
-You are a senior ROS 2 Humble autonomy engineer and motion-planning researcher working in the existing LIMO workspace. Implement and validate an occlusion-aware contingency planner based on:
-
-- Paper PDF: `C:\Users\IMSE\Downloads\Occlusion-Aware_Contingency_Safety-Critical_Planning_for_Autonomous_Driving.pdf`
-- Project page: <https://zack4417.github.io/oacp-website/>
-- Open-access paper record: <https://arxiv.org/abs/2502.06359>
-- Paper DOI: <https://doi.org/10.1109/TCYB.2025.3632366>
-- Current workspace: `D:\limo_ros2-humble`
-
-The goal is a reproducible ROS 2 simulation and a hardware-ready control path for an AgileX LIMO in this scenario: the ego travels in the left lane and passes a tall, large static obstacle in the middle lane. That obstacle hides the right lane. The ego must slow or maintain a cautious fallback while a potentially conflicting right-lane vehicle is hidden, then either brake/continue cautiously if a conflict appears or accelerate/progress when the occluded region is revealed to be clear.
-
-## Operating rules
-
-1. Inspect the repository and the cited paper before editing. Preserve existing user work and avoid unrelated rewrites.
-2. Work in small, runnable phases. Build and test after each phase; report commands, results, remaining failures, and unexecuted checks.
-3. Do not claim a paper-faithful reproduction unless every paper equation and assumption used by the implementation is traceable to code and tests.
-4. Do not allow the planner to consume simulator ground truth for a hidden actor. Ground truth may be used only by the simulated-perception adapter and evaluator. The planner must receive the same visibility-limited interface intended for hardware.
-5. Do not use Nav2/DWB, a hand-written speed heuristic, or a generic MPC as a substitute for the requested final planner. A simple controller may be used only for early bring-up or as an explicitly labeled emergency fallback.
-6. Keep an independent command watchdog and emergency-stop path. If planning is stale, infeasible, nonfinite, or misses its deadline, command a bounded controlled stop.
-7. Treat this as experimental safety research, not a certified safety guarantee. Document all unverified assumptions.
-8. Do not begin physical-robot testing until simulation acceptance criteria pass and a human explicitly authorizes hardware use.
-
-## Repository facts that must shape the implementation
-
-The current workspace is a minimal platform repository, not a navigation stack:
-
-- `limo_base` is the physical serial driver. It subscribes to absolute `/cmd_vel` and publishes `/odom`, `/imu`, and `/limo_status`.
-- In Ackermann mode, `limo_base/src/limo_driver.cpp` interprets `Twist.linear.x = v` and `Twist.angular.z = yaw_rate`; it derives steering through `r = v / yaw_rate` and a wheelbase model. Do not publish a steering angle in `angular.z`.
-- The physical driver constants are wheelbase `0.20 m`, track `0.172 m`, and maximum inner steering angle about `0.48869 rad`.
-- The main `limo_car` Gazebo model uses wheelbase `0.24 m`, track `0.168 m`, a `100 Hz` Ackermann plugin, `/cmd_vel`, and `/odom`. This model/driver wheelbase mismatch must be made explicit and configurable; do not silently tune around it.
-- The simulated 2-D lidar publishes `scan`, covers about `240 deg`, ranges from `0.2 m` to `8.0 m`, and updates at only `8 Hz`. The depth camera updates at `10 Hz`; the simulated IMU at `100 Hz`.
-- `limo_car/launch/ackermann_gazebo.launch.py` points to `worlds/empty_world.model`, but `limo_car/worlds` is absent. `limo_car/CMakeLists.txt` also installs absent `log`, `src`, and `worlds` directories. Repair or supersede this launch path as part of Phase 0.
-- `limo_bringup` is named in documentation and referenced by `open_ydlidar_launch.py`, but is absent from this folder.
-- The repository snapshot is not a Git working tree. Do not rely on Git for rollback or status reporting.
-- Topic names differ between simulation and physical launch conventions. Make state, scan, and command topics parameters; verify the actual ROS graph rather than assuming the `/wheel/odom` remap works with the driver's absolute `/odom` publisher.
-
-Do not modify `limo_base` unless a verified interface defect makes it necessary. Prefer adapter nodes and parameters in new packages.
-
-## Scientific fidelity contract
-
-Create `PAPER_TRACEABILITY.md` and maintain a table with columns:
-
-`Paper item | Meaning | Code symbol/file | Parameter source | Unit test/integration test | Fidelity status | Notes/deviation`
-
-At minimum trace:
-
-- Eq. (1): discrete Dubins-car state `[p_x, p_y, theta, v]` and controls `[yaw_rate, acceleration]`.
-- Eqs. (4)-(6): elliptical spatiotemporal barrier and relative obstacle angle.
-- Eqs. (7)-(9): order-10 Bezier/Bernstein trajectory parameterization.
-- Eqs. (10)-(13): simplified reachability quantification (SRQ) for longitudinal and lateral occlusion risk.
-- Eqs. (14)-(15): dynamic maximum velocity boundary.
-- Eqs. (16)-(18): costs and biconvex constraints.
-- Eqs. (19)-(31): augmented Lagrangian, primal/slack/consensus/dual updates.
-- Algorithm 1: receding-horizon loop, residual threshold, and command application.
-- Paper assumptions: free space is detected within the field of view; phantom vehicles stay in their lane, have constant velocity, and use a uniform speed distribution.
-
-Use the paper's final IEEE version in the attached PDF as the primary mathematical source. The public project page is secondary evidence for timing and hardware setup. No official source-code release is provided by those sources, so do not invent undocumented implementation details.
-
-The paper does not fully specify several integration choices. Mark the following as `implementation-specific`, not paper-derived:
-
-- extracting occluded lane intervals from sensor/map geometry;
-- associating and tracking visible objects;
-- selecting the executed branch after new observations;
-- mapping planned states to LIMO `/cmd_vel` commands;
-- emergency behavior and planner-deadline handling;
-- the requested three-lane scenario geometry.
-
-Also document these paper ambiguities instead of silently resolving them:
-
-- The article says the branch selector uses goal tracking, lateral deviation, safety, comfort, and consistency costs from prior work, but does not fully specify that selector here.
-- The text/figures use exploration/fallback color labels inconsistently in places.
-- With the same risk input and otherwise equal limits, Eq. (14) plus the reported maximum risk thresholds can produce unintuitive branch ordering. Log each branch's risk and velocity limit; add a semantic-ordering test; never swap thresholds merely to make a plot look right.
-
-## Scenario correction required for a meaningful experiment
-
-Three parallel lanes do not by themselves create a collision contingency if the ego stays in the left lane and the hidden vehicle stays in the right lane. The implementation must include both:
-
-1. A **conflict scenario** in which the hidden right-lane actor's admissible route or forward reachable set merges into or crosses the ego corridor within the prediction horizon.
-2. A **nonconflict control scenario** in which the hidden actor remains in a disjoint right-lane corridor and the FRS-intersection gate correctly suppresses irrelevant occlusion risk.
-
-This distinction is mandatory. A demo that brakes simply because something is hidden, without a reachable conflict, does not validate the method.
-
-Use a configurable, approximately 1:10-scale test geometry as the initial default, then tune only through YAML:
-
-- world frame: `map`; ego travels in `+x`;
-- three parallel lane centerlines near `y = +0.55, 0.0, -0.55 m` with configurable width around `0.45-0.50 m`;
-- ego start near `x = -2.5 m` in the left lane; goal beyond `x = +2.5 m`;
-- a static middle-lane occluder approximately `0.7-1.0 m` long, `0.30-0.40 m` wide, and tall enough to block the selected sensor rays;
-- right-lane phantom maximum speed initially `1.0 m/s`, matching the paper's real-robot setting;
-- nominal ego speed initially `0.5 m/s`, cautious speed around `0.3 m/s`, subject to measured LIMO limits;
-- safe ellipse initial axes around `0.06 m` only as a paper-derived starting point; inflate them by robot footprint, localization uncertainty, and tracking uncertainty before using them as a separation requirement.
-
-Provide at least these deterministic scenario variants with fixed seeds:
-
-- `clear_no_phantom`: occluded region is empty; ego cautiously approaches then progresses after visibility clears.
-- `hidden_nonconflicting`: an actor exists in the right lane but its FRS is disjoint from the ego corridor; risk gating avoids unnecessary braking.
-- `hidden_conflicting_merge`: the hidden actor can merge/cross into the ego corridor; ego slows before exposure and chooses/maintains the fallback.
-- `late_fast_emergence`: a worst-case actor appears near the configured phantom-speed bound; safety supervisor remains collision-free or reaches a stopped safe state.
-- `visible_conflicting`: same conflict without occlusion, used to separate tracking/control behavior from occlusion reasoning.
-- `occlusion_ignorant_ablation`: same planner with occlusion risk disabled, for comparison only.
-
-## Package and component architecture
-
-Create modular ROS 2 Humble packages rather than one monolithic node. A recommended layout is:
-
-### `limo_oacp_msgs`
-
-Use a new interface package or carefully extend `limo_msgs`. Define only the messages needed to avoid a heavy `vision_msgs` dependency. Suggested interfaces:
-
-- `TrackedObject.msg`: ID, timestamp, pose, twist, footprint dimensions/polygon, classification, covariance or conservative uncertainty bounds.
-- `TrackedObjectArray.msg`.
-- `OccludedLaneSegment.msg`: lane ID, `s_start`, `s_end`, lane width, maximum phantom speed, confidence, source frame, and active flag.
-- `OacpPlannerStatus.msg`: risk values, exploration/fallback velocity bounds, branch, solver status, solve time, iteration count, residuals, command age, and fail-safe reason.
-
-### `limo_oacp_perception`
-
-Implement two replaceable adapters behind the same output contract:
-
-- A simulation adapter may subscribe to Gazebo model states but must ray-cast against configured occluder polygons and publish only visible objects to the planner-facing topic.
-- A hardware adapter consumes real tracked objects/free-space data when available. For the initial milestone it may be a documented stub, but planner interfaces must not require Gazebo types.
-- An occlusion extractor combines ego pose, lane centerlines, sensor field of view/range, and static occluder polygons to publish lane-coordinate occluded intervals.
-
-Add an explicit information-flow test: no planner/controller executable may subscribe to raw Gazebo model states or the evaluator's ground-truth topics.
-
-### `limo_oacp_planner`
-
-Implement separable, testable libraries/classes:
-
-- `BernsteinBasis` / `BezierTrajectory`;
-- `OcclusionRiskAssessor` implementing SRQ and FRS-intersection gating;
-- `SpatiotemporalBarrier`;
-- `ConsensusAdmmSolver`;
-- `ContingencyPlanner` producing exploration and fallback trajectories with a shared initial segment;
-- `TrajectorySelector` with a transparent, configurable implementation-specific policy;
-- `SafetySupervisor` for validation, stale-plan handling, and controlled stop.
-
-The planner node should publish both branches, the shared segment, selected path, RViz markers, and full status. Keep the numerical core independent of ROS messages so it can be unit-tested.
-
-### `limo_oacp_control`
-
-Implement trajectory tracking and a watchdog:
-
-- subscribe to the selected trajectory and odometry;
-- use feedforward curvature/yaw-rate plus bounded feedback or another clearly documented LIMO-appropriate tracker;
-- publish `geometry_msgs/msg/Twist` to a configurable command topic, default `/cmd_vel`;
-- set `linear.x = commanded longitudinal speed` and `angular.z = commanded yaw rate = v * curvature`;
-- never put steering angle directly in `angular.z`;
-- guard zero/near-zero speed, saturate yaw rate/curvature/acceleration, and continuously publish zero during a stop;
-- stop on stale odometry, stale trajectory, solver failure, nonfinite values, excessive tracking error, emergency stop, or node shutdown.
-
-### `limo_oacp_sim`
-
-Provide:
-
-- a valid Gazebo Classic world and launch file for the requested three-lane scenario;
-- models for the large static occluder and scripted visible/phantom actors;
-- scenario YAML files, deterministic actor routes, and reset support;
-- RViz configuration showing visible objects, occluded intervals, phantom reachable sets/risk field, both trajectories, shared segment, selected branch, safety ellipses, and text status;
-- an evaluator that may consume ground truth but never republishes it on planner-facing topics;
-- rosbag/CSV logging and repeatable batch trials.
-
-### `limo_oacp_bringup`
-
-Provide separate launch files for:
-
-- simulation;
-- planner/controller with recorded inputs;
-- hardware dry-run with commands disabled;
-- hardware operation with an explicit `enable_motion:=true` gate.
-
-If fewer packages are chosen, preserve these dependency boundaries as components/libraries and explain the reason in the README.
-
-## ROS interface contract
-
-Use parameters/remappings rather than absolute names inside new code. Recommended defaults:
-
-| Direction | Topic | Type | Notes |
-|---|---|---|---|
-| input | `/odom` | `nav_msgs/msg/Odometry` | configurable; verify simulation/hardware graph |
-| input | `/scan` | `sensor_msgs/msg/LaserScan` | optional validation/input to occlusion adapter |
-| input | `/oacp/visible_objects` | custom array | never contains hidden ground truth |
-| input | `/oacp/occluded_segments` | custom array/message | lane-coordinate PVS input |
-| input | `/oacp/emergency_stop` | `std_msgs/msg/Bool` | latched/safety QoS as appropriate |
-| output | `/oacp/exploration_path` | `nav_msgs/msg/Path` | full horizon |
-| output | `/oacp/fallback_path` | `nav_msgs/msg/Path` | full horizon |
-| output | `/oacp/shared_path` | `nav_msgs/msg/Path` | first `N_s` points |
-| output | `/oacp/selected_path` | trajectory/path contract | must include time/speed, not positions alone |
-| output | `/oacp/risk_markers` | `visualization_msgs/msg/MarkerArray` | risk/PVS/FRS visualization |
-| output | `/oacp/status` | custom status | solver and safety diagnostics |
-| output | `/cmd_vel` | `geometry_msgs/msg/Twist` | only controller/supervisor publishes in normal operation |
-
-Avoid two normal-operation publishers racing on `/cmd_vel`. Use a mux or make the supervisor the sole final publisher.
-
-## Algorithm requirements
-
-### 1. State, timing, and scaling
-
-Final planner requirements:
-
-- order-10 Bezier trajectories;
-- two branches: exploration `j=0` and fallback `j=1`;
-- planning horizon `N = 40`, `dt = 0.1 s`, replanning at `10 Hz` as the initial paper-derived configuration;
-- shared horizon `N_s = 5` and free steps `N_d = 5` initially;
-- maximum ADMM iterations `200` and relative primal residual threshold `0.1` initially;
-- barrier coefficient schedule initially linear from `0.4` to `1.0` across the horizon;
-- warm-start from the shifted previous solution;
-- use Eigen's stable decompositions, including `HouseholderQR` or an equivalent documented stable factorization, for the paper's linear systems;
-- all units in SI and parameters in YAML with declared ranges and validation.
-
-The paper's simulation-scale weights are starting points, not automatically valid LIMO tuning: `Q_theta=150`, `Q_x=100`, `Q_y=100`, `Q_1=50`, `Q_2=100`, with ADMM penalties initially `5`. Keep them configurable and log the exact set used per trial.
-
-### 2. Occlusion risk and reachable-set gating
-
-- Represent each occluded lane segment as the PVS interval `[s_s, s_e]`.
-- Implement the piecewise longitudinal risk from Eq. (10), its PVS-length scaling in Eq. (11), the lateral normal model in Eq. (12), and the product risk in Eq. (13).
-- Use configurable prediction horizon, lane width, confidence factor, phantom maximum speed, and aggregated-risk rule.
-- Implement Eq. (14)-(15) with explicit saturation, continuity checks, and dimensional tests.
-- Compute conservative phantom reachable occupancy over the horizon.
-- Ignore an occluded actor/segment only if its FRS provably does not intersect the ego candidate corridor/FRS within the horizon. Test this on the nonconflict scenario.
-- Publish the risk field, PVS, and active FRS constraints for inspection.
-
-### 3. Dual-trajectory optimization
-
-- Enforce common initial state and terminal lane/heading conditions.
-- Enforce the discrete vehicle dynamics, bounded velocity, acceleration, jerk, curvature/yaw rate, and workspace/lane constraints.
-- Enforce obstacle separation using the paper's elliptical spatiotemporal barrier, inflated for the LIMO footprint and uncertainty.
-- Enforce exploration/fallback consistency over the first `N_s` steps in position, velocity, acceleration, and heading.
-- Update orientation, longitudinal, lateral, barrier variables, consensus variables, slack variables, and dual variables in the order described by Algorithm 1 and Eqs. (21)-(31).
-- Track both primal and dual residuals, time budget, convergence reason, constraint violations, and objective terms.
-- Verify every candidate after solving. Never publish a trajectory whose hard safety, dynamics, bound, or finite-value checks fail.
-
-Build a simple fixed-lane, speed-only dual-branch vertical slice first if useful, but the final default must use the full dual Bezier/ADMM planner. Label the vertical slice as bring-up code and do not use it for final paper-fidelity claims.
-
-### 4. Branch selection and execution
-
-Because the paper's complete selector is under-specified, implement and document a transparent policy:
-
-- before the visibility event, only execute commands belonging to the numerically verified common segment;
-- after an actor becomes visible, select fallback when its predicted occupancy conflicts with the ego corridor or safety margin;
-- select exploration/progress only when the newly visible free space and predicted objects satisfy clearance for the required horizon;
-- retain hysteresis/minimum hold time to prevent branch chattering;
-- if evidence is ambiguous, stale, or contradictory, choose the verified fallback or controlled stop;
-- log every branch decision and the exact evidence/cost terms that caused it.
-
-Do not describe this selector as paper-derived. If you implement the prior-work selector, cite and trace that source separately.
-
-## Tests required before integration
-
-Use `ament_cmake_gtest` or an equivalent ROS 2 test setup. At minimum add:
-
-### Mathematical unit tests
-
-- Bernstein basis partition of unity, endpoint interpolation, and derivative matrices.
-- SRQ Eq. (10) branch boundaries and continuity at `s_s` and `s_e`.
-- lateral risk symmetry and maximum at lane center.
-- velocity boundary monotonicity, saturation, continuity, and semantic-ordering diagnostics for both branches.
-- barrier sign and safety-ellipse geometry.
-- FRS-intersection gate: intersecting, tangent, and disjoint cases.
-- common-segment equality in position, velocity, acceleration, and heading.
-- ADMM residual calculation, stopping rules, maximum-iteration exit, infeasibility, and warm start.
-- solver outputs contain no NaN/Inf and satisfy constraints within configured tolerances.
-- LIMO command conversion uses yaw rate, respects bounds, and behaves safely at zero speed.
-
-### ROS integration tests
-
-- launch graph and topic/type contract;
-- only the final command component publishes `/cmd_vel`;
-- planner has no raw Gazebo-ground-truth subscription;
-- sensor/odometry/trajectory timeout produces a controlled stop;
-- visibility transition changes planner inputs only when line of sight actually clears;
-- deterministic reset produces repeatable initial conditions and metrics.
-
-## Evaluation design and acceptance criteria
-
-Create an experiment runner that executes every scenario and ablation for at least 30 deterministic trials or explains why a smaller smoke-test count was used during development. Write raw per-timestep CSV plus a per-run summary containing:
-
-- collision and minimum footprint separation;
-- task completion and duration;
-- ego speed/acceleration/jerk and maximum tracking error;
-- visibility state, occluded interval, risk, and both dynamic velocity limits;
-- selected branch and branch-switch count;
-- solver time, iterations, residuals, infeasible count, deadline misses;
-- emergency-stop and watchdog activations;
-- seed and full parameter-file hash/content identifier.
-
-Initial acceptance gates:
-
-1. OACP has zero collisions in all deterministic conflict, late-emergence, and visible-conflict trials.
-2. Minimum separation never violates the configured inflated safety boundary.
-3. The ego begins risk-responsive slowing before the occluded conflict becomes fully visible; it does not wait for ground-truth revelation.
-4. In clear trials, the ego returns toward nominal speed after the occluded interval clears, without oscillatory branch switching.
-5. In nonconflicting hidden trials, FRS gating avoids braking attributable solely to a disjoint hidden actor.
-6. The first `N_s` samples of both branches agree within declared numerical tolerance for position, velocity, acceleration, and heading.
-7. The 10 Hz planning loop has no stale commands. Development gate: `p95 < 100 ms`; target: mean below `50 ms` and no hard deadline miss, with paper results reported only as context rather than a guaranteed LIMO benchmark.
-8. No invalid trajectory is published; every solver failure produces a controlled stop.
-9. The occlusion-ignorant ablation demonstrates worse risk behavior in the conflict scenario, but do not deliberately allow a damaging physical collision; simulation only.
-10. Results report mean, standard deviation, maximum, minimum, and trial count. Do not cherry-pick a successful video.
-
-Also compare at least:
-
-- OACP full method;
-- occlusion-ignorant ablation;
-- conservative stop-before-occlusion baseline;
-- fixed-speed or ordinary tracking baseline, if safe in simulation.
-
-## Implementation phases and mandatory checkpoints
-
-### Phase 0 - Baseline audit and repair
-
-- Inventory ROS packages, topics, frames, model dimensions, plugins, missing paths, and build dependencies.
-- Make the existing Ackermann simulation launchable or create a clean superseding launch without breaking original files.
-- Resolve/configure the `0.20 m` driver versus `0.24 m` simulation wheelbase mismatch.
-- Verify manual bounded `/cmd_vel` motion and odometry.
-- Deliver `BASELINE_AUDIT.md` and exact build/launch commands.
-
-Checkpoint: do not implement the optimizer until the vehicle, frames, time source, and command semantics are verified.
-
-### Phase 1 - Scenario, visibility, and logging
-
-- Add the three-lane world, occluder, scripted actors, scenario variants, visibility-limited object output, occluded-lane extraction, RViz, reset, and evaluator.
-- Prove with a topic audit that hidden ground truth does not reach the planner-facing interface.
-
-Checkpoint: show that the actor is absent from visible-object output while geometrically occluded and appears after line of sight clears.
-
-### Phase 2 - SRQ and safe vertical slice
-
-- Implement/test Eqs. (10)-(15), phantom occupancy, and FRS gate.
-- Add the fixed-lane dual speed vertical slice and safety supervisor to validate brake/progress behavior.
-
-Checkpoint: clear, disjoint, and conflicting cases pass their behavioral tests.
-
-### Phase 3 - Full Bezier consensus-ADMM planner
-
-- Implement/test Eqs. (4)-(31), common-segment constraints, warm start, verifier, and diagnostics.
-- Compare numerical outputs against small offline reference problems.
-
-Checkpoint: full method passes mathematical tests and runs at the development timing gate.
-
-### Phase 4 - Controller and closed-loop evaluation
-
-- Integrate tracking, command arbitration, watchdogs, batch trials, baselines, and reports.
-- Tune only through versioned YAML; record every final parameter.
-
-Checkpoint: all simulation acceptance gates pass, or provide a precise failure report with logs and next fixes.
-
-### Phase 5 - Hardware-ready dry run
-
-- Add hardware topic/frame adapter, command-disable launch, calibration procedure, low-speed limit, emergency stop, and operator checklist.
-- Replay recorded data before enabling motion.
-
-Checkpoint: stop and request explicit human authorization before sending motion commands to a physical LIMO.
-
-## Required deliverables
-
-- Buildable ROS 2 Humble source packages and manifests.
-- Scenario world/model/config/launch files.
-- Unit, integration, and launch tests.
-- `README.md` with dependency installation, build, launch, scenario, replay, and troubleshooting commands.
-- `BASELINE_AUDIT.md`.
-- `PAPER_TRACEABILITY.md`.
-- `SAFETY_CASE.md` covering assumptions, hazards, watchdogs, stop behavior, and hardware gate.
-- `EXPERIMENT_PLAN.md` and `RESULTS.md` with raw-data locations and statistical summaries.
-- RViz configuration and a short demonstration recording or rosbag if the environment supports it.
-- A final change summary listing files changed, commands run, test results, timing results, known limitations, and every item not actually verified.
-
-## Build and verification expectations
-
-Run commands appropriate to the actual Ubuntu/ROS 2 workspace. Prefer:
-
-```bash
-rosdep install --from-paths . --ignore-src -r -y
-colcon build --symlink-install --event-handlers console_direct+
-source install/setup.bash
-colcon test --event-handlers console_direct+
-colcon test-result --verbose
+# LIMO ROS2 Agent Prompt: OACP Baseline (occlusion-aware contingency planning)
+
+Companion to `DREAM_LIMO_ROS_AGENT_PROMPT.md`. This is a **baseline arm**, not a new
+system. The LIMO already runs DREAM (DRIFT PDE risk field → decision veto + risk cost +
+CBF modulation) on top of the IDEAM LMPC. Here you keep that MPC stack and swap **only
+the occlusion-risk mechanism** for the one published in:
+
+> L. Zheng, R. Yang, M. Zheng, Z. Peng, M. Y. Wang, J. Ma,
+> "Occlusion-Aware Contingency Safety-Critical Planning for Autonomous Driving,"
+> arXiv:2502.06359 (v2, Nov 2025). Project page: https://zack4417.github.io/oacp-website/
+
+```text
+You are the agent on the AgileX LIMO (ROS2 Humble) that has already deployed the DREAM
+occlusion-aware planner. Your task now is to add a SECOND planner arm implementing the
+occlusion-aware risk methodology of Zheng et al. (arXiv:2502.06359), reusing the MPC
+framework you already built. Do NOT create a new package and do NOT rebuild perception,
+estimation, tracking, or the safety supervisor. Add a selectable planner mode to the
+existing package.
+
+========================================================================
+0. OBJECTIVE
+========================================================================
+Produce a fair, publishable baseline comparison on ONE physical scenario (the occluded
+merge already built for DREAM).
+
+THE CONTROLLER IS THE SAME. We are running the SAME MPC controller in every arm — the
+same LMPC code path, the same weights, horizon, kinematics, limits, and the same CBF
+collision constraints. What differs between arms is only:
+
+    (i)  RISK ASSESSMENT  — how a hidden hazard is represented, and
+    (ii) RISK EVALUATION  — where that representation is queried, how it is reduced to
+                            the number(s) the controller consumes, and which controller
+                            channel those numbers enter.
+
+  DREAM arm  : assessment = PDE risk field R(x,y,t) on a world grid.
+               evaluation = sampled along a candidate lane-change path and along the MPC
+               horizon -> enters as a decision veto, a risk term in the MPC cost, and
+               risk-scaled CBF ellipses.
+  OACP arm   : assessment = phantom-vehicle reachability risk r(s,d) on the occluded
+               lane centerline.
+               evaluation = reduced to a scalar r_total over the planned horizon -> enters
+               as a hard DYNAMIC VELOCITY UPPER BOUND, plus a two-branch
+               (exploration/fallback) contingency structure.
+
+Everything else — arena, lane geometry, obstacle and blocker placement, merger script,
+run trigger, control rate, MPC horizon and weights, base CBF ellipse axes, vehicle
+limits, IDEAM decision layer, state estimation — is IDENTICAL across arms. The arm must
+be selected by a runtime parameter on one shared node graph, never by a separate launch
+path or a second controller instance. If you change something for one arm, change it for
+both and say so in the report.
+
+RUN TRIGGER — reuse what you already built, do not invent a new one. Each run is started
+by publishing a navigation goal (the same goal topic, message type, and arming sequence
+already implemented for the DREAM arm). The planner arms on goal receipt, holds at
+standstill until the countdown completes, then executes. Requirements:
+  - identical goal pose and identical trigger path for all arms;
+  - the OACP risk module must be running and publishing r_total BEFORE the goal is
+    accepted, so the first commanded velocity is already risk-bounded (there is no PDE
+    warm-up in this arm, so arming is immediate — but still verify a valid bound exists
+    at the moment of goal acceptance, and refuse the goal if not);
+  - log the goal-acceptance timestamp. It is t = 0 for every time-aligned plot and the
+    common reference for cross-arm comparison.
+
+========================================================================
+1. THE SWAP, PRECISELY
+========================================================================
+REMOVE from the OACP arm (do not delete code; gate it behind the planner-mode flag):
+  - the DRIFT PDE solver, its grid, warm-up, and the risk OccupancyGrid publisher
+  - the decision-level risk veto (evaluate_decision_risk / gate_lane_change)
+  - the risk term in the MPC cost (risk_weight * 0.1 * R * vx^2)
+  - risk-based CBF ellipse and headway modulation (apply_risk_modulation)
+
+KEEP unchanged and shared (the controller itself is NOT part of the swap):
+  - the LMPC instance and every one of its parameters: horizon T, dt, cost weights
+    (R, Rd, Q, Qt, ...), acceleration/steer/jerk limits, slack penalties, and the CBF
+    collision constraints with FIXED (unmodulated) ellipse axes. The OACP arm adds ONE
+    new constraint (Section 4) and overrides the speed reference; it changes nothing
+    else inside the controller. Diff the effective parameter dict between arms at
+    startup and log it — if anything other than the risk channel differs, the
+    comparison is invalid.
+  - the IDEAM decision layer (gap groups + DFS). OACP as published is a SPEED-ONLY
+    method ("expert human drivers typically adjust their speed rather than alter their
+    path"); it contains no lane-change decision logic. The merge decision in our
+    scenario therefore comes from the shared IDEAM base in BOTH arms. This must be
+    disclosed in the paper — it is an addition to OACP, not part of it.
+  - vehicle kinematics, Frenet path objects, state estimation, tracking, the nav-goal
+    trigger, and the safety supervisor.
+
+ADD for the OACP arm:
+  - occlusion risk assessment via phantom-vehicle reachability (Section 2)
+  - the dynamic velocity boundary as a hard MPC constraint (Section 4)
+  - the two-branch contingency structure (Section 5)
+
+========================================================================
+2. METHOD TO IMPLEMENT (verbatim from the paper, Sec. III-A)
+========================================================================
+Assumptions: phantom vehicles (PVs) travel along the lane centerline; with no prior
+information a PV's initial position is uniformly distributed over the Phantom Vehicle
+Set (PVS), the occluded segment of that centerline, bounded by s_s (near) and s_e (far).
+PV speed is constant, uniform on [0, v_pv_max].
+
+Let T be the risk prediction horizon. Define the three intervals
+    I1 = [s_s, s_e]
+    I2 = [s_e, s_s + v_pv_max*T]
+    I3 = [s_s + v_pv_max*T, s_e + v_pv_max*T]
+
+Number of potential PVs able to reach longitudinal position s (paper Eq. 10):
+    s in I1:  g(s) = 0.5 * (2*v_pv_max - (s-s_s)/T) * (s - s_s)
+    s in I2:  g(s) = 0.5 * (2*v_pv_max - (s-s_s)/T - (s-s_e)/T) * (s_e - s_s)
+    s in I3:  g(s) = 0.5 * (v_pv_max - (s-s_e)/T) * (s_e - (s - v_pv_max*T))
+    otherwise g(s) = 0
+
+Longitudinal risk, scaled by PVS length so larger occluded zones carry more risk
+(Eq. 11):
+    r_lon(s) = (s_e - s_s) * g(s)
+
+Lateral risk from PV lateral-position uncertainty (Eq. 12), l_w = lane width,
+Z = confidence factor (Z = 1.645 for 90%):
+    r_lat(d) = N( 0, ( l_w / (2*Z*(1 - 0.5*(1-d))) )^2 )
+Risk is highest at d = 0 (PV on the lane centerline).
+
+Total risk (Eq. 13):
+    r(s,d) = r_lon(s) * r_lat(d)
+
+Dynamic maximum velocity boundary (Eqs. 14-15):
+    dv     = (v_occ_min - v_occ_max) / (c_th_max - c_th_min)          # negative
+    v_occ  = v_occ_min                              if r_total >  c_th_max
+    v_occ  = dv*(r_total - c_th_min) + v_occ_max    otherwise
+Check: r_total = c_th_min gives v_occ_max; r_total = c_th_max gives v_occ_min.
+
+Two thresholds give two bounds — c_th_max^exploration < c_th_max^fallback — so the
+exploration branch clamps to v_occ_min at lower risk (it prioritises situational
+awareness) while the fallback branch keeps a looser speed cap and takes its safety from
+the barrier constraints.
+
+Remark 2 (implement it — it prevents permanent over-conservatism): occlusion risk is
+IGNORED when the PVs' forward reachable set does not intersect the ego's planned
+trajectory within the prediction horizon.
+
+IMPLEMENTATION NOTE on Eq. 12: the paper writes r_lat as a normal distribution whose
+variance itself depends on the evaluation point d, which is ambiguous. Implement it as
+the pdf of N(0, sigma(d)^2) evaluated at d, verify numerically that it decreases
+monotonically in |d|, and then NORMALISE so r_lat(0) = 1. Normalisation makes r_total's
+magnitude governed by r_lon and makes threshold calibration (Section 7) interpretable.
+Log this as a documented deviation.
+
+========================================================================
+3. SCENARIO MAPPING: intersection -> occluded merge
+========================================================================
+The paper's scenario is an occluded intersection; ours is the occluded merge already
+built for DREAM (ego left lane, static box in middle lane, blocker forcing a merge,
+second robot hidden in the right lane). The SRQ formulation is one-dimensional along a
+lane centerline, so it transfers directly:
+
+  - PV lane        = the RIGHT lane (the occluded one).
+  - PVS            = the set of points on the right-lane centerline that are inside the
+                     ego's perception range r_l AND not visible (inside the geometric or
+                     lidar shadow of the box). s_s = nearest occluded point,
+                     s_e = farthest occluded point, capped by r_l.
+  - d              = lateral offset between the evaluated point and the right-lane
+                     centerline.
+  - Evaluation set = the ego's planned trajectory over the MPC horizon, mapped into the
+                     PV lane's longitudinal frame. Apply Remark 2 first: if the PV FRS
+                     over [0,T] does not intersect that trajectory, set r_total = 0.
+  - r_total        = max over the horizon of r(s_k, d_k). (Use max, not sum: it is
+                     deterministic and horizon-length independent. Expose sum behind a
+                     flag; if you switch, recalibrate thresholds.)
+
+Behavioural consequence to verify on hardware: as the ego advances, the shadow sweeps,
+so s_s and s_e move and r_total evolves. When the ego clears the box the right lane
+becomes visible, the PVS collapses (s_e - s_s -> 0), r_lon -> 0, and the velocity bound
+releases to v_occ_max — while the now-visible merger becomes a REAL obstacle handled by
+the existing CBF constraints. That handover (phantom risk -> real constraint) is the
+core behaviour of this baseline and is what the reveal-time metrics measure.
+
+========================================================================
+4. INTEGRATION POINT IN THE EXISTING MPC — read this before coding
+========================================================================
+AUDIT FINDING (verified in the development repo, Control/MPC.py): `MAX_SPEED` and
+`MIN_SPEED` are assigned in `LMPC.__init__` but NEVER appear in any constraint. Speed is
+currently shaped only through the reference (`_effective_target_speed()`) and the cost.
+There is therefore NO existing speed constraint to retarget — you must add one. This is
+the single most important line of this document, because OACP's entire mechanism is a
+hard velocity upper bound (paper constraint 18h).
+
+Add, in the MPC constraint assembly, for each horizon step t (state x[0,t] = vx):
+
+    constraints += [ x[0, t] <= v_occ_bound + slack_v[t] ]
+    constraints += [ slack_v >= 0 ]
+    cost        += W_v * sum_squares(slack_v)          # large W_v
+
+Use a slack with a heavy penalty rather than a bare hard bound: the existing stack relies
+on slacks throughout (slack_a, slack_d, slack_cbf_f, lateral d[...]), and an unslacked
+state bound will make the QP infeasible the moment the bound drops below the current
+speed. Report any step where slack_v is active — that is a genuine constraint violation
+and must appear in the results, not be hidden.
+
+Also override the tracking reference each step so the MPC does not fight its own bound:
+
+    controller.mpc.set_target_speed_override(min(v_ref_nominal, v_occ_bound))
+
+(`set_target_speed_override` already exists on LMPC.) The hard bound is the safety
+mechanism; the reference override is what makes the behaviour smooth. Implement both.
+
+Also set MIN_SPEED to 0 in the LIMO parameter set (it is currently 2.0 m/s, unscaled and
+unenforced) so that if you or a later change ever DO enforce it, the robot can still stop.
+
+========================================================================
+5. CONTINGENCY STRUCTURE (honest approximation — read Section 8)
+========================================================================
+The paper optimises exploration (j=0) and fallback (j=1) trajectories jointly, as a
+biconvex NLP over 10th-order Bezier control points, solved by consensus ADMM, with the
+branches sharing a common initial segment of N_s steps and diverging after N_s + N_d.
+
+You will NOT reproduce that solver. Approximate the contingency structure with two solves
+of the existing MPC:
+
+  1. Solve with v_occ_bound = v_occ^exploration  -> this is the EXECUTED trajectory.
+  2. Solve with v_occ_bound = v_occ^fallback, with the first N_s control inputs
+     constrained equal to those from solve 1 (the shared-segment consistency
+     constraint 18k-18l).
+  3. If solve 2 is infeasible or its slack is active, the fallback does not exist:
+     clamp the executed bound to v_occ_min for this step and log the event.
+
+This preserves what the contingency structure is FOR (a verified safe alternative sharing
+the immediate control action) at roughly 2x MPC cost. Measure that cost; if it breaks
+real time, run solve 2 at a reduced rate and say so.
+
+========================================================================
+6. ROBOT-SCALE PARAMETERS — use the paper's own 1:10 hardware numbers
+========================================================================
+Fortunately this paper validated on hardware at our exact scale: a 1:10 Ackermann robot
+(TianRacer, 380 x 210 mm) in a 1:10 intersection with 37.5 cm lanes, with AgileX LIMO
+Rovers serving as the phantom vehicles, on a Jetson Xavier NX. Use these published
+values, not a rescaling of the simulation values:
+
+    lane width l_w              0.375 m   (USE YOUR ARENA'S ACTUAL LANE WIDTH — it must
+                                           match the DREAM arm's arena exactly)
+    v_pv_max                    1.0 m/s
+    ego cruise speed            ~0.5 m/s, dropping to ~0.28-0.30 m/s near the occlusion
+    safety ellipse l_x = l_y    0.06 m
+    c_th_min                    0
+    c_th_max (exploration)      4.5        } recalibrate — see Section 7
+    c_th_max (fallback)         6.0        }
+    risk horizon T              4 s
+    perception range r_l        3 m        (30 m full scale at 1:10)
+    Z                           1.645
+    planning horizon N          40 steps at dt = 0.1 s
+    N_s / N_d                   5 / 5 steps
+    control rate                10 Hz
+    reported solve time         27.33 ms mean, 44.65 ms max (Jetson Xavier NX)
+
+NOTE ON TIME SCALING — this changes the DREAM arm too. The paper scales LENGTH by 1/10
+and leaves TIME unchanged (dt = 0.1 s, 10 Hz, T = 4 s; v_pv_max 10 -> 1 m/s is pure
+length scaling). The DREAM prompt recommended alpha = 1/10 with beta = 2 (dt = 0.2 s,
+5 Hz). Running the arms at different control rates would confound the comparison.
+Harmonise: pick ONE control rate both arms can sustain on your hardware, rerun the DREAM
+arm at that rate if it has already been tuned at another, and record the choice. If the
+DREAM MPC cannot hold 10 Hz, run both at 5 Hz and note that OACP is being run at half
+its published rate.
+
+========================================================================
+7. THRESHOLD CALIBRATION (required — do not transplant the numbers blindly)
+========================================================================
+r_total is geometry-dependent and NOT scale-invariant. Under length scaling by alpha with
+time unchanged: r_lon ~ alpha^3, normalised r_lat ~ 1, so r_total ~ alpha^3 (and ~alpha^2
+if you do not normalise r_lat). The paper's own numbers confirm the thresholds are tuned
+empirically rather than derived: simulation used c_th_max = 40/60 while the 1:10 hardware
+run used 4.5/6 — not the ratio any pure scaling law predicts. Therefore:
+
+  1. Run the approach ONCE with the velocity bound computed but NOT applied
+     (open-loop logging, ego at constant speed, merger scripted).
+  2. Log r_total(t) over the whole approach.
+  3. Set c_th_max^exploration ~= the 70th percentile of r_total over the occluded phase,
+     so the bound spans [v_occ_min, v_occ_max] across the approach instead of saturating
+     at one end. Set c_th_max^fallback ~= 1.33 * c_th_max^exploration (the paper's 6/4.5
+     ratio).
+  4. Set v_occ_max = the shared nominal cruise speed and v_occ_min ~= 0.55 * v_occ_max
+     (the paper's 0.28/0.5 hardware ratio).
+  5. Report the calibration curve. A baseline tuned to saturate is a strawman and will be
+     challenged in review.
+
+========================================================================
+8. SCIENTIFIC INTEGRITY — what you may and may not claim
+========================================================================
+You are implementing the paper's RISK ASSESSMENT inside our MPC. You are NOT implementing
+the paper's PLANNER. Not reproduced: the biconvex NLP formulation, 10th-order Bezier
+trajectory parameterisation, consensus-ADMM decomposition, the published spatiotemporal
+barrier (Eqs. 4-6) — we substitute IDEAM's existing CBF, which is structurally similar
+(elliptical, h = xi - 1) but not identical — and joint optimisation of the two branches.
+
+Consequences you must respect:
+  - Name the arm "OACP-VB (velocity-bound adaptation of Zheng et al., 2025)" everywhere:
+    code, plots, tables, text. Never "OACP".
+  - State explicitly that the lane-change decision comes from the shared IDEAM layer.
+  - Do not attribute the arm's performance to the published method. Efficiency claims in
+    particular are not transferable: the paper's headline result (30.17% faster traversal
+    than ST-RHC) comes from the contingency NLP, which you are approximating.
+  - PRECEDENT: the development repo already contains
+    `OA_CMPC/oa_cmpc_source.py`, an adapter for a DIFFERENT paper (arXiv:2503.04563)
+    that was WITHDRAWN from the benchmark for exactly this class of adaptation. Read its
+    docstring before you write any claim — it states the standard this project holds
+    itself to: "a method-changing adaptation, not a performance-neutral implementation
+    detail."
+  - If the paper's authors' own code becomes available, prefer porting it over this
+    adaptation, and say which was used.
+
+========================================================================
+9. A/B PROTOCOL
+========================================================================
+Three arms — same controller, same trigger, different risk assessment/evaluation:
+  A. Nominal    — shared LMPC-CBF + IDEAM decision, no occlusion risk at all (the floor).
+  B. OACP-VB    — this arm: reachability risk -> velocity bound.
+  C. DREAM      — already deployed: PDE field -> veto + cost + CBF scaling.
+
+Every run in every arm is started by publishing the same nav goal to the same topic with
+the same pose (Section 0). Arm selection is a parameter on the shared node graph. Before
+each run, log the startup parameter diff between arms and confirm it contains nothing but
+the risk-channel settings.
+
+Runs: >= 5 per arm with the identical scripted merger timing, plus >= 3 per arm with a
+randomised merger release time (to test that neither arm is tuned to one script).
+
+Report per arm, and do not omit the efficiency columns — OACP's contribution is
+efficiency WITH safety, and reporting only safety margins strawmans it:
+  Safety     : min clearance, min TTC, TTC at reveal, post-reveal min clearance (3 s
+               window), contacts, safety-supervisor triggers, slack_v activations.
+  Efficiency : traversal time over a fixed course, mean speed, distance-to-goal at
+               fixed time, time spent below 50% of nominal cruise.
+  Comfort    : max |a|, mean |jerk|.
+  Compute    : mean and max solve time per arm (both solves for OACP-VB).
+
+Expected qualitative signatures — if you see something else, investigate before writing:
+  - OACP-VB slows smoothly and monotonically as the PVS grows, then releases sharply on
+    reveal; it does not alter its path because of occlusion.
+  - DREAM builds spatial risk and can veto/defer the merge itself, so it may differ in
+    WHERE it goes, not only how fast.
+  - The Nominal arm shows the smallest TTC at reveal.
+
+========================================================================
+10. STAGED PLAN
+========================================================================
+  S0  Audit: confirm the DREAM arm's current control rate, arena lane width, MPC horizon,
+      base ellipse axes, where the constraint list is assembled, and the existing nav-goal
+      trigger (topic, message type, arming/countdown sequence). Report these before
+      coding — they become the shared configuration that the OACP arm must not alter.
+  S1  Implement risk assessment (Section 2) as a standalone module + unit tests:
+      g(s) continuous across I1/I2/I3 boundaries; g >= 0; g -> 0 outside I3;
+      r_lat monotone decreasing in |d| and equal to 1 at d = 0;
+      v_occ = v_occ_max at r_total = 0 and = v_occ_min at r_total = c_th_max.
+  S2  PVS geometry from the shadow (Section 3) + RViz markers for PVS extent and the
+      current bound. Verify visually that the PVS collapses at reveal.
+  S3  Wire the velocity bound into the MPC (Section 4) behind the arm-selection
+      parameter, triggered by the existing nav goal. Software-in-the-loop against the
+      existing scripted-merger fake world. Verify the bound is actually binding, that the
+      goal is refused when no valid bound exists, and that switching to the Nominal or
+      DREAM arm restores their previous behaviour bit-for-bit.
+  S4  Threshold calibration run (Section 7).
+  S5  Contingency second solve (Section 5) + timing check.
+  S6  Hardware: static world first (no merger), then the full A/B (Section 9).
+  S7  Report: metric table, calibration curve, v_occ(t) and r_total(t) traces aligned to
+      the reveal instant, and an explicit deviations list (Section 8).
+
+Safety rules from the DREAM deployment apply unchanged: supervisor node running, human
+with kill switch, speed cap, standstill start. Adding a hard state constraint to a
+previously unconstrained MPC is a real infeasibility risk — bench-test S3 with the robot
+on blocks before it drives.
+
+If any required input is missing or an audit finding contradicts this document, stop and
+report rather than improvising.
 ```
-
-If the packages are nested under a workspace `src/`, adjust paths accordingly. Do not report a build or test as passing unless it was executed. If the current host lacks ROS 2/Gazebo, still implement the code and static/unit-testable core, then clearly mark ROS/Gazebo tests `NOT RUN` and give exact commands for the LIMO Ubuntu environment.
-
-## Start now
-
-Begin with Phase 0. First present a concise baseline audit and proposed file/package tree, then make the smallest changes needed to obtain a verified Ackermann simulation and command path. Continue phase by phase without skipping tests. Stop only for a genuinely blocking choice, a safety authorization boundary, or an environment limitation that cannot be worked around. Do not jump directly to a large untested optimizer implementation.
-
----
