@@ -8,8 +8,9 @@ surveyed merge endpoint.
 from __future__ import annotations
 
 import json
+from dataclasses import dataclass
 from math import asin, atan2, cos, hypot, isfinite, sin
-from typing import Optional
+from typing import Any, Mapping, Optional
 
 import rclpy
 from geometry_msgs.msg import PoseStamped
@@ -62,6 +63,158 @@ def _quaternion_rpy(quaternion) -> tuple[float, float, float]:
     return roll, pitch, yaw
 
 
+@dataclass(frozen=True)
+class RiskAssessmentReadiness:
+    """Pre-goal readiness of an optional arm-specific risk provider."""
+
+    required: bool
+    ready: bool
+    reason: str
+    provider: Optional[str]
+    age: Optional[float]
+
+
+def _risk_reason(required_provider: str, suffix: str) -> str:
+    """Return stable, explicit reasons while keeping future providers generic."""
+
+    prefix = "OACP" if required_provider == "oacp_vb" else "RISK"
+    return f"{prefix}_{suffix}"
+
+
+def evaluate_required_risk_assessment(
+    required_provider: str,
+    payload: Optional[Mapping[str, Any]],
+    receipt_stamp: Optional[float],
+    *,
+    now: float,
+    timeout: float,
+    shared_minimum_speed: float,
+    shared_target_speed: float,
+) -> RiskAssessmentReadiness:
+    """Validate the pre-goal half of the two-phase risk contract.
+
+    With an empty ``required_provider`` this is deliberately a no-op, preserving
+    the existing DREAM and pure-MPC goal path.  A configured provider must have
+    a fresh status heartbeat that names that exact provider and explicitly
+    asserts both assessment readiness and a valid conservative pre-goal bound.
+    Truthy substitutes are rejected at this authorization boundary.
+    """
+
+    required = str(required_provider).strip()
+    if not required:
+        return RiskAssessmentReadiness(
+            required=False,
+            ready=True,
+            reason="RISK_ASSESSMENT_NOT_REQUIRED",
+            provider=None,
+            age=None,
+        )
+    values = (
+        now,
+        timeout,
+        shared_minimum_speed,
+        shared_target_speed,
+    )
+    if (
+        not all(isfinite(float(value)) for value in values)
+        or timeout <= 0.0
+        or shared_minimum_speed < 0.0
+        or shared_target_speed < shared_minimum_speed
+    ):
+        return RiskAssessmentReadiness(
+            required=True,
+            ready=False,
+            reason=_risk_reason(required, "ASSESSMENT_CONFIG_INVALID"),
+            provider=None,
+            age=None,
+        )
+    if not isinstance(payload, Mapping) or receipt_stamp is None:
+        return RiskAssessmentReadiness(
+            required=True,
+            ready=False,
+            reason=_risk_reason(required, "ASSESSMENT_UNAVAILABLE"),
+            provider=None,
+            age=None,
+        )
+    try:
+        receipt = float(receipt_stamp)
+    except (TypeError, ValueError, OverflowError):
+        receipt = float("nan")
+    age = float(now) - receipt
+    if not isfinite(receipt) or age < 0.0 or age >= float(timeout):
+        return RiskAssessmentReadiness(
+            required=True,
+            ready=False,
+            reason=_risk_reason(required, "ASSESSMENT_STALE"),
+            provider=(
+                str(payload.get("provider"))
+                if payload.get("provider") is not None
+                else None
+            ),
+            age=age if isfinite(age) and age >= 0.0 else None,
+        )
+    provider_value = payload.get("provider")
+    provider = None if provider_value is None else str(provider_value)
+    if provider != required:
+        return RiskAssessmentReadiness(
+            required=True,
+            ready=False,
+            reason=_risk_reason(required, "ASSESSMENT_PROVIDER_MISMATCH"),
+            provider=provider,
+            age=age,
+        )
+    if payload.get("assessment_ready") is not True:
+        return RiskAssessmentReadiness(
+            required=True,
+            ready=False,
+            reason=_risk_reason(required, "ASSESSMENT_NOT_READY"),
+            provider=provider,
+            age=age,
+        )
+    if payload.get("pre_goal_bound_valid") is not True:
+        return RiskAssessmentReadiness(
+            required=True,
+            ready=False,
+            reason=_risk_reason(required, "PRE_GOAL_BOUND_INVALID"),
+            provider=provider,
+            age=age,
+        )
+    try:
+        minimum_bound = float(payload["v_occ_min"])
+        maximum_bound = float(payload["v_occ_max"])
+        pre_goal_bound = float(payload["pre_goal_velocity_bound"])
+    except (KeyError, TypeError, ValueError, OverflowError):
+        minimum_bound = maximum_bound = pre_goal_bound = float("nan")
+    if (
+        not all(
+            isfinite(value)
+            for value in (
+                minimum_bound,
+                maximum_bound,
+                pre_goal_bound,
+            )
+        )
+        or minimum_bound < shared_minimum_speed
+        or maximum_bound < minimum_bound
+        or abs(maximum_bound - shared_target_speed) > 1.0e-9
+        or not minimum_bound <= pre_goal_bound <= maximum_bound
+    ):
+        return RiskAssessmentReadiness(
+            required=True,
+            ready=False,
+            reason=_risk_reason(required, "PRE_GOAL_BOUND_INVALID"),
+            provider=provider,
+            age=age,
+        )
+    return RiskAssessmentReadiness(
+        required=True,
+        ready=True,
+        reason=_risk_reason(required, "ASSESSMENT_READY"),
+        provider=provider,
+        age=age,
+    )
+
+
 class DreamFreeGoalAuthorizerNode(Node):
     """Authorize arbitrary observed-free goals while continuously failing closed."""
 
@@ -80,6 +233,17 @@ class DreamFreeGoalAuthorizerNode(Node):
         self.declare_parameter("accepted_goal_topic", "/dream/navigation_goal")
         self.declare_parameter("planner_status_topic", "/dream/planner_status")
         self.declare_parameter("preflight_status_topic", "/dream/preflight_status")
+        self.declare_parameter("required_risk_provider", "")
+        self.declare_parameter(
+            "risk_assessment_status_topic", "/dream/oacp_vb_status"
+        )
+        self.declare_parameter("risk_assessment_timeout", 0.50)
+        self.declare_parameter(
+            "shared_minimum_speed", deployment.mpc.minimum_speed
+        )
+        self.declare_parameter(
+            "shared_target_speed", deployment.mpc.target_speed
+        )
         self.declare_parameter("arm_topic", "/dream/arm")
         self.declare_parameter("external_stop_topic", "/dream/external_stop")
         self.declare_parameter("status_topic", "/dream/deadman_status")
@@ -119,11 +283,29 @@ class DreamFreeGoalAuthorizerNode(Node):
             str(self.get_parameter("odom_goal_frame").value)
         )
         self.tf_timeout = float(self.get_parameter("tf_timeout").value)
+        self.required_risk_provider = str(
+            self.get_parameter("required_risk_provider").value
+        ).strip()
+        self.risk_assessment_timeout = float(
+            self.get_parameter("risk_assessment_timeout").value
+        )
+        self.shared_minimum_speed = float(
+            self.get_parameter("shared_minimum_speed").value
+        )
+        self.shared_target_speed = float(
+            self.get_parameter("shared_target_speed").value
+        )
         publish_rate = float(self.get_parameter("publish_rate").value)
         if (
             not self.odom_goal_frame
             or not isfinite(self.tf_timeout)
             or self.tf_timeout <= 0.0
+            or not isfinite(self.risk_assessment_timeout)
+            or self.risk_assessment_timeout <= 0.0
+            or not isfinite(self.shared_minimum_speed)
+            or self.shared_minimum_speed < 0.0
+            or not isfinite(self.shared_target_speed)
+            or self.shared_target_speed < self.shared_minimum_speed
             or not isfinite(publish_rate)
             or publish_rate <= 0.0
         ):
@@ -148,9 +330,12 @@ class DreamFreeGoalAuthorizerNode(Node):
         self.costmap: Optional[CostmapSnapshot] = None
         self.planner: Optional[FreeGoalPlannerReadiness] = None
         self.preflight: Optional[FreeGoalPreflightReadiness] = None
+        self.risk_assessment_payload: Optional[dict] = None
+        self.risk_assessment_receipt_stamp: Optional[float] = None
         self.accepted_goal_source_stamp: Optional[float] = None
         self.accepted_goal_receipt_stamp: Optional[float] = None
         self.accepted_goal_publication_stamp: Optional[float] = None
+        self.candidate_goal_receipt_stamp: Optional[float] = None
         self.last_goal_source_frame: Optional[str] = None
         self.last_tf_error: Optional[str] = None
 
@@ -196,6 +381,12 @@ class DreamFreeGoalAuthorizerNode(Node):
             String,
             str(self.get_parameter("preflight_status_topic").value),
             self._on_preflight_status,
+            reliable,
+        )
+        self.create_subscription(
+            String,
+            str(self.get_parameter("risk_assessment_status_topic").value),
+            self._on_risk_assessment_status,
             reliable,
         )
         self.create_service(
@@ -309,6 +500,7 @@ class DreamFreeGoalAuthorizerNode(Node):
 
     def _on_goal(self, message: PoseStamped) -> None:
         now = self._now()
+        self.candidate_goal_receipt_stamp = now
         source_frame = _normalize_frame(message.header.frame_id)
         self.last_goal_source_frame = source_frame
         self.last_tf_error = None
@@ -342,6 +534,23 @@ class DreamFreeGoalAuthorizerNode(Node):
             now=now,
             config=self.config,
         )
+        if not validation.accepted:
+            self.state.consider(validation)
+            self._publish_goal_invalidation()
+            self.get_logger().warning(f"Goal rejected: {validation.reason}")
+            self._publish_heartbeat()
+            return
+        risk_readiness = self._risk_assessment_readiness(now)
+        if not risk_readiness.ready:
+            self.state.consider(
+                FreeGoalValidation(False, risk_readiness.reason)
+            )
+            self._publish_goal_invalidation()
+            self.get_logger().warning(
+                f"Goal rejected: {risk_readiness.reason}"
+            )
+            self._publish_heartbeat()
+            return
         if not self.state.consider(validation):
             self._publish_goal_invalidation()
             self.get_logger().warning(f"Goal rejected: {validation.reason}")
@@ -465,6 +674,28 @@ class DreamFreeGoalAuthorizerNode(Node):
             receipt_stamp=now,
         )
 
+    def _on_risk_assessment_status(self, message: String) -> None:
+        now = self._now()
+        try:
+            payload = json.loads(message.data)
+        except (json.JSONDecodeError, TypeError):
+            payload = None
+        self.risk_assessment_payload = payload if isinstance(payload, dict) else None
+        self.risk_assessment_receipt_stamp = now
+
+    def _risk_assessment_readiness(
+        self, now: Optional[float] = None
+    ) -> RiskAssessmentReadiness:
+        return evaluate_required_risk_assessment(
+            self.required_risk_provider,
+            self.risk_assessment_payload,
+            self.risk_assessment_receipt_stamp,
+            now=self._now() if now is None else now,
+            timeout=self.risk_assessment_timeout,
+            shared_minimum_speed=self.shared_minimum_speed,
+            shared_target_speed=self.shared_target_speed,
+        )
+
     def _on_stop_mission(self, _request: Trigger.Request, response: Trigger.Response):
         already_stopped = self.state.stop_latched
         self.state.stop()
@@ -493,6 +724,7 @@ class DreamFreeGoalAuthorizerNode(Node):
     def _status_payload(self) -> dict:
         now = self._now()
         authorization = self._authorization(now)
+        risk_readiness = self._risk_assessment_readiness(now)
         goal = self.state.accepted_goal
         validation = self.state.last_validation
         return {
@@ -504,6 +736,10 @@ class DreamFreeGoalAuthorizerNode(Node):
             "reason": authorization.reason,
             "goal_active": self.state.active,
             "goal_accepted": goal is not None,
+            "candidate_goal_received": self.candidate_goal_receipt_stamp is not None,
+            "candidate_goal_receipt_stamp": self.candidate_goal_receipt_stamp,
+            "goal_accepted_for_planning": goal is not None,
+            "accepted_for_motion": authorization.armed,
             "goal_revision": self.state.revision,
             "goal_replaceable": True,
             "one_shot": False,
@@ -512,7 +748,19 @@ class DreamFreeGoalAuthorizerNode(Node):
             "goal_x": None if goal is None else goal.goal_x,
             "goal_y": None if goal is None else goal.goal_y,
             "goal_yaw": None if goal is None else goal.goal_yaw,
+            "goal_source_stamp": self.accepted_goal_source_stamp,
+            "goal_receipt_stamp": self.accepted_goal_receipt_stamp,
             "goal_publication_stamp": self.accepted_goal_publication_stamp,
+            "required_risk_provider": self.required_risk_provider or None,
+            "risk_assessment_required": risk_readiness.required,
+            "risk_assessment_ready": risk_readiness.ready,
+            "risk_assessment_reason": risk_readiness.reason,
+            "risk_assessment_provider": risk_readiness.provider,
+            "risk_assessment_age": risk_readiness.age,
+            "pre_goal_bound_valid": bool(
+                self.risk_assessment_payload is not None
+                and self.risk_assessment_payload.get("pre_goal_bound_valid") is True
+            ),
             "last_goal_validation": (
                 None if validation is None else validation.reason
             ),

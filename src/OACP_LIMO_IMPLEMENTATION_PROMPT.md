@@ -1,5 +1,11 @@
 # Implementation Prompt: Occlusion-Aware Contingency Planning on LIMO ROS 2 Humble
 
+> **ARCHIVAL / SUPERSEDED:** This document specifies a standalone, paper-level
+> planner and is retained only as historical design context. For the current
+> shared-controller comparison baseline, use
+> [`dream_limo/OACP_VB.md`](dream_limo/OACP_VB.md). Do not use this prompt to
+> infer the deployed architecture or its fidelity claim.
+
 Use the following prompt as the complete task specification for the LIMO implementation agent.
 
 ---

@@ -1,4 +1,6 @@
+import json
 import math
+from pathlib import Path
 
 import pytest
 
@@ -8,6 +10,12 @@ from dream_limo.core.hardware_gate import (
     HardwareGateConfig,
     exact_publisher_owner,
 )
+from dream_limo.hardware_command_gate_node import (
+    DreamHardwareCommandGateNode,
+    risk_readiness_ready,
+    validated_risk_readiness_provider,
+)
+from std_msgs.msg import String
 
 
 def _prime(core: HardwareCommandGateCore, now: float, *, speed: float = 0.50) -> None:
@@ -83,6 +91,181 @@ def _complete_readiness_countdown(
     assert first is not None and first.reason == "READINESS_COUNTDOWN"
     assert command is not None and command.valid
     return now, command
+
+
+@pytest.mark.parametrize(
+    ("payload", "expected"),
+    (
+        (None, False),
+        ({}, False),
+        ({"ready": False}, False),
+        ({"ready": True}, True),
+        ({"ready": 1}, True),
+        ({"provider": "other", "ready": True}, True),
+    ),
+)
+def test_drift_risk_readiness_preserves_deployed_payload_contract(
+    payload, expected
+):
+    assert risk_readiness_ready(payload, "drift") is expected
+
+
+@pytest.mark.parametrize(
+    ("payload", "expected"),
+    (
+        (None, False),
+        ({}, False),
+        ({"ready": True}, False),
+        ({"provider": "drift", "ready": True}, False),
+        ({"provider": "oacp_vb", "ready": False}, False),
+        ({"provider": "oacp_vb", "ready": 1}, False),
+        ({"provider": "oacp_vb", "ready": "true"}, False),
+        ({"provider": "oacp_vb", "ready": True}, False),
+        (
+            {
+                "provider": "oacp_vb",
+                "assessment_ready": True,
+                "exact_bound_valid": False,
+                "ready": True,
+                "thresholds_calibrated": True,
+            },
+            False,
+        ),
+        (
+            {
+                "provider": "oacp_vb",
+                "assessment_ready": True,
+                "exact_bound_valid": True,
+                "ready": True,
+                "thresholds_calibrated": True,
+                "v_occ_min": 0.08,
+                "exploration_velocity_bound": 0.10,
+                "fallback_velocity_bound": 0.12,
+                "v_occ_max": 0.15,
+            },
+            True,
+        ),
+    ),
+)
+def test_oacp_vb_risk_readiness_requires_exact_provider_and_boolean_true(
+    payload, expected
+):
+    assert risk_readiness_ready(payload, "oacp_vb") is expected
+
+
+def test_risk_readiness_provider_rejects_unknown_contract():
+    assert validated_risk_readiness_provider("drift") == "drift"
+    assert validated_risk_readiness_provider("nominal") == "nominal"
+    assert validated_risk_readiness_provider("oacp_vb") == "oacp_vb"
+    with pytest.raises(ValueError, match="risk_readiness_provider"):
+        validated_risk_readiness_provider("")
+    with pytest.raises(ValueError, match="risk_readiness_provider"):
+        risk_readiness_ready({"ready": True}, "unknown")
+
+
+@pytest.mark.parametrize(
+    ("payload", "expected"),
+    (
+        (None, False),
+        ({"ready": True}, False),
+        ({"arm": "dream", "ready": True}, False),
+        ({"arm": "nominal", "ready": 1}, False),
+        ({"arm": "nominal", "ready": True}, True),
+    ),
+)
+def test_nominal_readiness_reuses_the_shared_planner_status(payload, expected):
+    assert risk_readiness_ready(payload, "nominal") is expected
+
+
+def test_oacp_calibration_logging_requires_an_explicit_gate_override():
+    payload = {
+        "provider": "oacp_vb",
+        "assessment_ready": True,
+        "exact_bound_valid": True,
+        "ready": True,
+        "thresholds_calibrated": False,
+        "v_occ_min": 0.08,
+        "exploration_velocity_bound": 0.10,
+        "fallback_velocity_bound": 0.12,
+        "v_occ_max": 0.15,
+    }
+    assert not risk_readiness_ready(payload, "oacp_vb")
+    assert risk_readiness_ready(
+        payload,
+        "oacp_vb",
+        allow_uncalibrated_oacp_logging=True,
+    )
+    assert not risk_readiness_ready(
+        payload,
+        "oacp_vb",
+        allow_uncalibrated_oacp_logging=True,
+        expected_v_occ_max=0.20,
+    )
+
+
+@pytest.mark.parametrize(
+    ("payload", "expected_ready"),
+    (
+        ({"provider": "drift", "ready": True}, False),
+        ({"provider": "oacp_vb", "ready": True}, False),
+        (
+            {
+                "provider": "oacp_vb",
+                "assessment_ready": True,
+                "exact_bound_valid": True,
+                "ready": True,
+                "thresholds_calibrated": True,
+                "v_occ_min": 0.08,
+                "exploration_velocity_bound": 0.10,
+                "fallback_velocity_bound": 0.12,
+                "v_occ_max": 0.15,
+            },
+            True,
+        ),
+    ),
+)
+def test_hardware_gate_callback_applies_selected_oacp_provider_contract(
+    payload, expected_ready
+):
+    updates = []
+
+    class Core:
+        @staticmethod
+        def update_drift(*, ready, stamp):
+            updates.append((ready, stamp))
+
+    class Harness:
+        risk_readiness_provider = "oacp_vb"
+        allow_uncalibrated_oacp_logging = False
+        gate_config = HardwareGateConfig(maximum_speed=0.15)
+        core = Core()
+        _payload = staticmethod(DreamHardwareCommandGateNode._payload)
+
+        @staticmethod
+        def _now():
+            return 12.5
+
+    DreamHardwareCommandGateNode._on_drift(
+        Harness(), String(data=json.dumps(payload))
+    )
+    assert updates == [(expected_ready, 12.5)]
+
+
+def test_hardware_gate_status_retains_drift_aliases_for_generic_risk_fields():
+    source = (
+        Path(__file__).resolve().parents[1]
+        / "dream_limo"
+        / "hardware_command_gate_node.py"
+    ).read_text(encoding="utf-8")
+    assert 'self.declare_parameter("risk_readiness_provider", "drift")' in source
+    assert '"risk_readiness_provider": self.risk_readiness_provider' in source
+    assert '"allow_uncalibrated_oacp_logging": (' in source
+    assert '"risk_ready": self.core.drift_ready' in source
+    assert '"drift_ready": self.core.drift_ready' in source
+    assert '"risk": age(self.core.drift_stamp)' in source
+    assert '"drift": age(self.core.drift_stamp)' in source
+    assert '"candidate_receipt_stamp": self.core.candidate_stamp' in source
+    assert '"forwarded_control_source_stamp": (' in source
 
 
 def test_checked_in_defaults_can_never_move_without_two_explicit_assertions():

@@ -3,7 +3,8 @@
 from __future__ import annotations
 
 import json
-from dataclasses import replace
+from dataclasses import asdict, replace
+from hashlib import sha256
 from math import asin, atan2, hypot, isfinite, pi
 from typing import List, Optional
 
@@ -32,14 +33,52 @@ from .core.path_tracking import (
 )
 from .core.risk_field import DREAMRiskField
 from .core.types import EgoState, Vehicle
-from .limo_scale import deployment_config_for_arena, get_preset
+from .limo_scale import (
+    IntegrationPreset,
+    deployment_config_for_arena,
+    get_preset,
+)
 from .ros_utils import (
+    ControlSourceStamp,
     ego_from_odometry,
     quaternion_to_yaw,
     stamp_to_seconds,
     vehicle_from_mapping,
     yaw_to_quaternion,
 )
+
+
+class _ZeroRiskField:
+    """Duck-typed risk source for arms that do not use the DRIFT PDE."""
+
+    @staticmethod
+    def risk_at(_x: float, _y: float) -> float:
+        return 0.0
+
+    @staticmethod
+    def cbf_scale(
+        _x: float, _y: float, _preset: IntegrationPreset
+    ) -> float:
+        """Keep the shared base CBF ellipse axes fixed in non-DREAM arms."""
+
+        return 1.0
+
+    @staticmethod
+    def headway_scale(
+        _x: float, _y: float, _preset: IntegrationPreset
+    ) -> float:
+        """Keep the shared base headway fixed in non-DREAM arms."""
+
+        return 1.0
+
+
+def shared_controller_parameter_fingerprint(mpc_config) -> str:
+    """Hash only controller parameters, excluding every arm's risk channel."""
+
+    payload = json.dumps(
+        asdict(mpc_config), sort_keys=True, separators=(",", ":")
+    )
+    return sha256(payload.encode("utf-8")).hexdigest()
 
 
 class DreamFreePlannerNode(Node):
@@ -49,11 +88,16 @@ class DreamFreePlannerNode(Node):
         super().__init__("dream_free_planner")
         self.declare_parameter("arena_file", "")
         self.declare_parameter("preset", "balanced")
+        self.declare_parameter("planner_mode", "")
         self.declare_parameter("target_speed", 0.15)
         self.declare_parameter("ego_topic", "/dream/ego_state")
         self.declare_parameter("world_topic", "/dream/world_model")
         self.declare_parameter("risk_topic", "/dream/risk_field_raw")
         self.declare_parameter("drift_ready_topic", "/dream/drift_ready")
+        self.declare_parameter("oacp_status_topic", "/dream/oacp_vb_status")
+        self.declare_parameter(
+            "hardware_gate_status_topic", "/dream/hardware_gate_status"
+        )
         self.declare_parameter("goal_topic", "/dream/navigation_goal")
         self.declare_parameter("path_topic", "/dream/geometric_path")
         self.declare_parameter("route_status_topic", "/dream/route_status")
@@ -79,6 +123,30 @@ class DreamFreePlannerNode(Node):
         self.declare_parameter("risk_lookahead", 3.0)
         self.declare_parameter("risk_samples", 10)
         self.declare_parameter("maximum_allowed_cbf_slack", 0.05)
+        self.declare_parameter("oacp_velocity_slack_weight", 1.0e4)
+        self.declare_parameter("oacp_maximum_future_velocity_slack", 0.01)
+        self.declare_parameter("oacp_enable_contingency", True)
+        self.declare_parameter("oacp_calibration_logging_only", False)
+        self.declare_parameter("oacp_shared_prefix_steps", 2)
+        self.declare_parameter("oacp_contingency_check_rate", 1.0)
+        # Numerical zero used only to decide whether the contingency
+        # alternative exists.  The executed branch has its separate future
+        # violation limit below; all nonzero values remain logged as slack.
+        self.declare_parameter("oacp_contingency_slack_tolerance", 1.0e-4)
+        self.declare_parameter("oacp_status_timeout", 0.50)
+        self.declare_parameter("oacp_gate_status_timeout", 0.30)
+        self.declare_parameter(
+            "oacp_prefix_position_tracking_tolerance", 0.01
+        )
+        self.declare_parameter(
+            "oacp_prefix_speed_tracking_tolerance", 0.03
+        )
+        self.declare_parameter(
+            "oacp_prefix_yaw_tracking_tolerance", 0.05
+        )
+        self.declare_parameter(
+            "oacp_prefix_advance_minimum_progress", 0.95
+        )
         self.declare_parameter("enforce_map_bounds", True)
         self.declare_parameter("verified_start_clearance_enabled", False)
         self.declare_parameter("verified_start_clearance_radius", 0.30)
@@ -91,10 +159,29 @@ class DreamFreePlannerNode(Node):
             self.config,
             mpc=replace(self.config.mpc, target_speed=target_speed),
         )
-        self.preset = get_preset(str(self.get_parameter("preset").value))
-        if self.preset.name not in {"balanced", "pure_mpc"}:
-            raise ValueError("free navigation supports balanced or pure_mpc")
-        self.field = DREAMRiskField(self.config)
+        configured_mode = str(self.get_parameter("planner_mode").value).strip()
+        if not configured_mode:
+            configured_mode = str(self.get_parameter("preset").value).strip()
+        if configured_mode not in {
+            "balanced",
+            "pure_mpc",
+            "nominal",
+            "oacp_vb",
+        }:
+            raise ValueError(
+                "free navigation supports balanced, nominal/pure_mpc, or oacp_vb"
+            )
+        self.planner_mode = configured_mode
+        self.oacp_mode = configured_mode == "oacp_vb"
+        self.nominal_mode = configured_mode == "nominal"
+        self.preset = get_preset(
+            "balanced" if configured_mode == "balanced" else "pure_mpc"
+        )
+        self.field = (
+            _ZeroRiskField()
+            if self.oacp_mode or self.nominal_mode
+            else DREAMRiskField(self.config)
+        )
         self.mpc = RiskAwareMPC(
             self.config,
             enforce_map_bounds=bool(
@@ -132,12 +219,31 @@ class DreamFreePlannerNode(Node):
         self.risk_source_stamp: Optional[float] = None
         self.ready_receipt: Optional[float] = None
         self.drift_ready = False
+        self.oacp_status: dict = {}
+        self.oacp_status_receipt: Optional[float] = None
+        self.pending_oacp_status: dict = {}
+        self.pending_oacp_status_receipt: Optional[float] = None
+        self.oacp_contingency_last_check_stamp: Optional[float] = None
+        self.oacp_contingency_cached_valid: Optional[bool] = None
+        self.oacp_contingency_cached_context: Optional[tuple] = None
+        self.oacp_contingency_cached_prefix: Optional[np.ndarray] = None
+        self.oacp_contingency_cached_states: Optional[np.ndarray] = None
+        self.oacp_contingency_cached_prefix_cursor = 0
+        self.oacp_prefix_pending_control_stamp: Optional[
+            ControlSourceStamp
+        ] = None
+        self.oacp_prefix_pending_cursor: Optional[int] = None
+        self.hardware_gate_status: dict = {}
+        self.hardware_gate_status_receipt: Optional[float] = None
         self.goal: Optional[PoseStamped] = None
         self.goal_receipt: Optional[float] = None
         self.goal_yaw: Optional[float] = None
         self.path_points: Optional[np.ndarray] = None
         self.path_receipt: Optional[float] = None
         self.path_source_stamp: Optional[float] = None
+        self.pending_path_points: Optional[np.ndarray] = None
+        self.pending_path_receipt: Optional[float] = None
+        self.pending_path_source_stamp: Optional[float] = None
         self.path_rejection_reason: Optional[str] = None
         self.path_rejection_details: dict = {}
         self.route_status: dict = {}
@@ -179,18 +285,36 @@ class DreamFreePlannerNode(Node):
             self._on_world,
             reliable,
         )
-        self.create_subscription(
-            Image,
-            str(self.get_parameter("risk_topic").value),
-            self._on_risk,
-            2,
-        )
-        self.create_subscription(
-            Bool,
-            str(self.get_parameter("drift_ready_topic").value),
-            self._on_ready,
-            reliable,
-        )
+        if self.oacp_mode:
+            self.create_subscription(
+                String,
+                str(self.get_parameter("oacp_status_topic").value),
+                self._on_oacp_status,
+                reliable,
+            )
+            self.create_subscription(
+                String,
+                str(
+                    self.get_parameter(
+                        "hardware_gate_status_topic"
+                    ).value
+                ),
+                self._on_hardware_gate_status,
+                reliable,
+            )
+        elif not self.nominal_mode:
+            self.create_subscription(
+                Image,
+                str(self.get_parameter("risk_topic").value),
+                self._on_risk,
+                2,
+            )
+            self.create_subscription(
+                Bool,
+                str(self.get_parameter("drift_ready_topic").value),
+                self._on_ready,
+                reliable,
+            )
         self.create_subscription(
             PoseStamped,
             str(self.get_parameter("goal_topic").value),
@@ -227,6 +351,94 @@ class DreamFreePlannerNode(Node):
         update_rate = float(self.get_parameter("update_rate").value)
         if not isfinite(update_rate) or update_rate <= 0.0:
             raise ValueError("free-planner update rate must be positive")
+        velocity_slack_weight = float(
+            self.get_parameter("oacp_velocity_slack_weight").value
+        )
+        maximum_future_velocity_slack = float(
+            self.get_parameter("oacp_maximum_future_velocity_slack").value
+        )
+        shared_prefix_steps = int(
+            self.get_parameter("oacp_shared_prefix_steps").value
+        )
+        contingency_slack_tolerance = float(
+            self.get_parameter(
+                "oacp_contingency_slack_tolerance"
+            ).value
+        )
+        contingency_check_rate = float(
+            self.get_parameter("oacp_contingency_check_rate").value
+        )
+        oacp_status_timeout = float(
+            self.get_parameter("oacp_status_timeout").value
+        )
+        gate_status_timeout = float(
+            self.get_parameter("oacp_gate_status_timeout").value
+        )
+        prefix_tracking_tolerances = (
+            float(
+                self.get_parameter(
+                    "oacp_prefix_position_tracking_tolerance"
+                ).value
+            ),
+            float(
+                self.get_parameter(
+                    "oacp_prefix_speed_tracking_tolerance"
+                ).value
+            ),
+            float(
+                self.get_parameter(
+                    "oacp_prefix_yaw_tracking_tolerance"
+                ).value
+            ),
+        )
+        prefix_advance_minimum_progress = float(
+            self.get_parameter(
+                "oacp_prefix_advance_minimum_progress"
+            ).value
+        )
+        if self.oacp_mode and (
+            not isfinite(velocity_slack_weight)
+            or velocity_slack_weight <= 0.0
+            or not isfinite(maximum_future_velocity_slack)
+            or maximum_future_velocity_slack < 0.0
+            or not 1 <= shared_prefix_steps < self.config.mpc.horizon
+            or not isfinite(contingency_slack_tolerance)
+            or contingency_slack_tolerance < 0.0
+            or not isfinite(contingency_check_rate)
+            or contingency_check_rate <= 0.0
+            or contingency_check_rate > update_rate
+            or not isfinite(oacp_status_timeout)
+            or oacp_status_timeout <= 0.0
+            or not isfinite(gate_status_timeout)
+            or gate_status_timeout <= 0.0
+            or any(
+                not isfinite(value) or value <= 0.0
+                for value in prefix_tracking_tolerances
+            )
+            or not isfinite(prefix_advance_minimum_progress)
+            or not 0.0 < prefix_advance_minimum_progress <= 1.0
+        ):
+            raise ValueError("invalid OACP-VB planner integration parameters")
+        self.controller_parameter_hash = (
+            shared_controller_parameter_fingerprint(self.config.mpc)
+        )
+        self.get_logger().info(
+            json.dumps(
+                {
+                    "event": "shared_controller_parameter_record",
+                    "planner_mode": self.planner_mode,
+                    "shared_controller_parameter_hash": (
+                        self.controller_parameter_hash
+                    ),
+                    "shared_controller_parameters": asdict(self.config.mpc),
+                    "permitted_arm_difference": (
+                        "occlusion_risk_assessment_and_evaluation_channel_only"
+                    ),
+                },
+                sort_keys=True,
+                separators=(",", ":"),
+            )
+        )
         self.create_timer(1.0 / update_rate, self._plan)
 
     def _now(self) -> float:
@@ -327,6 +539,132 @@ class DreamFreePlannerNode(Node):
         self.drift_ready = bool(message.data)
         self.ready_receipt = self._now()
 
+    def _clear_geometric_paths(self) -> None:
+        self.path_points = None
+        self.path_receipt = None
+        self.path_source_stamp = None
+        self.pending_path_points = None
+        self.pending_path_receipt = None
+        self.pending_path_source_stamp = None
+        if self.oacp_mode:
+            self.oacp_status = {}
+            self.oacp_status_receipt = None
+            self.pending_oacp_status = {}
+            self.pending_oacp_status_receipt = None
+            self._clear_oacp_contingency_certificate()
+
+    def _clear_oacp_contingency_certificate(
+        self, *, validity: Optional[bool] = None
+    ) -> None:
+        """Discard every artifact tied to one verified branch pair."""
+
+        self.oacp_contingency_cached_valid = validity
+        self.oacp_contingency_cached_context = None
+        self.oacp_contingency_cached_prefix = None
+        self.oacp_contingency_cached_states = None
+        self.oacp_contingency_cached_prefix_cursor = 0
+        self.oacp_prefix_pending_control_stamp = None
+        self.oacp_prefix_pending_cursor = None
+
+    def _try_activate_oacp_pair(self) -> bool:
+        """Atomically activate one path and its exact matching OACP bound."""
+
+        if (
+            not self.oacp_mode
+            or self.pending_path_points is None
+            or self.pending_path_receipt is None
+            or self.pending_path_source_stamp is None
+            or not self.pending_oacp_status
+            or self.pending_oacp_status_receipt is None
+            or self.pending_oacp_status.get("ready") is not True
+            or self.pending_oacp_status.get("exact_bound_valid") is not True
+        ):
+            return False
+        try:
+            assessment_stamp = float(
+                self.pending_oacp_status["path_source_stamp"]
+            )
+        except (KeyError, TypeError, ValueError, OverflowError):
+            return False
+        if (
+            not isfinite(assessment_stamp)
+            or assessment_stamp <= 0.0
+            or abs(assessment_stamp - self.pending_path_source_stamp)
+            > float(self.get_parameter("path_stamp_tolerance").value)
+        ):
+            return False
+        self.path_points = self.pending_path_points
+        self.path_receipt = self.pending_path_receipt
+        self.path_source_stamp = self.pending_path_source_stamp
+        self.oacp_status = self.pending_oacp_status
+        self.oacp_status_receipt = self.pending_oacp_status_receipt
+        self.pending_path_points = None
+        self.pending_path_receipt = None
+        self.pending_path_source_stamp = None
+        self.pending_oacp_status = {}
+        self.pending_oacp_status_receipt = None
+        # A contingency result for the previous geometry cannot certify this
+        # newly activated path/bound pair.
+        self.oacp_contingency_last_check_stamp = None
+        self._clear_oacp_contingency_certificate()
+        return True
+
+    def _on_oacp_status(self, message: String) -> None:
+        now = self._now()
+        try:
+            payload = json.loads(message.data)
+        except (json.JSONDecodeError, TypeError):
+            payload = None
+        if not isinstance(payload, dict) or payload.get("provider") != "oacp_vb":
+            self.oacp_status = {}
+            self.oacp_status_receipt = None
+            self.pending_oacp_status = {}
+            self.pending_oacp_status_receipt = None
+            return
+        if (
+            payload.get("ready") is not True
+            or payload.get("exact_bound_valid") is not True
+        ):
+            # Do not let a pre-goal or invalid assessment replace an active
+            # exact pair.  Its existing receipt will age out if no valid
+            # replacement arrives.
+            if self.path_points is None:
+                self.oacp_status = payload
+                self.oacp_status_receipt = now
+            return
+        try:
+            assessment_stamp = float(payload["path_source_stamp"])
+        except (KeyError, TypeError, ValueError, OverflowError):
+            return
+        tolerance = float(
+            self.get_parameter("path_stamp_tolerance").value
+        )
+        if (
+            self.path_source_stamp is not None
+            and isfinite(assessment_stamp)
+            and abs(assessment_stamp - self.path_source_stamp) <= tolerance
+        ):
+            self.oacp_status = payload
+            self.oacp_status_receipt = now
+            return
+        self.pending_oacp_status = payload
+        self.pending_oacp_status_receipt = now
+        self._try_activate_oacp_pair()
+
+    def _on_hardware_gate_status(self, message: String) -> None:
+        """Retain the final gate's acknowledgement of physical forwarding."""
+
+        try:
+            payload = json.loads(message.data)
+        except (json.JSONDecodeError, TypeError):
+            payload = None
+        if not isinstance(payload, dict):
+            self.hardware_gate_status = {}
+            self.hardware_gate_status_receipt = None
+            return
+        self.hardware_gate_status = payload
+        self.hardware_gate_status_receipt = self._now()
+
     def _on_costmap(self, message: OccupancyGrid) -> None:
         """Retain the same fresh inflated grid used to produce the Nav2 path."""
         now = self._now()
@@ -390,9 +728,7 @@ class DreamFreePlannerNode(Node):
         self.goal = None
         self.goal_receipt = None
         self.goal_yaw = None
-        self.path_points = None
-        self.path_receipt = None
-        self.path_source_stamp = None
+        self._clear_geometric_paths()
         self.path_rejection_reason = None
         self.path_rejection_details = {}
         self.route_status = {}
@@ -400,6 +736,8 @@ class DreamFreePlannerNode(Node):
         self.last_goal_key = None
         self.goal_complete = False
         self.mpc.reset()
+        self.oacp_contingency_last_check_stamp = None
+        self._clear_oacp_contingency_certificate()
         if message.header.frame_id != self.config.grid.frame_id:
             self.get_logger().warning("Ignored navigation goal with wrong frame")
             return
@@ -419,20 +757,23 @@ class DreamFreePlannerNode(Node):
 
     def _on_path(self, message: Path) -> None:
         # The provider publishes an empty latched path whenever its watchdog
-        # invalidates a route.  Clear the old route before validation so one
-        # callback-order window can never keep stale geometry active.
-        self.path_points = None
-        self.path_receipt = None
-        self.path_source_stamp = None
+        # invalidates a route.  Valid OACP replans are staged until the exact
+        # matching bound arrives; invalid/empty paths clear both active and
+        # pending pairs immediately.
         self.path_rejection_reason = None
         self.path_rejection_details = {}
         if self.goal is None or message.header.frame_id != self.config.grid.frame_id:
+            self._clear_geometric_paths()
             return
         if not message.poses:
             # An empty path is the provider's intentional fail-closed
             # invalidation signal, not malformed route data.
+            self._clear_geometric_paths()
             return
         try:
+            source_stamp = stamp_to_seconds(message.header.stamp)
+            if not isfinite(source_stamp) or source_stamp <= 0.0:
+                raise PathValidationError("path source stamp is invalid")
             raw_points = np.asarray(
                 [
                     (pose.pose.position.x, pose.pose.position.y)
@@ -459,12 +800,14 @@ class DreamFreePlannerNode(Node):
                     ),
                 )
         except PathValidationError as exc:
+            self._clear_geometric_paths()
             self.path_rejection_reason = f"PATH_REJECTED:{exc}"
             self.get_logger().warning(f"Rejected geometric path: {exc}")
             return
         goal = self.goal.pose.position
         endpoint_error = hypot(points[-1, 0] - goal.x, points[-1, 1] - goal.y)
         if endpoint_error > float(self.get_parameter("path_goal_tolerance").value):
+            self._clear_geometric_paths()
             self.path_rejection_reason = "PATH_GOAL_MISMATCH"
             self.get_logger().warning(
                 f"Rejected path for a different goal (error={endpoint_error:.3f} m)"
@@ -475,6 +818,7 @@ class DreamFreePlannerNode(Node):
         if final_yaw_error > float(
             self.get_parameter("path_goal_yaw_tolerance").value
         ):
+            self._clear_geometric_paths()
             self.path_rejection_reason = "PATH_GOAL_YAW_MISMATCH"
             self.get_logger().warning(
                 "Rejected path with a different terminal orientation "
@@ -486,6 +830,7 @@ class DreamFreePlannerNode(Node):
             # Require its complete padded footprint to be known and unoccupied
             # in the same live inflated costmap used for trajectory gating.
             if self.costmap is None or self.ego is None:
+                self._clear_geometric_paths()
                 self.path_rejection_reason = "PATH_START_CONTEXT_UNAVAILABLE"
                 self.get_logger().warning(
                     "Rejected path-start anchor without a live costmap and ego"
@@ -523,6 +868,7 @@ class DreamFreePlannerNode(Node):
                 verified_start_clearance_radius=start_radius,
             )
             if not anchor_check.safe:
+                self._clear_geometric_paths()
                 self.path_rejection_reason = (
                     f"PATH_START_{anchor_check.reason}"
                 )
@@ -540,9 +886,16 @@ class DreamFreePlannerNode(Node):
                     f"value={anchor_check.cell_value}"
                 )
                 return
-        self.path_points = points
-        self.path_receipt = self._now()
-        self.path_source_stamp = stamp_to_seconds(message.header.stamp)
+        receipt = self._now()
+        if self.oacp_mode:
+            self.pending_path_points = points
+            self.pending_path_receipt = receipt
+            self.pending_path_source_stamp = source_stamp
+            self._try_activate_oacp_pair()
+        else:
+            self.path_points = points
+            self.path_receipt = receipt
+            self.path_source_stamp = source_stamp
 
     def _on_route_status(self, message: String) -> None:
         try:
@@ -602,14 +955,24 @@ class DreamFreePlannerNode(Node):
         stamp_tolerance = float(
             self.get_parameter("path_stamp_tolerance").value
         )
+        received_path_stamps = [
+            float(stamp)
+            for stamp in (
+                self.path_source_stamp,
+                getattr(self, "pending_path_source_stamp", None),
+            )
+            if stamp is not None and isfinite(float(stamp))
+        ]
+        newest_received_path_stamp = (
+            None if not received_path_stamps else max(received_path_stamps)
+        )
         return bool(
-            self.path_source_stamp is not None
-            and isfinite(float(self.path_source_stamp))
-            and float(self.path_source_stamp) > 0.0
+            newest_received_path_stamp is not None
+            and newest_received_path_stamp > 0.0
             and isfinite(route_path_stamp)
             and route_path_stamp > 0.0
             and route_path_stamp
-            <= float(self.path_source_stamp) + stamp_tolerance
+            <= newest_received_path_stamp + stamp_tolerance
         )
 
     def _goal_status(self) -> dict:
@@ -632,7 +995,107 @@ class DreamFreePlannerNode(Node):
             "navigation_goal_stamp": stamp_to_seconds(self.goal.header.stamp),
         }
 
+    def _arm_status(self) -> dict:
+        if self.planner_mode == "balanced":
+            arm_name = "dream"
+            risk_channel = "drift_pde_veto_cost_cbf"
+            risk_channel_settings = {
+                "decision_veto": True,
+                "mpc_risk_cost": True,
+                "cbf_risk_expansion": True,
+                "oacp_velocity_bound": False,
+            }
+        elif self.oacp_mode:
+            arm_name = (
+                "oacp_vb_calibration"
+                if bool(
+                    self.get_parameter(
+                        "oacp_calibration_logging_only"
+                    ).value
+                )
+                else "oacp_vb"
+            )
+            risk_channel = "phantom_reachability_velocity_bound"
+            risk_channel_settings = {
+                "decision_veto": False,
+                "mpc_risk_cost": False,
+                "cbf_risk_expansion": False,
+                "oacp_velocity_bound": not bool(
+                    self.get_parameter(
+                        "oacp_calibration_logging_only"
+                    ).value
+                ),
+            }
+        else:
+            arm_name = "nominal"
+            risk_channel = "none"
+            risk_channel_settings = {
+                "decision_veto": False,
+                "mpc_risk_cost": False,
+                "cbf_risk_expansion": False,
+                "oacp_velocity_bound": False,
+            }
+        return {
+            "arm": arm_name,
+            "planner_mode": self.planner_mode,
+            "preset": self.preset.name,
+            "control_stack": arm_name,
+            "controller_stack": "shared_lmpc_cbf",
+            "risk_channel": risk_channel,
+            "risk_channel_settings": risk_channel_settings,
+            "shared_controller_parameter_hash": self.controller_parameter_hash,
+            "shared_controller_rate_hz": float(
+                self.get_parameter("update_rate").value
+            ),
+            "shared_mpc_horizon_steps": self.config.mpc.horizon,
+            "shared_mpc_dt": self.config.mpc.dt,
+        }
+
+    def _oacp_status_details(self) -> dict:
+        if not self.oacp_mode:
+            return {}
+        allowed = (
+            "assessment_ready",
+            "pre_goal_bound_valid",
+            "exact_bound_valid",
+            "thresholds_calibrated",
+            "path_source_stamp",
+            "pvs_component_count",
+            "pvs_start",
+            "pvs_end",
+            "pvs_length",
+            "frs_intersects_trajectory",
+            "risk_total",
+            "raw_risk_maximum",
+            "risk_reducer",
+            "exploration_velocity_bound",
+            "fallback_velocity_bound",
+            "v_occ_min",
+            "v_occ_max",
+            "c_th_max_exploration",
+            "c_th_max_fallback",
+            "calibration_sample_count",
+            "calibration_logging_only",
+            "calibration_run_active",
+            "calibration_goal_revision",
+            "calibration_goal_receipt_stamp",
+            "calibration_sample_scope",
+            "suggested_c_th_max_exploration",
+            "suggested_c_th_max_fallback",
+            "geometry_assumption",
+        )
+        return {
+            f"oacp_{key}": self.oacp_status.get(key)
+            for key in allowed
+            if key in self.oacp_status
+        }
+
     def _publish_stop(self, reason: str, details: Optional[dict] = None) -> None:
+        if self.oacp_mode:
+            # A command that failed any planner-side gate was not executed.
+            # Never carry its branch certificate across the stop.
+            self.oacp_contingency_last_check_stamp = None
+            self._clear_oacp_contingency_certificate(validity=False)
         if self.reference_active:
             # Do not leave a previously accepted MPC path visible or usable
             # after the current planning cycle has failed closed.  This also
@@ -650,10 +1113,6 @@ class DreamFreePlannerNode(Node):
             "stamp": self._now(),
             "ready": False,
             "reason": reason,
-            "preset": self.preset.name,
-            "control_stack": (
-                "dream" if self.preset.name != "pure_mpc" else "pure_mpc"
-            ),
             "navigation_mode": "free_space",
             "mission_complete": self.goal_complete,
             "mpc_fallback": False,
@@ -670,6 +1129,8 @@ class DreamFreePlannerNode(Node):
                 if self.verified_start_clearance_enabled
                 else None
             ),
+            **self._arm_status(),
+            **self._oacp_status_details(),
             **self._goal_status(),
         }
         if details:
@@ -719,20 +1180,43 @@ class DreamFreePlannerNode(Node):
         for name, receipt in (
             ("EGO", self.ego_receipt),
             ("WORLD", self.world_receipt),
-            ("RISK", self.risk_receipt),
-            ("DRIFT_READY", self.ready_receipt),
         ):
             if receipt is None or now - receipt >= timeout:
                 return False, f"STALE_{name}"
         for name, source_stamp in (
             ("EGO_SOURCE", self.ego_source_stamp),
             ("WORLD_SOURCE", self.world_source_stamp),
-            ("RISK_SOURCE", self.risk_source_stamp),
         ):
             if not self._source_is_fresh(source_stamp, now):
                 return False, f"STALE_{name}"
-        if not self.drift_ready:
-            return False, "DRIFT_NOT_READY"
+        if self.oacp_mode:
+            oacp_timeout = float(
+                self.get_parameter("oacp_status_timeout").value
+            )
+            if (
+                self.oacp_status_receipt is None
+                or now - self.oacp_status_receipt >= oacp_timeout
+            ):
+                return False, "STALE_OACP_ASSESSMENT"
+            if self.oacp_status.get("assessment_ready") is not True:
+                return False, "OACP_ASSESSMENT_NOT_READY"
+            if self.oacp_status.get("exact_bound_valid") is not True:
+                return False, "OACP_EXACT_BOUND_NOT_READY"
+            if self.oacp_status.get("ready") is not True:
+                return False, str(
+                    self.oacp_status.get("reason", "OACP_BOUND_NOT_READY")
+                )
+        elif not self.nominal_mode:
+            for name, receipt in (
+                ("RISK", self.risk_receipt),
+                ("DRIFT_READY", self.ready_receipt),
+            ):
+                if receipt is None or now - receipt >= timeout:
+                    return False, f"STALE_{name}"
+            if not self._source_is_fresh(self.risk_source_stamp, now):
+                return False, "STALE_RISK_SOURCE"
+            if not self.drift_ready:
+                return False, "DRIFT_NOT_READY"
         costmap_timeout = float(self.get_parameter("costmap_timeout").value)
         if (
             self.costmap is None
@@ -760,7 +1244,766 @@ class DreamFreePlannerNode(Node):
             return False, "STALE_ROUTE_STATUS"
         if not self._route_matches_goal():
             return False, str(self.route_status.get("reason", "ROUTE_NOT_READY"))
+        if self.oacp_mode:
+            try:
+                oacp_path_stamp = float(
+                    self.oacp_status["path_source_stamp"]
+                )
+            except (KeyError, TypeError, ValueError, OverflowError):
+                return False, "OACP_PATH_IDENTITY_MISSING"
+            assert self.path_source_stamp is not None
+            if (
+                not isfinite(oacp_path_stamp)
+                or oacp_path_stamp <= 0.0
+                or abs(oacp_path_stamp - self.path_source_stamp)
+                > float(self.get_parameter("path_stamp_tolerance").value)
+            ):
+                return False, "OACP_PATH_IDENTITY_MISMATCH"
         return True, "INPUTS_READY"
+
+    def _oacp_bound(self, key: str) -> float:
+        try:
+            value = float(self.oacp_status[key])
+        except (KeyError, TypeError, ValueError, OverflowError) as exc:
+            raise ValueError(f"missing or invalid OACP bound {key}") from exc
+        if (
+            not isfinite(value)
+            or value < self.config.mpc.minimum_speed
+            or value > self.config.mpc.maximum_speed
+        ):
+            raise ValueError(f"OACP bound {key} is outside shared speed limits")
+        return value
+
+    def _validated_oacp_bounds(self) -> tuple[float, float, float, float]:
+        """Return bounds only when the complete provider relation is valid."""
+
+        minimum_bound = self._oacp_bound("v_occ_min")
+        maximum_bound = self._oacp_bound("v_occ_max")
+        exploration_bound = self._oacp_bound(
+            "exploration_velocity_bound"
+        )
+        fallback_bound = self._oacp_bound("fallback_velocity_bound")
+        tolerance = 1.0e-9
+        if (
+            abs(maximum_bound - self.config.mpc.target_speed) > tolerance
+            or minimum_bound > exploration_bound + tolerance
+            or exploration_bound > fallback_bound + tolerance
+            or fallback_bound > maximum_bound + tolerance
+        ):
+            raise ValueError(
+                "OACP bounds violate v_min <= exploration <= fallback "
+                "<= v_max == shared target speed"
+            )
+        return (
+            minimum_bound,
+            maximum_bound,
+            exploration_bound,
+            fallback_bound,
+        )
+
+    def _oacp_contingency_context(
+        self,
+        *,
+        minimum_bound: float,
+        maximum_bound: float,
+        exploration_bound: float,
+        fallback_bound: float,
+    ) -> tuple:
+        """Describe every material input covered by a fallback verification."""
+
+        if self.path_source_stamp is None:
+            raise ValueError("OACP contingency has no active path identity")
+        vehicles = tuple(
+            sorted(
+                (
+                    vehicle.vehicle_id,
+                    float(vehicle.x),
+                    float(vehicle.y),
+                    float(vehicle.vx),
+                    float(vehicle.vy),
+                    float(vehicle.length),
+                    float(vehicle.width),
+                )
+                for vehicle in self.vehicles
+            )
+        )
+        return (
+            float(self.path_source_stamp),
+            vehicles,
+            float(minimum_bound),
+            float(maximum_bound),
+            float(exploration_bound),
+            float(fallback_bound),
+        )
+
+    @staticmethod
+    def _oacp_cached_context_covers(
+        cached: Optional[tuple],
+        current: tuple,
+    ) -> bool:
+        """Allow reuse only when geometry is identical and the cap did not tighten."""
+
+        if cached is None or len(cached) != 6 or len(current) != 6:
+            return False
+        return bool(
+            cached[0] == current[0]
+            and cached[1] == current[1]
+            and cached[2] == current[2]
+            and cached[3] == current[3]
+            # A looser cap preserves the previously certified prefix.  Any
+            # tightened executed or fallback cap requires a fresh pair.
+            and float(current[4]) + 1.0e-9 >= float(cached[4])
+            and float(current[5]) + 1.0e-9 >= float(cached[5])
+        )
+
+    def _oacp_prefix_state_matches(
+        self, ego: EgoState, state_index: int
+    ) -> bool:
+        """Check that physical state still follows the certified common segment."""
+
+        states = self.oacp_contingency_cached_states
+        if (
+            not isinstance(states, np.ndarray)
+            or states.ndim != 2
+            or states.shape[0] != 4
+            or not 0 <= state_index < states.shape[1]
+            or not np.all(np.isfinite(states))
+        ):
+            return False
+        expected = states[:, state_index]
+        position_error = hypot(
+            ego.x - float(expected[0]),
+            ego.y - float(expected[1]),
+        )
+        speed_error = abs(ego.speed - float(expected[2]))
+        yaw_error = abs(self._angle_error(ego.yaw, float(expected[3])))
+        return bool(
+            position_error
+            <= float(
+                self.get_parameter(
+                    "oacp_prefix_position_tracking_tolerance"
+                ).value
+            )
+            and speed_error
+            <= float(
+                self.get_parameter(
+                    "oacp_prefix_speed_tracking_tolerance"
+                ).value
+            )
+            and yaw_error
+            <= float(
+                self.get_parameter(
+                    "oacp_prefix_yaw_tracking_tolerance"
+                ).value
+            )
+        )
+
+    def _oacp_prefix_segment_progress(
+        self, ego: EgoState, state_index: int
+    ) -> Optional[float]:
+        """Return bounded progress when ego lies in the certified state tube."""
+
+        states = self.oacp_contingency_cached_states
+        if (
+            not isinstance(states, np.ndarray)
+            or states.ndim != 2
+            or states.shape[0] != 4
+            or not 0 <= state_index < states.shape[1] - 1
+            or not np.all(np.isfinite(states))
+        ):
+            return None
+        start = states[:, state_index]
+        end = states[:, state_index + 1]
+        position_delta = end[0:2] - start[0:2]
+        position_norm_squared = float(
+            np.dot(position_delta, position_delta)
+        )
+        if position_norm_squared > 1.0e-12:
+            raw_progress = float(
+                np.dot(
+                    np.asarray([ego.x, ego.y]) - start[0:2],
+                    position_delta,
+                )
+                / position_norm_squared
+            )
+        else:
+            speed_delta = float(end[2] - start[2])
+            yaw_delta = self._angle_error(
+                float(end[3]), float(start[3])
+            )
+            if abs(speed_delta) > 1.0e-9:
+                raw_progress = float(
+                    (ego.speed - start[2]) / speed_delta
+                )
+            elif abs(yaw_delta) > 1.0e-9:
+                raw_progress = (
+                    self._angle_error(ego.yaw, float(start[3]))
+                    / yaw_delta
+                )
+            else:
+                # A stationary certified step is complete once its exact
+                # command is acknowledged; there is no state change to observe.
+                raw_progress = 1.0
+        progress = float(np.clip(raw_progress, 0.0, 1.0))
+        speed_delta = float(end[2] - start[2])
+        yaw_delta = self._angle_error(float(end[3]), float(start[3]))
+        expected_position = (
+            start[0:2] + progress * position_delta
+        )
+        expected_speed = float(start[2] + progress * speed_delta)
+        expected_yaw = float(start[3] + progress * yaw_delta)
+        position_error = hypot(
+            ego.x - float(expected_position[0]),
+            ego.y - float(expected_position[1]),
+        )
+        speed_error = abs(ego.speed - expected_speed)
+        yaw_error = abs(self._angle_error(ego.yaw, expected_yaw))
+        if (
+            position_error
+            > float(
+                self.get_parameter(
+                    "oacp_prefix_position_tracking_tolerance"
+                ).value
+            )
+            or speed_error
+            > float(
+                self.get_parameter(
+                    "oacp_prefix_speed_tracking_tolerance"
+                ).value
+            )
+            or yaw_error
+            > float(
+                self.get_parameter(
+                    "oacp_prefix_yaw_tracking_tolerance"
+                ).value
+            )
+        ):
+            return None
+        return progress
+
+    def _reconcile_oacp_prefix_execution(
+        self, ego: EgoState, now: float
+    ) -> str:
+        """Advance a prefix cursor only after the final hardware gate forwarded it."""
+
+        if self.oacp_contingency_cached_valid is not True:
+            self.oacp_prefix_pending_control_stamp = None
+            self.oacp_prefix_pending_cursor = None
+            return "NO_VALID_CERTIFICATE"
+        prefix = self.oacp_contingency_cached_prefix
+        states = self.oacp_contingency_cached_states
+        cursor = self.oacp_contingency_cached_prefix_cursor
+        if (
+            not isinstance(prefix, np.ndarray)
+            or prefix.ndim != 2
+            or prefix.shape[0] != 2
+            or not np.all(np.isfinite(prefix))
+            or not isinstance(states, np.ndarray)
+            or states.shape != (4, prefix.shape[1] + 1)
+            or not np.all(np.isfinite(states))
+            or not 0 <= cursor < prefix.shape[1]
+        ):
+            self._clear_oacp_contingency_certificate(validity=False)
+            return "CERTIFICATE_MALFORMED"
+        pending_stamp = self.oacp_prefix_pending_control_stamp
+        pending_cursor = self.oacp_prefix_pending_cursor
+        if pending_stamp is None or pending_cursor is None:
+            self._clear_oacp_contingency_certificate(validity=False)
+            return "PREFIX_COMMAND_NOT_PUBLISHED"
+        if pending_cursor != cursor:
+            self._clear_oacp_contingency_certificate(validity=False)
+            return "PREFIX_CURSOR_MISMATCH"
+
+        gate_fresh = bool(
+            self.hardware_gate_status_receipt is not None
+            and now >= self.hardware_gate_status_receipt
+            and now - self.hardware_gate_status_receipt
+            < float(
+                self.get_parameter("oacp_gate_status_timeout").value
+            )
+        )
+        try:
+            forwarded_stamp = ControlSourceStamp.from_mapping(
+                self.hardware_gate_status["forwarded_control_source_stamp"]
+            )
+        except (KeyError, TypeError, ValueError):
+            forwarded_stamp = None
+        forwarded = bool(
+            gate_fresh
+            and self.hardware_gate_status.get("ready") is True
+            and self.hardware_gate_status.get("hardware_output_enabled") is True
+            and forwarded_stamp == pending_stamp
+        )
+        self.oacp_prefix_pending_control_stamp = None
+        self.oacp_prefix_pending_cursor = None
+        if not forwarded:
+            self._clear_oacp_contingency_certificate(validity=False)
+            return "PREFIX_EXECUTION_UNCONFIRMED_REVOKED"
+
+        next_cursor = cursor + 1
+        segment_progress = self._oacp_prefix_segment_progress(ego, cursor)
+        if segment_progress is None:
+            self._clear_oacp_contingency_certificate(validity=False)
+            return "FORWARDED_EXECUTION_STATE_MISMATCH"
+        if (
+            segment_progress
+            < float(
+                self.get_parameter(
+                    "oacp_prefix_advance_minimum_progress"
+                ).value
+            )
+            or not self._oacp_prefix_state_matches(ego, next_cursor)
+        ):
+            # Reapplying this control for a new full dt from a partially
+            # progressed state would extend it beyond the trajectory covered
+            # by the cached fallback solve.  Revoke and let the caller execute
+            # the fail-closed minimum-bound solve until the next scheduled
+            # two-branch verification.
+            self._clear_oacp_contingency_certificate(validity=False)
+            return "FORWARDED_PARTIAL_PREFIX_REVOKED"
+        self.oacp_contingency_cached_prefix_cursor = next_cursor
+        return "FORWARDED_PREFIX_ADVANCED"
+
+    def _solve_oacp_reference(
+        self,
+        ego: EgoState,
+        terminal_yaw: float,
+        *,
+        now: Optional[float] = None,
+    ):
+        """Execute the tighter branch and periodically verify an alternative.
+
+        Rebuilding two CVXPY problems every 200 ms missed the onboard 5 Hz
+        deadline in the reviewed benchmark.  The executed bound is still
+        solved every cycle; only the non-executed contingency check runs at
+        its explicit reduced rate, as permitted by the baseline protocol.
+        """
+
+        assert self.path_points is not None
+        cycle_stamp = self._now() if now is None else float(now)
+        if not isfinite(cycle_stamp):
+            raise ValueError("OACP solve stamp must be finite")
+        (
+            minimum_bound,
+            maximum_bound,
+            exploration_bound,
+            fallback_bound,
+        ) = self._validated_oacp_bounds()
+        contingency_context = self._oacp_contingency_context(
+            minimum_bound=minimum_bound,
+            maximum_bound=maximum_bound,
+            exploration_bound=exploration_bound,
+            fallback_bound=fallback_bound,
+        )
+        cache_context_matches = self._oacp_cached_context_covers(
+            self.oacp_contingency_cached_context,
+            contingency_context,
+        )
+        if (
+            self.oacp_contingency_cached_valid is True
+            and not cache_context_matches
+        ):
+            # Never reuse a verified alternative after a new path, a changed
+            # visible vehicle, or a tighter executed/fallback velocity bound.
+            self._clear_oacp_contingency_certificate(validity=False)
+        slack_weight = float(
+            self.get_parameter("oacp_velocity_slack_weight").value
+        )
+        if bool(
+            self.get_parameter("oacp_calibration_logging_only").value
+        ):
+            calibration = self.mpc.solve_reference(
+                ego,
+                self.path_points,
+                self.vehicles,
+                self.field,
+                self.preset,
+                terminal_yaw=terminal_yaw,
+            )
+            return calibration, {
+                "oacp_calibration_logging_only": True,
+                "oacp_bound_applied": False,
+                "oacp_executed_velocity_bound": None,
+                "oacp_computed_exploration_velocity_bound": (
+                    exploration_bound
+                ),
+                "oacp_computed_fallback_velocity_bound": fallback_bound,
+                "oacp_calibration_mpc_status": calibration.status,
+                "oacp_calibration_solve_seconds": (
+                    calibration.solve_seconds
+                ),
+                "oacp_contingency_enabled": False,
+                "oacp_contingency_valid": None,
+                "oacp_contingency_clamp_event": False,
+            }
+        try:
+            risk_total = float(self.oacp_status["risk_total"])
+        except (KeyError, TypeError, ValueError, OverflowError) as exc:
+            raise ValueError("missing or invalid OACP risk_total") from exc
+        if not isfinite(risk_total) or risk_total < 0.0:
+            raise ValueError("OACP risk_total must be finite and nonnegative")
+        if risk_total <= 1.0e-12:
+            # Remark 2 (or a collapsed PVS at reveal) removes the phantom
+            # hazard.  The shared executed MPC still enforces all visible-
+            # vehicle CBF constraints, but no phantom contingency is needed.
+            self._clear_oacp_contingency_certificate()
+            exploration = self.mpc.solve_reference(
+                ego,
+                self.path_points,
+                self.vehicles,
+                self.field,
+                self.preset,
+                terminal_yaw=terminal_yaw,
+                velocity_upper_bound=exploration_bound,
+                velocity_slack_weight=slack_weight,
+            )
+            return exploration, {
+                "oacp_velocity_slack_weight": slack_weight,
+                "oacp_calibration_logging_only": False,
+                "oacp_bound_applied": True,
+                "oacp_executed_velocity_bound": exploration_bound,
+                "oacp_exploration_mpc_status": exploration.status,
+                "oacp_exploration_solve_seconds": exploration.solve_seconds,
+                "oacp_exploration_cbf_slack": exploration.maximum_slack,
+                "oacp_exploration_velocity_slack": (
+                    exploration.maximum_velocity_slack
+                ),
+                "oacp_exploration_future_velocity_slack": (
+                    exploration.maximum_future_velocity_slack
+                ),
+                "oacp_contingency_enabled": bool(
+                    self.get_parameter("oacp_enable_contingency").value
+                ),
+                "oacp_contingency_applicable": False,
+                "oacp_contingency_not_applicable_reason": (
+                    "NO_ACTIVE_PHANTOM_RISK"
+                ),
+                "oacp_contingency_valid": None,
+                "oacp_contingency_clamp_event": False,
+            }
+        contingency_enabled = bool(
+            self.get_parameter("oacp_enable_contingency").value
+        )
+        prefix_execution_state = (
+            self._reconcile_oacp_prefix_execution(ego, cycle_stamp)
+            if contingency_enabled
+            else "CONTINGENCY_DISABLED"
+        )
+        check_rate = float(
+            self.get_parameter("oacp_contingency_check_rate").value
+        )
+        check_period = 1.0 / check_rate
+        check_age = (
+            None
+            if self.oacp_contingency_last_check_stamp is None
+            else max(
+                0.0,
+                cycle_stamp - self.oacp_contingency_last_check_stamp,
+            )
+        )
+        check_due = bool(
+            contingency_enabled
+            and (
+                self.oacp_contingency_last_check_stamp is None
+                or check_age is None
+                or check_age >= check_period
+            )
+        )
+        cached_prefix = self.oacp_contingency_cached_prefix
+        cached_prefix_cursor = self.oacp_contingency_cached_prefix_cursor
+        cached_prefix_well_formed = bool(
+            isinstance(cached_prefix, np.ndarray)
+            and cached_prefix.ndim == 2
+            and cached_prefix.shape[0] == 2
+            and np.all(np.isfinite(cached_prefix))
+            and 0 <= cached_prefix_cursor <= cached_prefix.shape[1]
+        )
+        if (
+            contingency_enabled
+            and self.oacp_contingency_cached_valid is True
+            and not check_due
+        ):
+            if not cached_prefix_well_formed:
+                self._clear_oacp_contingency_certificate(validity=False)
+            elif cached_prefix_cursor >= cached_prefix.shape[1]:
+                # The verified common segment has been consumed.  Hold the
+                # fail-closed minimum cap until the scheduled reduced-rate
+                # check instead of silently increasing solver load.
+                self._clear_oacp_contingency_certificate(validity=False)
+
+        # A previously invalid alternative stays fail-closed between its
+        # reduced-rate rechecks.  Avoid spending an exploration solve whose
+        # command cannot be executed while that cached result remains invalid.
+        if (
+            contingency_enabled
+            and not check_due
+            and self.oacp_contingency_cached_valid is not True
+        ):
+            clamped = self.mpc.solve_reference(
+                ego,
+                self.path_points,
+                self.vehicles,
+                self.field,
+                self.preset,
+                terminal_yaw=terminal_yaw,
+                velocity_upper_bound=minimum_bound,
+                velocity_slack_weight=slack_weight,
+            )
+            return clamped, {
+                "oacp_velocity_slack_weight": slack_weight,
+                "oacp_calibration_logging_only": False,
+                "oacp_bound_applied": True,
+                "oacp_executed_velocity_bound": minimum_bound,
+                "oacp_contingency_enabled": True,
+                "oacp_contingency_applicable": True,
+                "oacp_contingency_check_rate_hz": check_rate,
+                "oacp_contingency_check_performed": False,
+                "oacp_contingency_check_age": check_age,
+                "oacp_contingency_cached_valid": False,
+                "oacp_contingency_cache_context_match": (
+                    cache_context_matches
+                ),
+                "oacp_prefix_execution_state": prefix_execution_state,
+                "oacp_contingency_valid": False,
+                "oacp_contingency_clamp_event": True,
+                "oacp_clamped_mpc_status": clamped.status,
+                "oacp_clamped_solve_seconds": clamped.solve_seconds,
+                "oacp_clamped_velocity_slack": (
+                    clamped.maximum_velocity_slack
+                ),
+                "oacp_clamped_future_velocity_slack": (
+                    clamped.maximum_future_velocity_slack
+                ),
+            }
+
+        cached_execution_prefix = None
+        cached_execution_cursor = None
+        if (
+            contingency_enabled
+            and not check_due
+            and self.oacp_contingency_cached_valid is True
+        ):
+            assert isinstance(self.oacp_contingency_cached_prefix, np.ndarray)
+            cached_execution_cursor = (
+                self.oacp_contingency_cached_prefix_cursor
+            )
+            cached_execution_prefix = self.oacp_contingency_cached_prefix[
+                :, cached_execution_cursor:
+            ]
+
+        exploration = self.mpc.solve_reference(
+            ego,
+            self.path_points,
+            self.vehicles,
+            self.field,
+            self.preset,
+            terminal_yaw=terminal_yaw,
+            velocity_upper_bound=exploration_bound,
+            velocity_slack_weight=slack_weight,
+            fixed_control_prefix=cached_execution_prefix,
+            # On a contingency-check cycle the selected branch is not known
+            # yet.  Keep steer-rate history tied to the last physical command
+            # until the alternative has been verified.
+            commit_solution=not check_due,
+        )
+        details = {
+            "oacp_velocity_slack_weight": slack_weight,
+            "oacp_calibration_logging_only": False,
+            "oacp_bound_applied": True,
+            "oacp_executed_velocity_bound": exploration_bound,
+            "oacp_exploration_mpc_status": exploration.status,
+            "oacp_exploration_solve_seconds": exploration.solve_seconds,
+            "oacp_exploration_cbf_slack": exploration.maximum_slack,
+            "oacp_exploration_velocity_slack": (
+                exploration.maximum_velocity_slack
+            ),
+            "oacp_exploration_future_velocity_slack": (
+                exploration.maximum_future_velocity_slack
+            ),
+            "oacp_contingency_enabled": bool(
+                self.get_parameter("oacp_enable_contingency").value
+            ),
+            "oacp_contingency_applicable": True,
+            "oacp_contingency_check_rate_hz": check_rate,
+            "oacp_contingency_check_performed": False,
+            "oacp_contingency_check_age": check_age,
+            "oacp_contingency_cached_valid": (
+                self.oacp_contingency_cached_valid
+            ),
+            "oacp_contingency_cache_context_match": (
+                cache_context_matches
+            ),
+            "oacp_prefix_execution_state": prefix_execution_state,
+            "oacp_contingency_valid": (
+                self.oacp_contingency_cached_valid
+            ),
+            "oacp_contingency_clamp_event": False,
+            "oacp_cached_prefix_enforced": (
+                cached_execution_prefix is not None
+            ),
+            "oacp_cached_prefix_cursor": cached_execution_cursor,
+        }
+        if exploration.used_fallback and contingency_enabled:
+            # A failed executed-branch solve cannot inherit the previous
+            # fallback certificate.  Re-solve at the fail-closed minimum cap.
+            self._clear_oacp_contingency_certificate(validity=False)
+            clamped = self.mpc.solve_reference(
+                ego,
+                self.path_points,
+                self.vehicles,
+                self.field,
+                self.preset,
+                terminal_yaw=terminal_yaw,
+                velocity_upper_bound=minimum_bound,
+                velocity_slack_weight=slack_weight,
+            )
+            details.update(
+                {
+                    "oacp_contingency_cached_valid": False,
+                    "oacp_contingency_valid": False,
+                    "oacp_contingency_clamp_event": True,
+                    "oacp_executed_velocity_bound": minimum_bound,
+                    "oacp_clamped_mpc_status": clamped.status,
+                    "oacp_clamped_solve_seconds": clamped.solve_seconds,
+                    "oacp_clamped_velocity_slack": (
+                        clamped.maximum_velocity_slack
+                    ),
+                    "oacp_clamped_future_velocity_slack": (
+                        clamped.maximum_future_velocity_slack
+                    ),
+                }
+            )
+            return clamped, details
+        if not contingency_enabled:
+            return exploration, details
+        if not check_due:
+            assert cached_execution_cursor is not None
+            assert self.oacp_contingency_cached_prefix is not None
+            details["oacp_prefix_command_cursor"] = (
+                cached_execution_cursor
+            )
+            details["oacp_cached_prefix_remaining_steps"] = max(
+                0,
+                self.oacp_contingency_cached_prefix.shape[1]
+                - cached_execution_cursor,
+            )
+            return exploration, details
+
+        prefix_steps = int(
+            self.get_parameter("oacp_shared_prefix_steps").value
+        )
+        fallback = self.mpc.solve_reference(
+            ego,
+            self.path_points,
+            self.vehicles,
+            self.field,
+            self.preset,
+            terminal_yaw=terminal_yaw,
+            velocity_upper_bound=fallback_bound,
+            velocity_slack_weight=slack_weight,
+            fixed_control_prefix=exploration.controls[:, :prefix_steps],
+            commit_solution=False,
+        )
+        contingency_slack_tolerance = float(
+            self.get_parameter(
+                "oacp_contingency_slack_tolerance"
+            ).value
+        )
+        fallback_valid = bool(
+            not fallback.used_fallback
+            and fallback.maximum_velocity_slack
+            <= contingency_slack_tolerance
+            and fallback.maximum_slack <= contingency_slack_tolerance
+        )
+        self.oacp_contingency_last_check_stamp = cycle_stamp
+        self.oacp_contingency_cached_valid = fallback_valid
+        self.oacp_contingency_cached_context = contingency_context
+        if fallback_valid:
+            self.oacp_contingency_cached_prefix = np.array(
+                exploration.controls[:, :prefix_steps],
+                dtype=np.float64,
+                copy=True,
+            )
+            self.oacp_contingency_cached_states = np.array(
+                exploration.states[:, : prefix_steps + 1],
+                dtype=np.float64,
+                copy=True,
+            )
+            # The first command is only pending here.  The cursor advances on
+            # the next cycle after a fresh final-gate acknowledgement and a
+            # bounded physical-state tracking check.
+            self.oacp_contingency_cached_prefix_cursor = 0
+            self.oacp_prefix_pending_control_stamp = None
+            self.oacp_prefix_pending_cursor = None
+        else:
+            self.oacp_contingency_cached_prefix = None
+            self.oacp_contingency_cached_states = None
+            self.oacp_contingency_cached_prefix_cursor = 0
+        details.update(
+            {
+                "oacp_contingency_check_performed": True,
+                "oacp_contingency_check_age": 0.0,
+                "oacp_contingency_cached_valid": fallback_valid,
+                "oacp_shared_prefix_steps": prefix_steps,
+                "oacp_shared_prefix_seconds": (
+                    prefix_steps * self.config.mpc.dt
+                ),
+                "oacp_fallback_mpc_status": fallback.status,
+                "oacp_fallback_solve_seconds": fallback.solve_seconds,
+                "oacp_fallback_cbf_slack": fallback.maximum_slack,
+                "oacp_fallback_velocity_slack": (
+                    fallback.maximum_velocity_slack
+                ),
+                "oacp_fallback_future_velocity_slack": (
+                    fallback.maximum_future_velocity_slack
+                ),
+                "oacp_contingency_slack_tolerance": (
+                    contingency_slack_tolerance
+                ),
+                "oacp_contingency_valid": fallback_valid,
+                "oacp_cached_prefix_enforced": False,
+                "oacp_cached_prefix_cursor": (
+                    self.oacp_contingency_cached_prefix_cursor
+                    if fallback_valid
+                    else None
+                ),
+                "oacp_prefix_command_cursor": (
+                    0 if fallback_valid else None
+                ),
+            }
+        )
+        if fallback_valid:
+            self.mpc.commit_result(exploration)
+            return exploration, details
+
+        # This is a third solve only on a contingency failure.  Executing the
+        # earlier exploration solution under a newly declared lower bound
+        # would be internally inconsistent, so solve the clamped branch now.
+        clamped = self.mpc.solve_reference(
+            ego,
+            self.path_points,
+            self.vehicles,
+            self.field,
+            self.preset,
+            terminal_yaw=terminal_yaw,
+            velocity_upper_bound=minimum_bound,
+            velocity_slack_weight=slack_weight,
+        )
+        details.update(
+            {
+                "oacp_contingency_clamp_event": True,
+                "oacp_executed_velocity_bound": minimum_bound,
+                "oacp_clamped_mpc_status": clamped.status,
+                "oacp_clamped_solve_seconds": clamped.solve_seconds,
+                "oacp_clamped_velocity_slack": (
+                    clamped.maximum_velocity_slack
+                ),
+                "oacp_clamped_future_velocity_slack": (
+                    clamped.maximum_future_velocity_slack
+                ),
+            }
+        )
+        return clamped, details
 
     def _plan(self) -> None:
         now = self._now()
@@ -837,19 +2080,50 @@ class DreamFreePlannerNode(Node):
                     },
                 )
                 return
-            result = self.mpc.solve_reference(
-                ego,
-                self.path_points,
-                self.vehicles,
-                self.field,
-                self.preset,
-                terminal_yaw=self.goal_yaw,
-            )
+            oacp_solver_details = {}
+            if self.oacp_mode:
+                result, oacp_solver_details = self._solve_oacp_reference(
+                    ego, self.goal_yaw, now=now
+                )
+            else:
+                result = self.mpc.solve_reference(
+                    ego,
+                    self.path_points,
+                    self.vehicles,
+                    self.field,
+                    self.preset,
+                    terminal_yaw=self.goal_yaw,
+                )
         except (PathValidationError, ValueError, RuntimeError) as exc:
             self.get_logger().error(f"Free planner failed closed: {exc}")
             self.mpc.reset()
             self._publish_stop(f"PLANNER_ERROR:{exc}")
             return
+
+        if self.oacp_mode:
+            future_slack_limit = float(
+                self.get_parameter(
+                    "oacp_maximum_future_velocity_slack"
+                ).value
+            )
+            if result.maximum_future_velocity_slack > future_slack_limit:
+                self.mpc.reset()
+                self._publish_stop(
+                    "OACP_VELOCITY_BOUND_VIOLATION",
+                    {
+                        **oacp_solver_details,
+                        "maximum_velocity_slack": (
+                            result.maximum_velocity_slack
+                        ),
+                        "maximum_future_velocity_slack": (
+                            result.maximum_future_velocity_slack
+                        ),
+                        "maximum_allowed_future_velocity_slack": (
+                            future_slack_limit
+                        ),
+                    },
+                )
+                return
 
         assert self.costmap is not None
         start_center, start_radius = self._start_clearance_contract()
@@ -919,8 +2193,35 @@ class DreamFreePlannerNode(Node):
         control.twist.linear.x = gated.target_speed
         control.twist.linear.y = gated.acceleration
         control.twist.angular.z = gated.steering
+        if self.oacp_mode:
+            prefix_cursor = oacp_solver_details.get(
+                "oacp_prefix_command_cursor"
+            )
+            if (
+                oacp_solver_details.get("oacp_contingency_valid") is True
+                and isinstance(prefix_cursor, int)
+                and not isinstance(prefix_cursor, bool)
+                and prefix_cursor
+                == self.oacp_contingency_cached_prefix_cursor
+            ):
+                self.oacp_prefix_pending_control_stamp = (
+                    ControlSourceStamp.from_ros_stamp(control.header.stamp)
+                )
+                self.oacp_prefix_pending_cursor = prefix_cursor
+            else:
+                self.oacp_prefix_pending_control_stamp = None
+                self.oacp_prefix_pending_cursor = None
         self.control_publisher.publish(control)
         self._publish_trajectory(result.states)
+        total_mpc_seconds = result.solve_seconds
+        if self.oacp_mode:
+            total_mpc_seconds = sum(
+                float(value)
+                for key, value in oacp_solver_details.items()
+                if key.endswith("_solve_seconds")
+                and value is not None
+                and isfinite(float(value))
+            )
         self.status_publisher.publish(
             String(
                 data=json.dumps(
@@ -928,12 +2229,6 @@ class DreamFreePlannerNode(Node):
                         "stamp": now,
                         "ready": True,
                         "reason": "ok",
-                        "preset": self.preset.name,
-                        "control_stack": (
-                            "dream"
-                            if self.preset.name != "pure_mpc"
-                            else "pure_mpc"
-                        ),
                         "navigation_mode": "free_space",
                         "mission_complete": False,
                         "maneuver": (
@@ -954,9 +2249,16 @@ class DreamFreePlannerNode(Node):
                         "acceleration": result.command.acceleration,
                         "center_steer": result.command.steering,
                         "t_mpc": result.solve_seconds,
+                        "t_mpc_total": total_mpc_seconds,
                         "mpc_status": result.status,
                         "mpc_fallback": result.used_fallback,
                         "maximum_cbf_slack": result.maximum_slack,
+                        "maximum_velocity_slack": (
+                            result.maximum_velocity_slack
+                        ),
+                        "maximum_future_velocity_slack": (
+                            result.maximum_future_velocity_slack
+                        ),
                         "maximum_allowed_cbf_slack": maximum_allowed_slack,
                         "map_bounds_enforced": self.mpc.enforce_map_bounds,
                         "verified_start_clearance_active": (
@@ -967,6 +2269,9 @@ class DreamFreePlannerNode(Node):
                             if self.verified_start_clearance_enabled
                             else None
                         ),
+                        **self._arm_status(),
+                        **self._oacp_status_details(),
+                        **oacp_solver_details,
                         **self._goal_status(),
                     },
                     separators=(",", ":"),

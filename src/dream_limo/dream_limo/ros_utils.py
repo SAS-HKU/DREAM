@@ -2,16 +2,117 @@
 
 from __future__ import annotations
 
+from dataclasses import dataclass
 from math import atan2, cos, sin
-from typing import Any, Dict, Mapping, Tuple
+from typing import Any, Dict, Mapping, Optional, Tuple
 
 import numpy as np
+from geometry_msgs.msg import TwistStamped
 
+from .core.command_adapter import VelocityCommand
 from .core.types import EgoState, Vehicle
 
 
 def stamp_to_seconds(stamp: Any) -> float:
     return float(stamp.sec) + 1.0e-9 * float(stamp.nanosec)
+
+
+@dataclass(frozen=True)
+class ControlSourceStamp:
+    """Exact planner-command identity preserved across internal safety hops."""
+
+    sec: int
+    nanosec: int
+
+    def __post_init__(self) -> None:
+        if (
+            isinstance(self.sec, bool)
+            or not isinstance(self.sec, int)
+            or isinstance(self.nanosec, bool)
+            or not isinstance(self.nanosec, int)
+            or self.sec < 0
+            or not 0 <= self.nanosec < 1_000_000_000
+            or (self.sec == 0 and self.nanosec == 0)
+        ):
+            raise ValueError("control source stamp must be a nonzero ROS time")
+
+    @classmethod
+    def from_ros_stamp(cls, stamp: Any) -> "ControlSourceStamp":
+        return cls(sec=stamp.sec, nanosec=stamp.nanosec)
+
+    @classmethod
+    def from_mapping(cls, value: Any) -> "ControlSourceStamp":
+        if not isinstance(value, Mapping):
+            raise ValueError("control source stamp payload must be a mapping")
+        try:
+            return cls(sec=value["sec"], nanosec=value["nanosec"])
+        except KeyError as exc:
+            raise ValueError("control source stamp payload is incomplete") from exc
+
+    def apply_to(self, stamp: Any) -> None:
+        stamp.sec = self.sec
+        stamp.nanosec = self.nanosec
+
+    def as_mapping(self) -> Dict[str, int]:
+        return {"sec": self.sec, "nanosec": self.nanosec}
+
+
+def velocity_command_from_stamped_twist(
+    message: TwistStamped,
+    *,
+    malformed_reason: str,
+    expected_frame: str = "base_link",
+) -> tuple[VelocityCommand, Optional[ControlSourceStamp]]:
+    """Decode one internal command and reject missing identity or extra axes."""
+
+    twist = message.twist
+    expected_zero = (
+        float(twist.linear.y),
+        float(twist.linear.z),
+        float(twist.angular.x),
+        float(twist.angular.y),
+    )
+    values = (
+        float(twist.linear.x),
+        float(twist.angular.z),
+        *expected_zero,
+    )
+    try:
+        source_stamp = ControlSourceStamp.from_ros_stamp(message.header.stamp)
+    except (AttributeError, TypeError, ValueError):
+        source_stamp = None
+    valid = bool(
+        message.header.frame_id == expected_frame
+        and source_stamp is not None
+        and all(np.isfinite(value) for value in values)
+        and all(abs(value) <= 1.0e-9 for value in expected_zero)
+    )
+    if not valid:
+        return VelocityCommand.zero(malformed_reason), None
+    return (
+        VelocityCommand(values[0], values[1], True, "ok"),
+        source_stamp,
+    )
+
+
+def stamped_twist_from_velocity_command(
+    command: VelocityCommand,
+    source_stamp: Optional[ControlSourceStamp],
+    *,
+    frame_id: str = "base_link",
+) -> TwistStamped:
+    """Encode a valid internal command with its unchanged planner identity."""
+
+    message = TwistStamped()
+    if not command.valid:
+        return message
+    if source_stamp is None or not frame_id:
+        raise ValueError("valid internal commands require an exact source stamp")
+    source_stamp.apply_to(message.header.stamp)
+    message.header.frame_id = frame_id
+    message.twist.linear.x = command.linear_x
+    message.twist.angular.z = command.angular_z
+    return message
 
 
 def quaternion_to_yaw(quaternion: Any) -> float:

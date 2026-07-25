@@ -7,7 +7,7 @@ from math import isfinite
 
 import numpy as np
 import rclpy
-from geometry_msgs.msg import Twist
+from geometry_msgs.msg import TwistStamped
 from limo_msgs.msg import LimoStatus
 from nav_msgs.msg import Odometry
 from rclpy.node import Node
@@ -17,6 +17,11 @@ from std_msgs.msg import Bool, String
 
 from .core.command_adapter import SafetySupervisorCore, VelocityCommand
 from .limo_scale import default_deployment_config
+from .ros_utils import (
+    ControlSourceStamp,
+    stamped_twist_from_velocity_command,
+    velocity_command_from_stamped_twist,
+)
 
 
 class DreamSafetySupervisorNode(Node):
@@ -40,6 +45,7 @@ class DreamSafetySupervisorNode(Node):
         self.declare_parameter("external_stop_topic", "/dream/external_stop")
         self.declare_parameter("reset_topic", "/dream/reset_stop")
         self.declare_parameter("arm_topic", "/dream/arm")
+        self.candidate_source_stamp: ControlSourceStamp | None = None
 
         reliable = QoSProfile(
             history=HistoryPolicy.KEEP_LAST,
@@ -54,7 +60,7 @@ class DreamSafetySupervisorNode(Node):
             durability=DurabilityPolicy.VOLATILE,
         )
         self.create_subscription(
-            Twist,
+            TwistStamped,
             str(self.get_parameter("candidate_topic").value),
             self._on_candidate,
             reliable,
@@ -80,21 +86,21 @@ class DreamSafetySupervisorNode(Node):
         self.create_subscription(
             Bool, str(self.get_parameter("arm_topic").value), self._on_arm, reliable
         )
-        self.output_publisher = self.create_publisher(Twist, self.OUTPUT_TOPIC, reliable)
+        self.output_publisher = self.create_publisher(
+            TwistStamped, self.OUTPUT_TOPIC, reliable
+        )
         self.status_publisher = self.create_publisher(String, "/dream/safety_status", reliable)
         self.create_timer(1.0 / float(self.get_parameter("publish_rate").value), self._publish)
 
     def _now(self) -> float:
         return self.get_clock().now().nanoseconds * 1.0e-9
 
-    def _on_candidate(self, message: Twist) -> None:
-        values = (float(message.linear.x), float(message.angular.z))
-        valid = all(isfinite(value) for value in values)
-        command = (
-            VelocityCommand(values[0], values[1], True, "ok")
-            if valid
-            else VelocityCommand.zero("NONFINITE_CANDIDATE")
+    def _on_candidate(self, message: TwistStamped) -> None:
+        command, source_stamp = velocity_command_from_stamped_twist(
+            message,
+            malformed_reason="MALFORMED_CANDIDATE",
         )
+        self.candidate_source_stamp = source_stamp
         self.core.update_candidate(command, self._now())
 
     def _on_odom(self, _message: Odometry) -> None:
@@ -126,9 +132,12 @@ class DreamSafetySupervisorNode(Node):
     def _publish(self) -> None:
         now = self._now()
         command = self.core.evaluate(now)
-        message = Twist()
-        message.linear.x = command.linear_x
-        message.angular.z = command.angular_z
+        if command.valid and self.candidate_source_stamp is None:
+            command = VelocityCommand.zero("MISSING_CONTROL_SOURCE_STAMP")
+        message = stamped_twist_from_velocity_command(
+            command,
+            self.candidate_source_stamp,
+        )
         self.output_publisher.publish(message)
         status = String()
         status.data = json.dumps(
@@ -138,6 +147,12 @@ class DreamSafetySupervisorNode(Node):
                 "output_topic": self.OUTPUT_TOPIC,
                 "linear_x": command.linear_x,
                 "angular_z": command.angular_z,
+                "control_source_stamp": (
+                    self.candidate_source_stamp.as_mapping()
+                    if command.valid
+                    and self.candidate_source_stamp is not None
+                    else None
+                ),
                 "motion_mode": self.core.motion_mode,
                 "obstacle_latched": self.core.obstacle_latched,
                 "external_stop_latched": self.core.external_stop_latched,
@@ -173,7 +188,7 @@ def main(args=None) -> None:
     finally:
         # Publish an explicit zero before teardown when the executor permits it.
         if rclpy.ok():
-            node.output_publisher.publish(Twist())
+            node.output_publisher.publish(TwistStamped())
         node.destroy_node()
         if rclpy.ok():
             rclpy.shutdown()

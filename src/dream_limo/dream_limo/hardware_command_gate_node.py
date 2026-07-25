@@ -13,7 +13,7 @@ from typing import Any, Dict, Optional
 
 import numpy as np
 import rclpy
-from geometry_msgs.msg import Twist
+from geometry_msgs.msg import Twist, TwistStamped
 from limo_msgs.msg import LimoStatus
 from nav_msgs.msg import Odometry
 from rclpy.node import Node
@@ -21,9 +21,91 @@ from rclpy.qos import DurabilityPolicy, HistoryPolicy, QoSProfile, ReliabilityPo
 from sensor_msgs.msg import LaserScan
 from std_msgs.msg import String
 
-from .core.command_adapter import VelocityCommand
 from .core.hardware_gate import HardwareCommandGateCore, HardwareGateConfig
 from .limo_scale import default_deployment_config
+from .ros_utils import (
+    ControlSourceStamp,
+    velocity_command_from_stamped_twist,
+)
+
+
+def validated_risk_readiness_provider(value: Any) -> str:
+    """Return the selected risk provider or reject an unknown safety contract."""
+
+    provider = str(value).strip()
+    if provider not in {"drift", "nominal", "oacp_vb"}:
+        raise ValueError(
+            "risk_readiness_provider must be 'drift', 'nominal', or 'oacp_vb'"
+        )
+    return provider
+
+
+def risk_readiness_ready(
+    payload: Optional[Dict[str, Any]],
+    provider: str,
+    *,
+    allow_uncalibrated_oacp_logging: bool = False,
+    expected_v_occ_max: Optional[float] = None,
+) -> bool:
+    """Validate a provider-specific readiness heartbeat without weakening DRIFT."""
+
+    selected = validated_risk_readiness_provider(provider)
+    if selected == "drift":
+        # Preserve the deployed DRIFT callback contract exactly.
+        return bool(payload and payload.get("ready", False))
+    if selected == "nominal":
+        return bool(
+            payload
+            and payload.get("arm") == "nominal"
+            and payload.get("ready") is True
+        )
+    try:
+        minimum_bound = float(payload["v_occ_min"]) if payload else float("nan")
+        maximum_bound = float(payload["v_occ_max"]) if payload else float("nan")
+        exploration_bound = (
+            float(payload["exploration_velocity_bound"])
+            if payload
+            else float("nan")
+        )
+        fallback_bound = (
+            float(payload["fallback_velocity_bound"])
+            if payload
+            else float("nan")
+        )
+        expected = (
+            maximum_bound
+            if expected_v_occ_max is None
+            else float(expected_v_occ_max)
+        )
+    except (KeyError, TypeError, ValueError, OverflowError):
+        return False
+    bounds_valid = bool(
+        all(
+            np.isfinite(value)
+            for value in (
+                minimum_bound,
+                maximum_bound,
+                exploration_bound,
+                fallback_bound,
+                expected,
+            )
+        )
+        and 0.0 <= minimum_bound <= exploration_bound
+        <= fallback_bound <= maximum_bound
+        and abs(maximum_bound - expected) <= 1.0e-9
+    )
+    return bool(
+        payload
+        and payload.get("provider") == "oacp_vb"
+        and payload.get("assessment_ready") is True
+        and payload.get("exact_bound_valid") is True
+        and payload.get("ready") is True
+        and bounds_valid
+        and (
+            payload.get("thresholds_calibrated") is True
+            or allow_uncalibrated_oacp_logging
+        )
+    )
 
 
 class DreamHardwareCommandGateNode(Node):
@@ -64,6 +146,8 @@ class DreamHardwareCommandGateNode(Node):
         self.declare_parameter("deadman_status_topic", "/dream/deadman_status")
         self.declare_parameter("world_status_topic", "/dream/world_status")
         self.declare_parameter("drift_status_topic", "/dream/drift_status")
+        self.declare_parameter("risk_readiness_provider", "drift")
+        self.declare_parameter("allow_uncalibrated_oacp_logging", False)
         self.declare_parameter("planner_status_topic", "/dream/planner_status")
         self.declare_parameter("gate_status_topic", "/dream/hardware_gate_status")
         self.declare_parameter("expected_candidate_owner", "dream_safety_supervisor")
@@ -130,6 +214,15 @@ class DreamHardwareCommandGateNode(Node):
             ),
         )
         self.core = HardwareCommandGateCore(self.gate_config)
+        self.risk_readiness_provider = validated_risk_readiness_provider(
+            self.get_parameter("risk_readiness_provider").value
+        )
+        self.allow_uncalibrated_oacp_logging = bool(
+            self.get_parameter("allow_uncalibrated_oacp_logging").value
+        )
+        self.candidate_control_source_stamp: Optional[
+            ControlSourceStamp
+        ] = None
 
         reliable = QoSProfile(
             history=HistoryPolicy.KEEP_LAST,
@@ -144,7 +237,7 @@ class DreamHardwareCommandGateNode(Node):
             durability=DurabilityPolicy.VOLATILE,
         )
         self.create_subscription(
-            Twist,
+            TwistStamped,
             str(self.get_parameter("candidate_topic").value),
             self._on_candidate,
             reliable,
@@ -227,22 +320,12 @@ class DreamHardwareCommandGateNode(Node):
         except (TypeError, ValueError, OverflowError):
             return default
 
-    def _on_candidate(self, message: Twist) -> None:
-        expected_zero = (
-            float(message.linear.y),
-            float(message.linear.z),
-            float(message.angular.x),
-            float(message.angular.y),
+    def _on_candidate(self, message: TwistStamped) -> None:
+        command, source_stamp = velocity_command_from_stamped_twist(
+            message,
+            malformed_reason="MALFORMED_CANDIDATE",
         )
-        values = (float(message.linear.x), float(message.angular.z), *expected_zero)
-        valid = all(isfinite(value) for value in values) and all(
-            abs(value) <= 1.0e-9 for value in expected_zero
-        )
-        command = (
-            VelocityCommand(values[0], values[1], True, "ok")
-            if valid
-            else VelocityCommand.zero("MALFORMED_CANDIDATE")
-        )
+        self.candidate_control_source_stamp = source_stamp
         self.core.update_candidate(command, self._now())
 
     def _on_odom(self, _message: Odometry) -> None:
@@ -322,8 +405,18 @@ class DreamHardwareCommandGateNode(Node):
         )
 
     def _on_drift(self, message: String) -> None:
-        payload = self._payload(message) or {}
-        self.core.update_drift(ready=bool(payload.get("ready", False)), stamp=self._now())
+        payload = self._payload(message)
+        self.core.update_drift(
+            ready=risk_readiness_ready(
+                payload,
+                self.risk_readiness_provider,
+                allow_uncalibrated_oacp_logging=(
+                    self.allow_uncalibrated_oacp_logging
+                ),
+                expected_v_occ_max=self.gate_config.maximum_speed,
+            ),
+            stamp=self._now(),
+        )
 
     def _on_planner(self, message: String) -> None:
         payload = self._payload(message) or {}
@@ -401,6 +494,7 @@ class DreamHardwareCommandGateNode(Node):
             return None if stamp is None else max(0.0, now - stamp)
 
         status = {
+            "stamp": now,
             "ready": command.valid,
             "reason": command.reason,
             "hardware_output_enabled": enabled,
@@ -420,6 +514,18 @@ class DreamHardwareCommandGateNode(Node):
             "output_topic": self.OUTPUT_TOPIC,
             "linear_x": command.linear_x,
             "angular_z": command.angular_z,
+            "candidate_receipt_stamp": self.core.candidate_stamp,
+            "candidate_control_source_stamp": (
+                self.candidate_control_source_stamp.as_mapping()
+                if self.candidate_control_source_stamp is not None
+                else None
+            ),
+            "forwarded_control_source_stamp": (
+                self.candidate_control_source_stamp.as_mapping()
+                if command.valid
+                and self.candidate_control_source_stamp is not None
+                else None
+            ),
             "candidate_owners": candidate_owners,
             "candidate_owner_ok": candidate_owner_ok,
             "cmd_vel_owners": output_owners,
@@ -433,6 +539,12 @@ class DreamHardwareCommandGateNode(Node):
             "collision_ready": self.core.collision_ready,
             "trajectory_clear": self.core.trajectory_clear,
             "world_ready": self.core.world_ready,
+            "risk_readiness_provider": self.risk_readiness_provider,
+            "allow_uncalibrated_oacp_logging": (
+                self.allow_uncalibrated_oacp_logging
+            ),
+            "risk_ready": self.core.drift_ready,
+            # Compatibility aliases for existing monitoring and bag tooling.
             "drift_ready": self.core.drift_ready,
             "planner_ready": self.core.planner_ready,
             "mpc_fallback": self.core.planner_used_fallback,
@@ -451,6 +563,7 @@ class DreamHardwareCommandGateNode(Node):
                 "collision": age(self.core.collision_stamp),
                 "deadman": age(self.core.deadman_stamp),
                 "world": age(self.core.world_stamp),
+                "risk": age(self.core.drift_stamp),
                 "drift": age(self.core.drift_stamp),
                 "planner": age(self.core.planner_stamp),
             },

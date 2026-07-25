@@ -8,7 +8,7 @@ from pathlib import Path as FilePath
 from typing import Any, Dict, Optional
 
 import rclpy
-from geometry_msgs.msg import Twist
+from geometry_msgs.msg import TwistStamped
 from nav_msgs.msg import OccupancyGrid, Odometry, Path
 from rclpy.node import Node
 from rclpy.qos import DurabilityPolicy, HistoryPolicy, QoSProfile, ReliabilityPolicy
@@ -103,8 +103,15 @@ class DreamSmokeMonitor(Node):
         self.create_subscription(
             MarkerArray, "/dream/scenario_markers", lambda msg: self._record("markers"), 10
         )
-        self.create_subscription(Twist, "/dream/cmd_vel_candidate", self._on_candidate, 20)
-        self.create_subscription(Twist, "/cmd_vel_test", self._on_command, 20)
+        self.create_subscription(
+            TwistStamped,
+            "/dream/cmd_vel_candidate",
+            self._on_candidate,
+            20,
+        )
+        self.create_subscription(
+            TwistStamped, "/cmd_vel_test", self._on_command, 20
+        )
         self.publisher = self.create_publisher(String, "/dream/smoke_status", latched)
         self.create_timer(0.2, self._tick)
 
@@ -260,14 +267,23 @@ class DreamSmokeMonitor(Node):
                 self.minimum_post_reveal_speed, self.latest_ego_speed
             )
 
-    def _on_candidate(self, message: Twist) -> None:
+    def _on_candidate(self, message: TwistStamped) -> None:
         self._record("candidate")
-        if not all(isfinite(value) for value in (message.linear.x, message.angular.z)):
+        if not all(
+            isfinite(value)
+            for value in (
+                message.twist.linear.x,
+                message.twist.angular.z,
+            )
+        ):
             self.command_nonfinite += 1
 
-    def _on_command(self, message: Twist) -> None:
+    def _on_command(self, message: TwistStamped) -> None:
         self._record("safe_command")
-        values = (float(message.linear.x), float(message.angular.z))
+        values = (
+            float(message.twist.linear.x),
+            float(message.twist.angular.z),
+        )
         if not all(isfinite(value) for value in values):
             self.command_nonfinite += 1
             return

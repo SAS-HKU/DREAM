@@ -7,13 +7,17 @@ from math import tan
 from typing import Optional
 
 import rclpy
-from geometry_msgs.msg import Twist, TwistStamped
+from geometry_msgs.msg import TwistStamped
 from limo_msgs.msg import LimoStatus
 from rclpy.node import Node
 from std_msgs.msg import String
 
 from .core.command_adapter import CommandAdapter, VelocityCommand
 from .limo_scale import default_deployment_config
+from .ros_utils import (
+    ControlSourceStamp,
+    stamped_twist_from_velocity_command,
+)
 
 
 class DreamCommandAdapterNode(Node):
@@ -48,7 +52,7 @@ class DreamCommandAdapterNode(Node):
             10,
         )
         self.candidate_publisher = self.create_publisher(
-            Twist, str(self.get_parameter("candidate_topic").value), 10
+            TwistStamped, str(self.get_parameter("candidate_topic").value), 10
         )
         self.status_publisher = self.create_publisher(String, "/dream/adapter_status", 10)
         self.create_timer(1.0 / float(self.get_parameter("publish_rate").value), self._publish)
@@ -70,6 +74,14 @@ class DreamCommandAdapterNode(Node):
 
     def _publish(self) -> None:
         now = self._now()
+        source_stamp: Optional[ControlSourceStamp] = None
+        if self.control is not None:
+            try:
+                source_stamp = ControlSourceStamp.from_ros_stamp(
+                    self.control.header.stamp
+                )
+            except (AttributeError, TypeError, ValueError):
+                source_stamp = None
         if self.control is None or self.control_receipt is None or now - self.control_receipt >= float(
             self.get_parameter("control_timeout").value
         ):
@@ -89,9 +101,9 @@ class DreamCommandAdapterNode(Node):
                 allow_differential=bool(self.get_parameter("allow_differential").value),
                 desired_yaw_rate=desired_yaw_rate,
             )
-        message = Twist()
-        message.linear.x = command.linear_x
-        message.angular.z = command.angular_z
+        if command.valid and source_stamp is None:
+            command = self._zero("INVALID_CONTROL_SOURCE_STAMP")
+        message = stamped_twist_from_velocity_command(command, source_stamp)
         self.candidate_publisher.publish(message)
         status = String()
         status.data = json.dumps(
@@ -101,6 +113,11 @@ class DreamCommandAdapterNode(Node):
                 "motion_mode": self.motion_mode,
                 "linear_x": command.linear_x,
                 "angular_z": command.angular_z,
+                "control_source_stamp": (
+                    source_stamp.as_mapping()
+                    if command.valid and source_stamp is not None
+                    else None
+                ),
                 "required_mode": self.config.safety.required_motion_mode,
             },
             separators=(",", ":"),
