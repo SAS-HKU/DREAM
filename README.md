@@ -5,7 +5,7 @@ Preliminary risk field modeling is based on [DRIFT](https://github.com/SAS-HKU/D
 
 ### proposed framework:
 
-![Methodology graph](assests/methodology.jpg)
+![Methodology graph](assets/methodology.jpg)
 
 
 ## 🚀 Quick Start
@@ -210,16 +210,16 @@ python uncertainty_test_DREAM.py --models DREAM IDEAM --mode batch
 
 ## Demonstrations:
 
-![simple snapshot for quick understanding](assests/DREAM_demo2.gif)
+![simple snapshot for quick understanding](assets/DREAM_demo2.gif)
 demonstration of LC for emergency vehicle with safety-critical considerations ([IDEAM](https://github.com/YimingShu-teay/IDEAM.git)-based planning).
 
-![simple snapshot for quick understanding](assests/198.png)
+![simple snapshot for quick understanding](assets/198.png)
 Compared with the baseline planner, DREAM enables the ego stay away from the agent group ahead and find the appropriate spaces with no agents around, where the risk score is minimal. However, the progress was sacrificed.
 
-![simple snapshot for quick understanding](assests/299.png)
+![simple snapshot for quick understanding](assets/299.png)
 The baseline planner forced the ego to perform very aggressive and dangerous overtaking (LC to the left) and nearly collide with the rear of the truck-trailer ahead. Instead, DREAM shows a more conservative planning that better aware of the risk from the truck-trailer and the uncertainty.
 
-![simple snapshot for quick understanding](assests/inD_dream_benchmark_03-ezgif.com-video-to-gif-converter.gif)
+![simple snapshot for quick understanding](assets/inD_dream_benchmark_03-ezgif.com-video-to-gif-converter.gif)
 
 We compare the trajectories of (1): the ground truth ego trajectories from BEV datasets; (2): the baseline planner trajectories; (3): the DREAM planner trajectories.
 The results show that baseline planner is over aggressive as near collision with the truck rear, and our planner is more conservative but sacrifice the progress. (The selected scenario include the occlusion-aware planning from the truck-trailer that may block the visibility of the ego)
@@ -230,7 +230,7 @@ The standalone ROS 2 Humble package for arbitrary RViz-goal navigation,
 LiDAR-derived occlusion risk, sudden-merger tracking, and DREAM-versus-pure-MPC
 physical A/B tests is in [`src/dream_limo`](src/dream_limo/README.md). The platform is open-sourced from [agilexrobotics](https://github.com/agilexrobotics/limo_ros2_doc/blob/master/LIMO-ROS2-humble(EN).md)
 
-![platform validation result](assests/platform_result.jpg)
+![platform validation result](assets/platform_result.jpg)
 
 
 ## Acknowledgement:
