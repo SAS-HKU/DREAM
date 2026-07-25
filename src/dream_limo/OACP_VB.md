@@ -1,10 +1,5 @@
 # OACP-VB scientific implementation note
 
-The formal name of this experimental arm is **OACP-VB (velocity-bound
-adaptation of Zheng et al., 2025)**. `OACP-VB` is the short machine- and
-plot-label. It must not be described as an implementation of the complete OACP
-planner. The formal arm label follows the cited arXiv-v2 year required by this
-benchmark; the final journal article appeared in 2026.
 
 ## Primary reference and provenance
 
