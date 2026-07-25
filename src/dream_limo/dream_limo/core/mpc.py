@@ -41,6 +41,8 @@ class MPCResult:
     maximum_slack: float
     risk_profile: Array
     used_fallback: bool
+    maximum_velocity_slack: float = 0.0
+    maximum_future_velocity_slack: float = 0.0
 
 
 class KinematicBicycleModel:
@@ -94,6 +96,37 @@ class RiskAwareMPC:
         self.last_states = None
         self.last_controls = None
         self.last_applied_control = np.zeros(2, dtype=np.float64)
+
+    def commit_result(self, result: MPCResult) -> None:
+        """Commit one previously solved branch as the physically selected one.
+
+        Contingency solves must leave the warm-start and steer-rate history
+        untouched until the planner chooses the branch that will actually be
+        sent downstream.  This helper makes that selection explicit and
+        rejects fallback or malformed results.
+        """
+
+        if not isinstance(result, MPCResult) or result.used_fallback:
+            raise ValueError("only a successful MPC result can be committed")
+        expected_states = (4, self.config.horizon + 1)
+        expected_controls = (2, self.config.horizon)
+        if (
+            result.states.shape != expected_states
+            or result.controls.shape != expected_controls
+            or not np.all(np.isfinite(result.states))
+            or not np.all(np.isfinite(result.controls))
+            or not np.isfinite(result.command.acceleration)
+            or not np.isfinite(result.command.steering)
+        ):
+            raise ValueError("MPC result is malformed or non-finite")
+        self.last_states = np.array(result.states, dtype=np.float64, copy=True)
+        self.last_controls = np.array(
+            result.controls, dtype=np.float64, copy=True
+        )
+        self.last_applied_control = np.asarray(
+            [result.command.acceleration, result.command.steering],
+            dtype=np.float64,
+        )
 
     def _initial_state(self, ego: EgoState) -> Array:
         return np.asarray([ego.x, ego.y, ego.speed, ego.yaw], dtype=np.float64)
@@ -274,6 +307,8 @@ class RiskAwareMPC:
             maximum_slack=float("inf"),
             risk_profile=np.empty(0),
             used_fallback=True,
+            maximum_velocity_slack=float("inf"),
+            maximum_future_velocity_slack=float("inf"),
         )
 
     def solve(
@@ -542,24 +577,79 @@ class RiskAwareMPC:
         preset: IntegrationPreset,
         *,
         terminal_yaw: Optional[float] = None,
+        velocity_upper_bound: Optional[float] = None,
+        velocity_slack_weight: Optional[float] = None,
+        fixed_control_prefix: Optional[Sequence[Sequence[float]] | Array] = None,
+        commit_solution: bool = True,
     ) -> MPCResult:
         """Track an arbitrary Cartesian path with DREAM risk and CBF behavior.
 
         Unlike :meth:`solve`, this entry point has no lane or one-way mission
         assumption.  It constructs an arc-length horizon from the current ego
         pose, tracks ``x`` and ``y`` isotropically, and keeps the complete robot
-        footprint inside the risk grid's road corridor.
+        footprint inside the risk grid's road corridor.  The optional velocity
+        upper bound is the OACP-VB integration hook: it is softened separately
+        from obstacle CBF constraints, and the tracking reference is capped to
+        the same value.  ``fixed_control_prefix`` has shape ``(2, k)`` and lets
+        a non-committing contingency solve verify a shared immediate action
+        without replacing the executed branch's warm start.
         """
 
         started = perf_counter()
         initial = self._initial_state(ego)
+        horizon = self.config.horizon
+        effective_target_speed = self.config.target_speed
+        velocity_bound: Optional[float] = None
+        effective_velocity_slack_weight: Optional[float] = None
+        if velocity_upper_bound is not None:
+            velocity_bound = float(velocity_upper_bound)
+            if not np.isfinite(velocity_bound):
+                raise ValueError("velocity_upper_bound must be finite")
+            if not (
+                self.config.minimum_speed
+                <= velocity_bound
+                <= self.config.maximum_speed
+            ):
+                raise ValueError(
+                    "velocity_upper_bound must lie within the configured speed limits"
+                )
+            effective_target_speed = min(effective_target_speed, velocity_bound)
+            effective_velocity_slack_weight = (
+                self.config.cbf_slack_weight
+                if velocity_slack_weight is None
+                else float(velocity_slack_weight)
+            )
+            if (
+                not np.isfinite(effective_velocity_slack_weight)
+                or effective_velocity_slack_weight <= 0.0
+            ):
+                raise ValueError(
+                    "velocity_slack_weight must be finite and positive"
+                )
+
+        control_prefix: Optional[Array] = None
+        if fixed_control_prefix is not None:
+            control_prefix = np.asarray(fixed_control_prefix, dtype=np.float64)
+            if (
+                control_prefix.ndim != 2
+                or control_prefix.shape[0] != 2
+                or control_prefix.shape[1] > horizon
+            ):
+                raise ValueError(
+                    "fixed_control_prefix must have shape (2, k) with k <= horizon"
+                )
+            if not np.all(np.isfinite(control_prefix)):
+                raise ValueError("fixed_control_prefix must contain finite values")
+        if not isinstance(commit_solution, (bool, np.bool_)):
+            raise TypeError("commit_solution must be a boolean")
+
         reference = build_path_reference(
             path_points,
             ego_xy=initial[0:2],
             ego_yaw=float(initial[3]),
-            horizon=self.config.horizon,
+            horizon=horizon,
             dt=self.config.dt,
-            cruise_speed=self.config.target_speed,
+            cruise_speed=effective_target_speed,
             braking_deceleration=self.config.mission_braking_deceleration,
             maximum_cross_track_error=(
                 self.config.maximum_path_cross_track_error
@@ -569,9 +659,17 @@ class RiskAwareMPC:
         linearization_states, linearization_controls = self._reference_warm_start(
             initial, reference
         )
-        horizon = self.config.horizon
         state = cp.Variable((4, horizon + 1), name="reference_state")
         control = cp.Variable((2, horizon), name="reference_control")
+        velocity_slack = (
+            cp.Variable(
+                horizon + 1,
+                nonneg=True,
+                name="reference_velocity_bound_slack",
+            )
+            if velocity_bound is not None
+            else None
+        )
         obstacle_slack = (
             cp.Variable(
                 (len(vehicles), horizon + 1),
@@ -593,6 +691,19 @@ class RiskAwareMPC:
                 control[1, :] <= self.config.maximum_steer,
             )
         )
+        if velocity_slack is not None:
+            constraints.append(state[2, :] <= velocity_bound + velocity_slack)
+            # The initial speed is measured and cannot be changed by this
+            # optimization.  Pinning its unavoidable relaxation to the exact
+            # violation is equivalent to the positive-penalty optimum and
+            # avoids leaving a poorly scaled free variable in OSQP.
+            constraints.append(
+                velocity_slack[0] == max(0.0, float(initial[2]) - velocity_bound)
+            )
+        if control_prefix is not None and control_prefix.shape[1] > 0:
+            constraints.append(
+                control[:, : control_prefix.shape[1]] == control_prefix
+            )
         # Preserve the footprint-checked Nav2 geometry as a hard local tube.
         # Both normal and tangent displacement are bounded at every prediction
         # step; a later live-costmap swept-footprint check verifies the solved
@@ -644,6 +755,10 @@ class RiskAwareMPC:
             )
 
         objective = 0.0
+        if velocity_slack is not None:
+            objective += effective_velocity_slack_weight * cp.sum_squares(
+                velocity_slack
+            )
         risk_profile = np.asarray(
             [
                 risk_field.risk_at(
@@ -788,7 +903,22 @@ class RiskAwareMPC:
             return self._fallback(ego, f"MPC status {problem.status}", started)
         states = np.asarray(state.value, dtype=np.float64)
         controls = np.asarray(control.value, dtype=np.float64)
-        if not np.all(np.isfinite(states)) or not np.all(np.isfinite(controls)):
+        velocity_slack_values = (
+            None
+            if velocity_slack is None or velocity_slack.value is None
+            else np.asarray(velocity_slack.value, dtype=np.float64)
+        )
+        if (
+            not np.all(np.isfinite(states))
+            or not np.all(np.isfinite(controls))
+            or (
+                velocity_slack is not None
+                and (
+                    velocity_slack_values is None
+                    or not np.all(np.isfinite(velocity_slack_values))
+                )
+            )
+        ):
             return self._fallback(ego, "MPC returned non-finite values", started)
         acceleration = float(
             np.clip(
@@ -811,13 +941,24 @@ class RiskAwareMPC:
                 self.config.maximum_speed,
             )
         )
-        self.last_states = states
-        self.last_controls = controls
-        self.last_applied_control = np.asarray([acceleration, steering])
+        if commit_solution:
+            self.last_states = states
+            self.last_controls = controls
+            self.last_applied_control = np.asarray([acceleration, steering])
         maximum_slack = (
             0.0
             if obstacle_slack is None or obstacle_slack.value is None
             else float(np.max(obstacle_slack.value))
+        )
+        maximum_velocity_slack = (
+            0.0
+            if velocity_slack_values is None
+            else max(0.0, float(np.max(velocity_slack_values)))
+        )
+        maximum_future_velocity_slack = (
+            0.0
+            if velocity_slack_values is None or velocity_slack_values.size <= 1
+            else max(0.0, float(np.max(velocity_slack_values[1:])))
         )
         command = ControlCommand(
             target_speed=speed,
@@ -837,4 +978,6 @@ class RiskAwareMPC:
             maximum_slack=maximum_slack,
             risk_profile=risk_profile,
             used_fallback=False,
+            maximum_velocity_slack=maximum_velocity_slack,
+            maximum_future_velocity_slack=maximum_future_velocity_slack,
         )

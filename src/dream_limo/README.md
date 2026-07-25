@@ -10,6 +10,10 @@ There is no mission distance, lane coordinate, occluder pose, or terminal goal
 to configure. The clicked pose is validated against the live LiDAR costmap.
 Unknown/occluded cells and occupied/inflated cells are rejected.
 
+The package is a sibling of `sfg_nav`. It does not modify or run the SFG
+planner. It reuses only SFG's public, class-neutral LiDAR clustering executable
+and message convention; DREAM owns tracking, risk, decision-making, MPC, and
+all command output.
 
 ## What runs
 
@@ -18,22 +22,29 @@ The primary launch is `dream_free_navigation.launch.py`:
 1. `/scan` is converted to a world-fixed observed-free/occupied costmap. A
    planner-only Nav2 SMAC Hybrid node computes Ackermann-feasible geometry.
    No Nav2 controller, behavior tree, navigator, or velocity publisher runs.
-2. `dream_world_model` derives visibility and occlusion shadow directly from
-   LiDAR first returns. A hidden merger does not leak into `Q_veh`; its unseen
-   region contributes through DREAM's `Q_occ`.
-3. `dream_drift_field` evolves the scaled PDE field in `map` and warms it for
-   about five model seconds.
-4. `dream_free_planner` tracks the arbitrary geometric path with DREAM's local
+   The shared launch replans geometry at 1 Hz for every comparison arm; local
+   MPC and swept-costmap validation continue at 5 Hz.
+2. SFG's neutral `/sfg/lidar_clusters` are classified over time by
+   `dream_vehicle_tracker`. Only motion-confirmed, vehicle-sized tracks are
+   forwarded on `/tracked_agents`; the SFG pedestrian detector and SFG planner
+   are not started.
+3. `dream_world_model` derives visibility and an occlusion mask directly from
+   LiDAR first returns. A hidden merger never leaks into the visible-vehicle
+   track list.
+4. The selected arm changes only the occlusion-risk channel. `balanced` runs
+   the warmed DRIFT PDE; `oacp_vb` runs phantom-vehicle reachability and a
+   dynamic velocity bound; `nominal` runs no occlusion-risk assessor.
+5. `dream_free_planner` tracks the arbitrary geometric path with the shared
    bicycle MPC inside a hard route tube. Every solved footprint and the swept
    motion between MPC knots are rechecked against the fresh inflated costmap.
-   In `balanced`, route-level risk veto,
-   risk cost, and risk-expanded CBF/headway are active. A free-space veto
-   stops/yields because no unplanned substitute corridor is certified. In
-   `pure_mpc`, those three risk channels are disabled while path, perception,
-   dynamics, nominal CBF, and safety remain identical.
-5. Independent collision, front-bubble, watchdog, drive-mode, ownership, and
+   In `balanced`, route-level risk veto, risk cost, and risk-expanded
+   CBF/headway are active. In `oacp_vb`, DREAM risk is zero, the base
+   CBF/headway stays fixed, and phantom risk caps speed through the MPC. In
+   `nominal`, every occlusion-risk channel is disabled. `pure_mpc` remains a
+   legacy compatibility mode, not a separate scientific arm.
+6. Independent collision, front-bubble, watchdog, drive-mode, ownership, and
    hardware gates are the only route to `/cmd_vel`.
-6. The front camera is shown and recordable as occlusion evidence. Camera
+7. The front camera is shown and recordable as occlusion evidence. Camera
    pixels do not enter the planner.
 
 ## Verified platform and solver
@@ -54,6 +65,28 @@ arbitrary-path samples solved `balanced` in about 70 ms and `pure_mpc` in about
 [`benchmark_results/`](benchmark_results/) records p99 below the 150 ms
 acceptance threshold and every solve inside the 200 ms planning period; it
 does not claim that every solve is below 100 ms.
+
+For OACP-VB, a motion-free onboard benchmark measured the two sequential
+branches at 185.0 ms median and 247.3 ms p95, which did not sustain a second
+solve every 200 ms. The executed MPC remains at 5 Hz; the non-executed fallback
+is therefore checked at 1 Hz. Between checks, the executed solve is constrained
+to consume the remaining control prefix that the verified fallback shares. The
+prefix cursor advances only after the final hardware gate returns the exact
+planner command's structured ROS timestamp and odometry remains within explicit
+position/speed/yaw tolerances. The adapter and supervisor preserve that identity
+on internal `TwistStamped` topics; the physical `/cmd_vel` remains `Twist`. A
+partially executed command is not reissued for a new full MPC step because that
+would exceed the trajectory covered by the cached fallback solve. Instead its
+certificate is revoked and a fresh `v_occ_min` solve executes until the next
+scheduled two-branch check. Advancement requires at least 95% spatial progress
+plus next-knot agreement. A withheld or repeated older command is not consumed;
+because absence of an exact acknowledgement cannot prove non-execution, any
+missing, stale, or mismatched token also revokes and clamps. An off-segment
+mismatch, planner stop, changed path,
+visible vehicle, or tightened bound revokes the certificate and clamps to
+`v_occ_min` until a new check. This is a disclosed approximation, not the
+paper's joint contingency optimizer. See [`OACP_VB.md`](OACP_VB.md) and the aggregate
+[`timing record`](benchmark_results/oacp_vb_contingency_nuc12_2026-07-25.json).
 
 The implementation is based on upstream DREAM commit
 `0d298cd6de11c268224173a4d75770e934fd0861`; see
@@ -90,12 +123,16 @@ source "$HOME/agilex_ws/install/setup.bash"
 
 rosdep install --from-paths src --ignore-src -r -y
 python3 -m pip install --user -r src/dream_limo/requirements.txt
-colcon build --symlink-install --packages-up-to dream_limo
+colcon build --symlink-install --packages-select dream_limo
 source install/setup.bash
+ros2 pkg prefix sfg_nav >/dev/null
 ```
 
 If this is the first ROS installation on the machine and `rosdep` reports that
 it is uninitialized, run `sudo rosdep init` once and then `rosdep update`.
+If the final `ros2 pkg prefix` check fails, install/build the sibling `sfg_nav`
+once using its own README, source that overlay, and rerun the check. DREAM does
+not rebuild or launch the SFG planner.
 
 Verify the numerical stack:
 
@@ -248,14 +285,93 @@ ros2 service call /dream/stop_mission std_srvs/srv/Trigger "{}"
 The human independent hardware/power stop remains mandatory; the ROS service
 is not a substitute.
 
-## Pure-MPC baseline
+## Three-arm comparison and OACP-VB calibration
 
-Run the A/B arms sequentially in the same geometry. Stop the previous DREAM
-launch completely, reset the starting pose, and change only the model:
+The publishable arms are `nominal`, `oacp_vb`, and `balanced`. They use one
+launch graph, one `dream_free_planner`, one shared LMPC-CBF configuration, and
+the same `/goal_pose` trigger. `pure_mpc` is retained only for regression
+compatibility. The OACP-VB arm is the **velocity-bound adaptation of Zheng et
+al. (2025)** documented in [`OACP_VB.md`](OACP_VB.md); it is not the published
+Bezier/ADMM planner.
+
+First verify OACP-VB with physical output disabled:
 
 ```bash
 ros2 launch dream_limo dream_free_navigation.launch.py \
-  model:=pure_mpc \
+  model:=oacp_vb \
+  target_speed:=0.15 \
+  rviz:=true
+```
+
+RViz adds the phantom connector, PVS extent, reachable extent, `r_total`, and
+both velocity bounds. `/dream/oacp_vb_status` must show a valid pre-goal bound
+before a click and an exact bound with the matching path stamp afterward.
+
+The paper's `4.5/6.0` thresholds are references, not arena calibration. Run one
+identified logging approach before an OACP-VB comparison:
+
+Set `ARM=oacp_calibration` in the bag-recording command below and start that
+recorder before publishing the calibration goal.
+
+```bash
+ros2 launch dream_limo dream_free_navigation.launch.py \
+  model:=oacp_vb \
+  target_speed:=0.15 \
+  oacp_calibration_logging_only:=true \
+  rviz:=true \
+  staging_pose_verified:=true \
+  platform_watchdog_verified:=true \
+  operator_kill_verified:=true \
+  enable_physical_motion:=true
+```
+
+This excluded run computes risk and suggested thresholds but deliberately does
+not apply the velocity bound. Samples reset on the accepted goal and begin
+after motion authorization. Record the run with the bag command below, then
+extract the actual occluded interval directly from the bag:
+
+```bash
+BAG="$HOME/limo_lvv_ws/bags/oacp_calibration_YYYYMMDD_HHMMSS"
+
+ros2 run dream_limo dream_oacp_calibration "$BAG" \
+  --start-offset 0.0 \
+  --end-offset 8.0 \
+  --csv "$HOME/oacp_calibration_curve.csv" \
+  --output "$HOME/oacp_calibration_thresholds.json"
+```
+
+The offsets are seconds from the accepted-goal receipt timestamp (`t=0`);
+replace `0.0/8.0` with the visually reviewed interval during which the PVS is
+occluded. Plot or inspect the exported CSV, then record the reported linear
+70th-percentile exploration threshold and the `4/3` fallback value. The command
+rejects bags containing multiple goal revisions unless `--goal-revision` is
+selected. Do not set the calibration acknowledgement from the live suggestion
+alone.
+
+Run the calibrated OACP-VB arm with the reviewed values:
+
+```bash
+CEXP="<reviewed exploration threshold>"
+CFALL="<reviewed fallback threshold>"
+
+ros2 launch dream_limo dream_free_navigation.launch.py \
+  model:=oacp_vb \
+  target_speed:=0.15 \
+  c_th_max_exploration:="$CEXP" \
+  c_th_max_fallback:="$CFALL" \
+  oacp_thresholds_calibrated:=true \
+  rviz:=true \
+  staging_pose_verified:=true \
+  platform_watchdog_verified:=true \
+  operator_kill_verified:=true \
+  enable_physical_motion:=true
+```
+
+Run the no-occlusion-risk floor by changing only the arm:
+
+```bash
+ros2 launch dream_limo dream_free_navigation.launch.py \
+  model:=nominal \
   target_speed:=0.15 \
   rviz:=true \
   staging_pose_verified:=true \
@@ -264,9 +380,79 @@ ros2 launch dream_limo dream_free_navigation.launch.py \
   enable_physical_motion:=true
 ```
 
-Use an equivalently placed RViz destination and identical merger timing. Both
-arms use the same obstacle-free geometric path machinery and nominal safety.
-Only DREAM's occlusion-risk veto/cost/CBF expansion differs.
+Run the DREAM comparison arm through the same launch:
+
+```bash
+ros2 launch dream_limo dream_free_navigation.launch.py \
+  model:=balanced \
+  target_speed:=0.15 \
+  rviz:=true \
+  staging_pose_verified:=true \
+  platform_watchdog_verified:=true \
+  operator_kill_verified:=true \
+  enable_physical_motion:=true
+```
+
+Capture the first RViz click without measuring or typing coordinates. Start
+this before clicking once:
+
+```bash
+GOAL_FILE="$HOME/limo_lvv_ws/bags/comparison_goal.yaml"
+mkdir -p "$(dirname "$GOAL_FILE")"
+ros2 topic echo /goal_pose --once > "$GOAL_FILE"
+```
+
+For every run, first start the merger cue in a separate terminal **before**
+clicking or replaying the goal:
+
+```bash
+MERGER_DELAY=2.0
+ros2 run dream_limo dream_merger_cue --delay "$MERGER_DELAY"
+```
+
+Then, for every later arm, replay the exact saved pose after its risk provider
+is ready:
+
+```bash
+GOAL_MESSAGE="$(
+  python3 - "$GOAL_FILE" <<'PY'
+import sys
+import yaml
+
+with open(sys.argv[1], encoding="utf-8") as stream:
+    goal = next(
+        document
+        for document in yaml.safe_load_all(stream)
+        if document is not None
+    )
+goal["header"]["stamp"] = "now"
+print(yaml.safe_dump(goal, default_flow_style=True))
+PY
+)"
+
+ros2 topic pub --once /goal_pose geometry_msgs/msg/PoseStamped \
+  "$GOAL_MESSAGE"
+```
+
+ROS 2 expands `stamp: now` at publication, so the authorizer receives a fresh
+source timestamp while every pose and frame value remains identical. The
+package does not actuate the independent merger robot. For a publishable
+fixed-timing run, connect its separately safety-reviewed runner to
+`/dream/merger_release`. `dream_merger_cue` ignores retained empty goal
+invalidations, cancels a pending cue if the accepted goal is invalidated, and
+reschedules for any newer accepted goal. It also ignores transient-local goals
+retained from before the cue process started. Its delay starts from publication
+of the currently accepted `map` goal, which occurs just after
+the authorizer's recorded acceptance-receipt `t=0`; use the recorded
+`/dream/merger_release` timestamp as the authoritative release time.
+
+Record `/dream/merger_release`. A human reacting to this cue is acceptable for
+a smoke demonstration but is not an identical scripted merger trajectory.
+Use the same saved goal, starting geometry, delay, and external merger runner
+for `nominal`, `oacp_vb`, and `balanced`, and restart the launch between runs.
+The planner status logs the shared controller hash; a mismatch invalidates the
+comparison. Physical OACP-VB comparison runs reject
+`enable_contingency:=false`.
 
 ## Occluder and sudden-merger experiment
 
@@ -276,7 +462,9 @@ Only DREAM's occlusion-risk veto/cost/CBF expansion differs.
   directly in front of the ego is correctly treated as an obstacle and will
   prevent motion.
 - Initially hide the second vehicle behind the occluder. While hidden, it must
-  not appear in `/tracked_agents`; the shadow is represented by `Q_occ`.
+  not appear in `/tracked_agents`. `balanced` represents the shadow through
+  DRIFT `Q_occ`, `oacp_vb` through the right-lane PVS, and `nominal` through no
+  occlusion-risk channel.
 - Move the merger into view and toward the ego's intended path. LiDAR first
   returns provide immediate collision evidence, while temporal clustering
   confirms a moving vehicle for DREAM's dynamic CBF.
@@ -330,7 +518,7 @@ Do not apply it a second time to an already patched driver.
 
 - raw rays: current `/scan`;
 - global costmap: observed free, occupied/inflated, and unknown regions;
-- occlusion mask: LiDAR line-of-sight shadow used by DRIFT;
+- occlusion mask: LiDAR line-of-sight shadow used by DRIFT or OACP-VB;
 - risk grid: DREAM PDE field;
 - geometric path: planner-only Nav2 output;
 - MPC path: DREAM's short controlled reference;
@@ -360,11 +548,11 @@ at zero cost, it cannot enter positive cost. Cost 99 (Nav2's inscribed value),
 unknown or occupied centre cells, and any unknown or occupied padded-footprint
 sample remain hard failures in both modes.
 
-## Record an A/B run
+## Record a comparison run
 
 ```bash
 mkdir -p "$HOME/limo_lvv_ws/bags"
-ARM=balanced  # or pure_mpc
+ARM=balanced  # nominal, oacp_vb, or balanced
 
 ros2 bag record \
   -o "$HOME/limo_lvv_ws/bags/${ARM}_$(date +%Y%m%d_%H%M%S)" \
@@ -374,14 +562,17 @@ ros2 bag record \
   /dream/geometric_path /dream/reference_trajectory /dream/control \
   /sfg/lidar_clusters /tracked_agents /dream/world_model \
   /dream/occlusion_mask /dream/risk_field /dream/drift_status \
+  /dream/oacp_vb_status /dream/oacp_vb_markers \
   /dream/route_status /dream/planner_status \
   /dream/collision_status /dream/safety_status \
-  /dream/deadman_status /dream/hardware_gate_status /cmd_vel
+  /dream/deadman_status /dream/hardware_gate_status \
+  /dream/metrics /dream/merger_release /cmd_vel
 ```
 
 Record reveal time, clearance, TTC/conflict-arrival margin, speed,
-acceleration/jerk, veto state, risk at ego, and DRIFT/MPC timing. Repeat at
-least five times per arm with matched starting geometry and merger timing.
+acceleration/jerk, veto state, risk/bounds, velocity-slack activations, and
+per-branch MPC timing. Repeat at least five fixed-timing runs per arm and at
+least three randomized-release runs per arm with matched starting geometry.
 
 ## Tests and offline checks
 
@@ -438,8 +629,9 @@ They are not the physical free-navigation workflow.
   100, and the independent LiDAR collision envelope remain hard stops.
 - **`DECISION_RISK_VETO`:** the balanced DREAM arm is intentionally yielding
   to route risk. This is controller behavior, not a lost RViz goal. Record it
-  as a veto activation; the matched `pure_mpc` arm disables this DREAM veto but
-  retains all collision and footprint gates.
+  as a veto activation; the matched scientific floor is `nominal`, which
+  disables every occlusion-risk channel but retains all collision and footprint
+  gates. `pure_mpc` is legacy regression compatibility only.
 - **No LiDAR free space:** check `/scan`, TF, and
   `/global_costmap/costmap`. The scan observation source must cover the LiDAR's
   physical height, and ray clearing must be active.

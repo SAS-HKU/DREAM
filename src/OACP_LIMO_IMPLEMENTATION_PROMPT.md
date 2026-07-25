@@ -1,5 +1,13 @@
 # LIMO ROS2 Agent Prompt: OACP Baseline (occlusion-aware contingency planning)
 
+> **IMPLEMENTATION STATUS:** The selectable baseline delivered in this
+> repository is documented in
+> [`dream_limo/OACP_VB.md`](dream_limo/OACP_VB.md). It is explicitly named
+> **OACP-VB (velocity-bound adaptation of Zheng et al., 2025)** and does not
+> claim to reproduce the paper's Bezier/consensus-ADMM planner. This prompt is
+> retained as the design input; the implementation document records the
+> realized architecture, tests, timing, and deviations.
+
 Companion to `DREAM_LIMO_ROS_AGENT_PROMPT.md`. This is a **baseline arm**, not a new
 system. The LIMO already runs DREAM (DRIFT PDE risk field → decision veto + risk cost +
 CBF modulation) on top of the IDEAM LMPC. Here you keep that MPC stack and swap **only

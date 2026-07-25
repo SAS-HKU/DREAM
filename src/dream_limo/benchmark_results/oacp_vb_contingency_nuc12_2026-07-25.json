@@ -1,0 +1,54 @@
+{
+  "benchmark": "OACP-VB sequential contingency timing",
+  "date": "2026-07-25",
+  "motion_output_possible": false,
+  "platform": {
+    "machine": "x86_64",
+    "platform": "onboard NUC12"
+  },
+  "dependencies": {
+    "python": "3.10.12",
+    "numpy": "1.26.4",
+    "scipy": "1.13.0",
+    "cvxpy": "1.7.5",
+    "osqp": "1.1.1",
+    "casadi": "3.7.2"
+  },
+  "provenance": {
+    "source_base_commit": "58bdabd26726d013697e5c92f7912ed678c30f96",
+    "source_tree_state": "uncommitted OACP-VB integration under review",
+    "harness": "motion-free inline RiskAwareMPC.solve_reference sequential-branch benchmark",
+    "raw_per_cycle_timings_retained": false,
+    "limitation": "This aggregate record cannot reproduce quantiles without rerunning the benchmark harness."
+  },
+  "configuration": {
+    "shared_mpc_horizon_steps": 6,
+    "shared_mpc_dt_seconds": 0.2,
+    "shared_control_rate_hz": 5.0,
+    "target_speed_mps": 0.15,
+    "exploration_velocity_bound_mps": 0.1,
+    "fallback_velocity_bound_mps": 0.13,
+    "velocity_slack_weight": 10000.0,
+    "shared_prefix_steps": 2,
+    "visible_vehicle_cbf_constraints": 1,
+    "iterations": 30
+  },
+  "results": {
+    "exploration_median_ms": 90.812324999888,
+    "fallback_median_ms": 85.31596600005287,
+    "two_solve_cycle_median_ms": 184.97244600007434,
+    "two_solve_cycle_p95_ms": 247.3391431502023,
+    "two_solve_cycle_p99_ms": 273.6114495102402,
+    "two_solve_cycle_maximum_ms": 283.98462800032576,
+    "all_solves_optimal": true,
+    "maximum_executed_future_velocity_slack": 7.076198685808197e-07,
+    "maximum_fallback_velocity_slack": 7.938468663080183e-06,
+    "maximum_fallback_cbf_slack": 1.3803091356978473e-08
+  },
+  "decision": {
+    "fallback_verification_rate_hz": 1.0,
+    "executed_branch_rate_hz": 5.0,
+    "reason": "The two-solve p95 exceeded the 200 ms shared control period.",
+    "deviation": "Between reduced-rate checks, only exact full-step final-gate and state confirmation may consume one certified shared-prefix control; any missing, stale, mismatched, duplicate, partial, or off-tube acknowledgement revokes the certificate and clamps execution to v_occ_min until renewal. This is not the paper's joint optimizer."
+  }
+}

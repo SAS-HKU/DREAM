@@ -52,6 +52,18 @@ Visualization Manager:
         Reliability Policy: Reliable
         Value: /dream/occlusion_mask
       Value: true
+    - Class: rviz_default_plugins/MarkerArray
+      Enabled: true
+      Name: OACP-VB PVS and Velocity Bound
+      Namespaces:
+        {}
+      Topic:
+        Depth: 10
+        Durability Policy: Volatile
+        History Policy: Keep Last
+        Reliability Policy: Reliable
+        Value: /dream/oacp_vb_markers
+      Value: true
     - Alpha: 0.35
       Class: rviz_default_plugins/Map
       Color Scheme: costmap

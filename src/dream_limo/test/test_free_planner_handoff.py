@@ -71,3 +71,10 @@ def test_replan_handoff_waits_if_ready_status_names_a_newer_unreceived_path():
     planner = _planner_for_handoff()
     planner.route_status["path_source_stamp"] = 13.0
     assert not planner._route_matches_goal()
+
+
+def test_oacp_handoff_accepts_route_status_for_received_pending_path():
+    planner = _planner_for_handoff()
+    planner.pending_path_source_stamp = 13.0
+    planner.route_status["path_source_stamp"] = 13.0
+    assert planner._route_matches_goal()

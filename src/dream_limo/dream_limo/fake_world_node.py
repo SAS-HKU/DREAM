@@ -11,7 +11,7 @@ from typing import Dict, Optional
 import numpy as np
 import rclpy
 import yaml
-from geometry_msgs.msg import TransformStamped, Twist, TwistStamped
+from geometry_msgs.msg import TransformStamped, TwistStamped
 from limo_msgs.msg import LimoStatus
 from nav_msgs.msg import Odometry
 from rclpy.node import Node
@@ -66,7 +66,9 @@ class DreamFakeWorldNode(Node):
         self.tf_broadcaster = TransformBroadcaster(self)
         self.static_tf_broadcaster = StaticTransformBroadcaster(self)
         self._publish_laser_transform()
-        self.create_subscription(Twist, "/cmd_vel_test", self._on_safe_command, 10)
+        self.create_subscription(
+            TwistStamped, "/cmd_vel_test", self._on_safe_command, 10
+        )
         self.create_subscription(TwistStamped, "/dream/control", self._on_control, 10)
         self.create_subscription(Bool, "/dream/drift_ready", self._on_drift_ready, 10)
         self.create_subscription(String, "/dream/preflight_status", self._on_preflight, 10)
@@ -114,8 +116,14 @@ class DreamFakeWorldNode(Node):
     def _now(self) -> float:
         return self.get_clock().now().nanoseconds * 1.0e-9
 
-    def _on_safe_command(self, message: Twist) -> None:
-        self.speed = float(np.clip(message.linear.x, 0.0, self.config.mpc.maximum_speed))
+    def _on_safe_command(self, message: TwistStamped) -> None:
+        self.speed = float(
+            np.clip(
+                message.twist.linear.x,
+                0.0,
+                self.config.mpc.maximum_speed,
+            )
+        )
 
     def _on_drift_ready(self, message: Bool) -> None:
         self.drift_ready = bool(message.data)
