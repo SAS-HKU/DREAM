@@ -230,6 +230,9 @@ The standalone ROS 2 Humble package for arbitrary RViz-goal navigation,
 LiDAR-derived occlusion risk, sudden-merger tracking, and DREAM-versus-pure-MPC
 physical A/B tests is in [`src/dream_limo`](src/dream_limo/README.md). 
 
+![platform validation result](assests/platform_result.jpg)
+
+
 ## Acknowledgement:
 #### The BEV dataset visualizations:
 [drone-dataset-tools](https://github.com/ika-rwth-aachen/drone-dataset-tools.git)
