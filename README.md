@@ -284,21 +284,6 @@ Corresponding paper:
 ```
 (Referenced coding package: [Artificial-Potential-Field](https://github.com/liuxuexun/Artificial-Potential-Field.git))
 
-#### The baseline Gaussian Velocity Field (GVF) modeling:
-```
-@article{zhang2021spatiotemporal,
-  title={Spatiotemporal learning of multivehicle interaction patterns in lane-change scenarios},
-  author={Zhang, Chengyuan and Zhu, Jiacheng and Wang, Wenshuo and Xi, Junqiang},
-  journal={IEEE Transactions on Intelligent Transportation Systems},
-  volume={23},
-  number={7},
-  pages={6446--6459},
-  year={2021},
-  publisher={IEEE}
-}
-```
-(Referenced coding package: [Gaussian Velocity Field (GVF)](https://github.com/Chengyuan-Zhang/Gaussian_Velocity_Field.git))
-
 #### The baseline Asymmetric Driving Aggressiveness (ADA) modeling:
 ```
 @article{hu2025socially,
