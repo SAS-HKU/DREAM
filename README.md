@@ -293,15 +293,8 @@ Corresponding paper:
   year={2025},
   publisher={IEEE}
 }
-@article{deng2024eliminating,
-  title={Eliminating uncertainty of driver’s social preferences for lane change decision-making in realistic simulation environment},
-  author={Deng, Zejian and Hu, Wen and Sun, Chen and Chu, Duanfeng and Huang, Tao and Li, Wenbo and Yu, Chao and Pirani, Mohammad and Cao, Dongpu and Khajepour, Amir},
-  journal={IEEE Transactions on Intelligent Transportation Systems},
-  year={2024},
-  publisher={IEEE}
-}
 ```
-#### The baseline occlusion-aware contingency MPC (OA-CMPC):
+#### The baseline occlusion-aware contingency planning (OACP):
 ```
 @article{zhengocclusion,
   title={Occlusion-Aware Contingency Safety-Critical Planning for Autonomous Driving},
