@@ -38,15 +38,6 @@ The scientific source is:
 - [DOI 10.1109/TCYB.2025.3632366](https://doi.org/10.1109/TCYB.2025.3632366)
 - [Author project page](https://zack4417.github.io/oacp-website/)
 
-An [author-origin review snapshot at commit
-`06760501d24af6093994f4d6d6e95cf9e26f45e1`](https://github.com/mengxingshifen1218/OACP/commit/06760501d24af6093994f4d6d6e95cf9e26f45e1)
-was inspected only to help resolve the interpretation of Equation (12). No code
-from that repository is copied or vendored here. The snapshot has no
-`LICENSE`/`COPYING` file, is not linked by the paper or project page, and
-predates arXiv v2. It is therefore treated as an unlicensed review artifact,
-not as an official code release or an implementation authority. Its README
-license badge does not provide this project with a license grant.
-
 The implementation in `dream_limo` is an independent implementation of the
 paper’s simplified reachability quantification and dynamic velocity boundary.
 The paper and arXiv v2 remain the normative scientific references.
