@@ -226,6 +226,13 @@ Compared with the baseline planner, DREAM enables the ego stay away from the age
 We compare the trajectories of (1): the ground truth ego trajectories from BEV datasets; (2): the baseline planner trajectories; (3): the DREAM planner trajectories.
 The results show that baseline planner is over aggressive as near collision with the truck rear, and our planner is more conservative but sacrifice the progress. (The selected scenario include the occlusion-aware planning from the truck-trailer that may block the visibility of the ego)
 
+## CARLA closed-loop validation with higher fidelity
+lower-density:
+![platform validation result](assets/carla_c1_driver_bev_pairs.png)
+
+higher-density (near-collision behavior from baseline):
+![platform validation result](assets/carla_c2_driver_bev_pairs.png)
+
 ## ROS2 deployment
 
 The standalone ROS 2 Humble package for arbitrary RViz-goal navigation,
