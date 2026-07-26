@@ -3,11 +3,11 @@ DREAM is an occlusion-aware, safety-critical planning framework that couples dyn
 
 Preliminary risk field modeling is based on [DRIFT](https://github.com/SAS-HKU/DRIFT.git): Dynamic Risk Inference via Field Transmission for Human-like Autonomous Driving.
 
-### proposed framework:
+### Proposed Framework:
 
 ![Methodology graph](assets/methodology.jpg)
 
-### experiment design:
+### Experiment Design:
 ![Experiment_design](assets/experiment_hierarchy.jpg)
 
 ## 🚀 Quick Start
