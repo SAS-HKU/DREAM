@@ -255,7 +255,7 @@ Corresponding paper:
 ```
 (Referenced coding package: [IDEAM](https://github.com/YimingShu-teay/IDEAM.git))
 
-#### The baseline MPC planner:
+#### The baseline SODM (MPC-CBF planner):
 Corresponding paper:
 ```
 @inproceedings{shu2023safety,
@@ -264,6 +264,7 @@ Corresponding paper:
   booktitle={2023 IEEE Intelligent Vehicles Symposium (IV)},
   pages={1--8},
   year={2023},
+  doi={10.1109/IV55152.2023.10186772},
   organization={IEEE}
 }
 ```
