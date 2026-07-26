@@ -242,7 +242,7 @@ The platform is open-sourced from
 #### The BEV dataset visualizations:
 [drone-dataset-tools](https://github.com/ika-rwth-aachen/drone-dataset-tools.git)
 
-#### The baseline IDEAM (MPC-CBF) planner:
+#### The baseline IDEAM planner:
 Corresponding paper:
 ```
 @article{shu2025agile,
@@ -254,6 +254,20 @@ Corresponding paper:
 }
 ```
 (Referenced coding package: [IDEAM](https://github.com/YimingShu-teay/IDEAM.git))
+
+#### The baseline MPC planner:
+Corresponding paper:
+```
+@inproceedings{shu2023safety,
+  title={Safety-critical decision-making and control for autonomous vehicles with highest priority},
+  author={Shu, Yiming and Zhou, Jingyuan and Zhang, Fu},
+  booktitle={2023 IEEE Intelligent Vehicles Symposium (IV)},
+  pages={1--8},
+  year={2023},
+  organization={IEEE}
+}
+```
+(Referenced coding package: [SODM](https://github.com/YimingShu-teay/SODM.git))
 
 #### The baseline Artificial Potential Field (APF) modeling:
 Corresponding paper:
