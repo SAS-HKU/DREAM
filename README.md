@@ -213,11 +213,13 @@ python uncertainty_test_DREAM.py --models DREAM IDEAM --mode batch
 ![simple snapshot for quick understanding](assets/DREAM_demo2.gif)
 demonstration of LC for emergency vehicle with safety-critical considerations ([IDEAM](https://github.com/YimingShu-teay/IDEAM.git)-based planning).
 
-![simple snapshot for quick understanding](assets/198.png)
-Compared with the baseline planner, DREAM enables the ego stay away from the agent group ahead and find the appropriate spaces with no agents around, where the risk score is minimal. However, the progress was sacrificed.
+Set 1 Experimental Snapshots across baselines and DREAM:
+![simple snapshot for quick understanding](assets/merging_s1_2.jpg)
 
-![simple snapshot for quick understanding](assets/299.png)
-The baseline planner forced the ego to perform very aggressive and dangerous overtaking (LC to the left) and nearly collide with the rear of the truck-trailer ahead. Instead, DREAM shows a more conservative planning that better aware of the risk from the truck-trailer and the uncertainty.
+Set 2 Experimental Snapshots across baselines and DREAM:
+![simple snapshot for quick understanding](assets/merging_s2.jpg)
+
+Compared with the baseline planner, DREAM enables the ego stay away from the agent group ahead and find the appropriate spaces with no agents around, where the risk score is minimal. However, the progress was sacrificed.
 
 ![simple snapshot for quick understanding](assets/inD_dream_benchmark_03-ezgif.com-video-to-gif-converter.gif)
 
