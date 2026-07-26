@@ -203,7 +203,7 @@ The platform is open-sourced from
 #### ROS2 platform:
 [agilexrobotics](https://github.com/agilexrobotics/limo_ros2_doc/blob/master/LIMO-ROS2-humble(EN).md).
 #### The baseline IDEAM planner:
-Corresponding paper:
+
 ```
 @article{shu2025agile,
   title={Agile Decision-Making and Safety-Critical Motion Planning for Emergency Autonomous Vehicles},
@@ -216,7 +216,7 @@ Corresponding paper:
 (Referenced coding package: [IDEAM](https://github.com/YimingShu-teay/IDEAM.git))
 
 #### The baseline SODM (MPC-CBF planner):
-Corresponding paper:
+
 ```
 @inproceedings{shu2023safety,
   title={Safety-critical decision-making and control for autonomous vehicles with highest priority},
@@ -231,7 +231,7 @@ Corresponding paper:
 (Referenced coding package: [SODM](https://github.com/YimingShu-teay/SODM.git))
 
 #### The baseline Artificial Potential Field (APF) modeling:
-Corresponding paper:
+
 ```
 @article{gao2025trajectory,
   title={Trajectory Planning Algorithm Considering Obstacle Risk in Dynamic Traffic Scenarios},
