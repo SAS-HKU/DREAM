@@ -227,8 +227,13 @@ The results show that baseline planner is over aggressive as near collision with
 ## ROS2 deployment
 
 The standalone ROS 2 Humble package for arbitrary RViz-goal navigation,
-LiDAR-derived occlusion risk, sudden-merger tracking, and DREAM-versus-pure-MPC
-physical A/B tests is in [`src/dream_limo`](src/dream_limo/README.md). The platform is open-sourced from [agilexrobotics](https://github.com/agilexrobotics/limo_ros2_doc/blob/master/LIMO-ROS2-humble(EN).md)
+LiDAR-derived occlusion risk, sudden-merger tracking, and the matched
+nominal/OACP-VB/DREAM comparison is in
+[`src/dream_limo`](src/dream_limo/README.md). The OACP-VB implementation,
+scientific scope, calibration utility, and timing artifact are indexed at
+[`src/dream_limo/dream_limo/OACP/`](src/dream_limo/dream_limo/OACP/README.md).
+The platform is open-sourced from
+[agilexrobotics](https://github.com/agilexrobotics/limo_ros2_doc/blob/master/LIMO-ROS2-humble(EN).md).
 
 ![platform validation result](assets/platform_result.jpg)
 

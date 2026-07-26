@@ -85,8 +85,9 @@ missing, stale, or mismatched token also revokes and clamps. An off-segment
 mismatch, planner stop, changed path,
 visible vehicle, or tightened bound revokes the certificate and clamps to
 `v_occ_min` until a new check. This is a disclosed approximation, not the
-paper's joint contingency optimizer. See [`OACP_VB.md`](OACP_VB.md) and the aggregate
-[`timing record`](benchmark_results/oacp_vb_contingency_nuc12_2026-07-25.json).
+paper's joint contingency optimizer. The OACP-VB source, scientific note,
+calibration utility, and timing record are indexed together in
+[`dream_limo/OACP/`](dream_limo/OACP/README.md).
 
 The implementation is based on upstream DREAM commit
 `0d298cd6de11c268224173a4d75770e934fd0861`; see
@@ -291,7 +292,8 @@ The publishable arms are `nominal`, `oacp_vb`, and `balanced`. They use one
 launch graph, one `dream_free_planner`, one shared LMPC-CBF configuration, and
 the same `/goal_pose` trigger. `pure_mpc` is retained only for regression
 compatibility. The OACP-VB arm is the **velocity-bound adaptation of Zheng et
-al. (2025)** documented in [`OACP_VB.md`](OACP_VB.md); it is not the published
+al. (2025)** documented with its reproducible source in
+[`dream_limo/OACP/`](dream_limo/OACP/README.md); it is not the published
 Bezier/ADMM planner.
 
 First verify OACP-VB with physical output disabled:

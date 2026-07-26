@@ -1,5 +1,30 @@
 # OACP-VB scientific implementation note
 
+## Reproducibility map
+
+This directory is the canonical, reviewer-facing location for the implemented
+OACP-VB comparison arm:
+
+| Artifact | Location | Role |
+| --- | --- | --- |
+| Numerical SRQ and velocity-bound core | [`oacp_vb.py`](oacp_vb.py) | ROS-independent implementation |
+| ROS 2 risk assessor | [`assessor_node.py`](assessor_node.py) | Occlusion/PVS assessment and status/marker publication |
+| Calibration extractor | [`calibration_cli.py`](calibration_cli.py) | Offline threshold-candidate extraction |
+| Timing evidence | [`results/oacp_vb_contingency_nuc12_2026-07-25.json`](results/oacp_vb_contingency_nuc12_2026-07-25.json) | Aggregate motion-free onboard timing record |
+| Realized design input | [`DESIGN_INPUT.md`](DESIGN_INPUT.md) | Original implementation brief and claims boundary |
+| Direct tests | [`../../test/`](../../test/) | Numerical, node, planner-contract, calibration, and MPC-hook tests |
+
+Shared vehicle dynamics, MPC, planner orchestration, safety gates, and metrics
+remain in the parent `dream_limo` package because all comparison arms use them.
+The relevant integration points are `../core/mpc.py`,
+`../free_planner_node.py`, `../free_goal_authorizer_node.py`,
+`../hardware_command_gate_node.py`, and `../metrics_node.py`. They are not
+OACP-owned copies.
+
+The historical modules `dream_limo.core.oacp_vb`,
+`dream_limo.oacp_vb_node`, and `dream_limo.oacp_calibration_cli` are thin
+compatibility wrappers. New code and reviewer instructions should use
+`dream_limo.OACP.*`.
 
 ## Primary reference and provenance
 
@@ -49,9 +74,9 @@ Zheng et al.’s method.
 
 ## Equation-to-code traceability
 
-The ROS-independent implementation is
-[`dream_limo/core/oacp_vb.py`](dream_limo/core/oacp_vb.py). Its numerical tests
-are in [`test/test_oacp_vb.py`](test/test_oacp_vb.py).
+The ROS-independent implementation is [`oacp_vb.py`](oacp_vb.py). Its
+numerical tests are in
+[`../../test/test_oacp_vb.py`](../../test/test_oacp_vb.py).
 
 | Paper element | Core symbol | Test evidence |
 | --- | --- | --- |
@@ -68,8 +93,8 @@ The scenario geometry is implemented by `build_phantom_merge_connector`,
 curved routes, disconnected shadow components, PVS collapse after reveal,
 finite conflict gating, and a positive merge-conflict case.
 
-The MPC hook is in [`dream_limo/core/mpc.py`](dream_limo/core/mpc.py) and is
-tested by [`test/test_mpc_velocity_bound.py`](test/test_mpc_velocity_bound.py).
+The shared MPC hook is in [`../core/mpc.py`](../core/mpc.py) and is tested by
+[`../../test/test_mpc_velocity_bound.py`](../../test/test_mpc_velocity_bound.py).
 `RiskAwareMPC.solve_reference`:
 
 1. caps the path-speed reference at the supplied bound;
@@ -170,21 +195,18 @@ The executed exploration solve’s median was 90.8 ms. The 1 Hz fallback check
 keeps the executed solve at 5 Hz but does not reproduce the paper’s joint
 optimization; occasional verification cycles can still exceed 200 ms. The
 independent 0.5 s command watchdog remains unchanged. The aggregate record is
-[`benchmark_results/oacp_vb_contingency_nuc12_2026-07-25.json`](benchmark_results/oacp_vb_contingency_nuc12_2026-07-25.json).
+[`results/oacp_vb_contingency_nuc12_2026-07-25.json`](results/oacp_vb_contingency_nuc12_2026-07-25.json).
 It records the dependency versions and the fact that raw per-cycle timings were
 not retained; it is timing evidence, not a fully replayable benchmark trace.
 
-The repository’s archival
-[`OA_CMPC/oa_cmpc_source.py`](../OA_CMPC/oa_cmpc_source.py) concerns the
-different work arXiv:2503.04563. Its own docstring records why that
-single-branch surrogate was withdrawn from benchmarking: it was likewise a
-method-changing adaptation. OACP-VB neither imports nor reuses it; that
-precedent is the reason this arm’s reduced scope is named and disclosed
-explicitly.
+An older single-branch source surrogate for the different work
+arXiv:2503.04563 was removed from the repository after its comparison was
+withdrawn. OACP-VB neither imports nor reuses that surrogate; that precedent is
+the reason this arm’s reduced scope is named and disclosed explicitly.
 
 ## ROS contract and readiness
 
-[`dream_limo/oacp_vb_node.py`](dream_limo/oacp_vb_node.py) consumes:
+[`assessor_node.py`](assessor_node.py) consumes:
 
 - `/dream/ego_state` (`nav_msgs/msg/Odometry`);
 - `/dream/occlusion_mask` (`nav_msgs/msg/OccupancyGrid`); and
