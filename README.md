@@ -221,7 +221,7 @@ Set 2 Experimental Snapshots across baselines and DREAM:
 
 Compared with the baseline planner, DREAM enables the ego stay away from the agent group ahead and find the appropriate spaces with no agents around, where the risk score is minimal. However, the progress was sacrificed.
 
-![simple snapshot for quick understanding](assets/inD_dream_benchmark_03-ezgif.com-video-to-gif-converter.gif)
+![simple snapshot for quick understanding](assets/inD_dream_benchmark_03-ezgif.com-video-to-gif-converter(1).gif)
 
 We compare the trajectories of (1): the ground truth ego trajectories from BEV datasets; (2): the baseline planner trajectories; (3): the DREAM planner trajectories.
 The results show that baseline planner is over aggressive as near collision with the truck rear, and our planner is more conservative but sacrifice the progress. (The selected scenario include the occlusion-aware planning from the truck-trailer that may block the visibility of the ego)
