@@ -35,5 +35,5 @@ was consulted as interpretive provenance only. No source from it is copied,
 vendored, imported, or linked as a build/runtime dependency. That snapshot
 contains no `LICENSE`/`COPYING` file, is not linked from the paper or project
 page, and predates arXiv v2; this project therefore treats it as an unlicensed
-review artifact rather than an official code release. See `OACP_VB.md` for the
-adaptation and claims boundary.
+review artifact rather than an official code release. See
+`dream_limo/OACP/README.md` for the adaptation and claims boundary.

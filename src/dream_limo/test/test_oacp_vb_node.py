@@ -6,10 +6,10 @@ import numpy as np
 import pytest
 from std_msgs.msg import String
 
-from dream_limo.core.oacp_vb import OACPVBConfig
+from dream_limo.OACP.oacp_vb import OACPVBConfig
 from dream_limo.core.types import EgoState
 from dream_limo.limo_scale import deployment_config_for_arena
-from dream_limo.oacp_vb_node import (
+from dream_limo.OACP.assessor_node import (
     GEOMETRY_ASSUMPTION,
     GridContract,
     OACPVBNode,

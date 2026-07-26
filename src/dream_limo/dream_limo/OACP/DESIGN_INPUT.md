@@ -1,17 +1,17 @@
-# LIMO ROS2 Agent Prompt: OACP Baseline (occlusion-aware contingency planning)
+# OACP-VB ROS 2 design input
 
 > **IMPLEMENTATION STATUS:** The selectable baseline delivered in this
 > repository is documented in
-> [`dream_limo/OACP_VB.md`](dream_limo/OACP_VB.md). It is explicitly named
+> [`README.md`](README.md). It is explicitly named
 > **OACP-VB (velocity-bound adaptation of Zheng et al., 2025)** and does not
 > claim to reproduce the paper's Bezier/consensus-ADMM planner. This prompt is
 > retained as the design input; the implementation document records the
 > realized architecture, tests, timing, and deviations.
 
-Companion to `DREAM_LIMO_ROS_AGENT_PROMPT.md`. This is a **baseline arm**, not a new
-system. The LIMO already runs DREAM (DRIFT PDE risk field → decision veto + risk cost +
-CBF modulation) on top of the IDEAM LMPC. Here you keep that MPC stack and swap **only
-the occlusion-risk mechanism** for the one published in:
+This is a **baseline arm**, not a new system. The LIMO already runs DREAM
+(DRIFT PDE risk field → decision veto + risk cost + CBF modulation) on top of
+the IDEAM LMPC. Here you keep that MPC stack and swap **only the
+occlusion-risk mechanism** for the one published in:
 
 > L. Zheng, R. Yang, M. Zheng, Z. Peng, M. Y. Wang, J. Ma,
 > "Occlusion-Aware Contingency Safety-Critical Planning for Autonomous Driving,"
@@ -304,12 +304,11 @@ Consequences you must respect:
   - Do not attribute the arm's performance to the published method. Efficiency claims in
     particular are not transferable: the paper's headline result (30.17% faster traversal
     than ST-RHC) comes from the contingency NLP, which you are approximating.
-  - PRECEDENT: the development repo already contains
-    `OA_CMPC/oa_cmpc_source.py`, an adapter for a DIFFERENT paper (arXiv:2503.04563)
-    that was WITHDRAWN from the benchmark for exactly this class of adaptation. Read its
-    docstring before you write any claim — it states the standard this project holds
-    itself to: "a method-changing adaptation, not a performance-neutral implementation
-    detail."
+  - PRECEDENT: an earlier development snapshot contained a single-branch adapter for a
+    DIFFERENT paper (arXiv:2503.04563). That adapter was WITHDRAWN from the benchmark
+    for exactly this class of adaptation and has since been removed. Preserve the same
+    claims boundary: this is "a method-changing adaptation, not a performance-neutral
+    implementation detail."
   - If the paper's authors' own code becomes available, prefer porting it over this
     adaptation, and say which was used.
 

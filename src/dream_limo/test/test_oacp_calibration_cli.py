@@ -1,6 +1,6 @@
 import pytest
 
-from dream_limo.oacp_calibration_cli import (
+from dream_limo.OACP.calibration_cli import (
     extract_calibration_samples,
     summarize_calibration,
 )

@@ -4,7 +4,7 @@ from math import isclose
 import numpy as np
 import pytest
 
-from dream_limo.core.oacp_vb import (
+from dream_limo.OACP.oacp_vb import (
     ContingencyBranch,
     OACPVBConfig,
     PVSComponent,

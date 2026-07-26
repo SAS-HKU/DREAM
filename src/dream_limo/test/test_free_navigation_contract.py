@@ -314,7 +314,7 @@ def test_free_navigation_entry_points_and_rviz_goal_contract_are_installed():
         "dream_merger_cue",
     ):
         assert executable in setup
-    assert "dream_limo.oacp_vb_node:main" in setup
+    assert "dream_limo.OACP.assessor_node:main" in setup
     rviz = (
         root / "rviz" / "dream_free_navigation.rviz"
     ).read_text(encoding="utf-8")
