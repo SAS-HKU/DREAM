@@ -200,7 +200,7 @@ The platform is open-sourced from
 ## Acknowledgement:
 #### The BEV dataset visualizations:
 [drone-dataset-tools](https://github.com/ika-rwth-aachen/drone-dataset-tools.git)
-### ROS2 platform:
+#### ROS2 platform:
 [agilexrobotics](https://github.com/agilexrobotics/limo_ros2_doc/blob/master/LIMO-ROS2-humble(EN).md).
 #### The baseline IDEAM planner:
 Corresponding paper:
