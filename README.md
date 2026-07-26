@@ -7,6 +7,8 @@ Preliminary risk field modeling is based on [DRIFT](https://github.com/SAS-HKU/D
 
 ![Methodology graph](assets/methodology.jpg)
 
+### experiment design:
+![Experiment_design](assets/experiment_hierarchy.jpg)
 
 ## 🚀 Quick Start
 
